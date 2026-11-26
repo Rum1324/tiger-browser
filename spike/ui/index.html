@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Tiger spike</title>
+<style>
+  :root {
+    --bg: #f4f4f5; --panel: #ffffff; --line: #d4d4d8; --text: #18181b; --muted: #71717a;
+    --accent: #2563eb; --pass: #16a34a; --fail: #dc2626; --skip: #a16207; --tab: #e4e4e7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "IPAGothic", "Yu Gothic UI", sans-serif; overflow: hidden; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 8px; color: var(--text); }
+  button:hover { background: #f0f0f2; }
+  button:disabled { opacity: .4; cursor: default; }
+  /* Top area: must total 76px (TOP_H in main.js) */
+  #tabstrip { height: 34px; display: flex; align-items: flex-end; gap: 2px; padding: 0 6px; background: #d9d9de; overflow-x: auto; overflow-y: hidden; white-space: nowrap; }
+  .tab { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; min-width: 90px; height: 28px; padding: 0 8px; border-radius: 7px 7px 0 0; background: var(--tab); cursor: default; flex: 0 1 auto; }
+  .tab.active { background: var(--bg); }
+  .tab .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .tab .x { border: 0; background: transparent; padding: 0 4px; color: var(--muted); }
+  .tab.blocked .t { color: var(--fail); font-weight: 600; }
+  .tab .spin { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; visibility: hidden; }
+  .tab.loading .spin { visibility: visible; }
+  #newtab { border: 0; background: transparent; font-size: 18px; padding: 0 8px; height: 28px; }
+  #toolbar { height: 42px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+  #toolbar button.nav { width: 30px; height: 28px; padding: 0; font-size: 15px; }
+  #address { flex: 1; height: 28px; border: 1px solid var(--line); border-radius: 14px; padding: 0 12px; font: inherit; background: #fff; }
+  #uabadge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #e0e7ff; color: #3730a3; white-space: nowrap; }
+  #panelToggle { white-space: nowrap; }
+  /* Checklist panel on the right; the page views are placed to its left by main.js */
+  #panel { position: absolute; top: 76px; right: 0; bottom: 0; width: 420px; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 10px 12px 40px; }
+  #panel.hidden { display: none; }
+  #empty { position: absolute; top: 76px; left: 0; right: 420px; bottom: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  h2 { font-size: 14px; margin: 4px 0 6px; }
+  .envline { color: var(--muted); font-size: 11px; word-break: break-all; }
+  .check { border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; margin: 6px 0; }
+  .check.pass { border-color: var(--pass); background: #f0fdf4; }
+  .check.fail { border-color: var(--fail); background: #fef2f2; }
+  .check.skip { border-color: #e7c66b; background: #fefce8; }
+  .row { display: flex; align-items: center; gap: 4px; }
+  .label { flex: 1; font-weight: 600; }
+  .label .en { font-weight: 400; color: var(--muted); }
+  .hint { color: var(--muted); font-size: 11px; margin: 3px 0; }
+  .auto { color: var(--fail); font-size: 11px; word-break: break-all; }
+  .btn-pass.on { background: var(--pass); color: #fff; border-color: var(--pass); }
+  .btn-fail.on { background: var(--fail); color: #fff; border-color: var(--fail); }
+  .btn-skip.on { background: var(--skip); color: #fff; border-color: var(--skip); }
+  textarea { width: 100%; min-height: 26px; height: 26px; resize: vertical; font: inherit; font-size: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; margin-top: 4px; }
+  #report { margin-top: 12px; padding: 8px; border-radius: 8px; background: #f8fafc; border: 1px solid var(--line); }
+  #report code { font-size: 11px; word-break: break-all; }
+  #log { font: 11px/1.35 ui-monospace, Menlo, monospace; color: #3f3f46; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow-y: auto; background: #fafafa; border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
+</style>
+</head>
+<body>
+  <div id="tabstrip"><span id="tabs"></span><button id="newtab" title="新しいタブ (New tab)">+</button></div>
+  <div id="toolbar">
+    <button class="nav" id="back" title="戻る (Back)">&#8592;</button>
+    <button class="nav" id="forward" title="進む (Forward)">&#8594;</button>
+    <button class="nav" id="reload" title="再読み込み (Reload)">&#8635;</button>
+    <input id="address" spellcheck="false" placeholder="URL または検索語 (URL or search)">
+    <span id="uabadge"></span>
+    <button id="panelToggle">チェックリスト (Checklist)</button>
+  </div>
+  <div id="empty">タブがありません (No tabs). 右のチェックリストの「開く」を押してください。</div>
+  <div id="panel">
+    <h2>確認チェックリスト (Checklist)</h2>
+    <div class="envline" id="env"></div>
+    <div id="checks"></div>
+    <div id="report">
+      <h2>結果ファイル (Report files)</h2>
+      <div>自動保存されます (saved automatically). このファイルを送ってください (send this file back):</div>
+      <div><code id="mdpath"></code></div>
+      <div><code id="jsonpath"></code></div>
+      <div class="row" style="margin-top:6px">
+        <button id="copy">Markdown をコピー (Copy)</button>
+        <button id="reveal">Finder で表示 (Reveal)</button>
+        <span id="savedmsg" class="hint"></span>
+      </div>
+    </div>
+    <h2 style="margin-top:12px">ログ (Event log)</h2>
+    <div id="log"></div>
+  </div>
+<script src="renderer.js"></script>
+</body>
+</html>
