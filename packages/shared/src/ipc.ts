@@ -33,7 +33,10 @@ export const Tab = z.object({
 })
 export type Tab = z.infer<typeof Tab>
 
+/** Tab state is per window. Every tab of a private window is private. */
 export const TabsState = z.object({
+  windowId: z.string(),
+  privateWindow: z.boolean(),
   tabs: z.array(Tab),
   activeTabId: z.string().nullable(),
 })
@@ -130,8 +133,29 @@ export const GoogleConnection = z.object({
 })
 export type GoogleConnection = z.infer<typeof GoogleConnection>
 
+/** Site permissions the engine asks the member about. Everything else is denied without asking. */
+export const SitePermission = z.enum([
+  'notifications',
+  'camera',
+  'microphone',
+  'camera-and-microphone',
+  'geolocation',
+  'clipboard-read',
+  'screen-capture',
+])
+export type SitePermission = z.infer<typeof SitePermission>
+
+export const PermissionRequest = z.object({
+  requestId: z.string(),
+  tabId: z.string(),
+  origin: z.string(),
+  permission: SitePermission,
+})
+export type PermissionRequest = z.infer<typeof PermissionRequest>
+
 export const ShortcutAction = z.enum([
   'new-tab',
+  'new-window',
   'new-private-window',
   'close-tab',
   'reopen-closed-tab',
@@ -166,7 +190,6 @@ export const engineCommands = {
       input: z.string().optional(),
       active: z.boolean().optional(),
       spaceId: z.string().nullable().optional(),
-      private: z.boolean().optional(),
     }),
     Tab,
   ),
@@ -209,9 +232,18 @@ export const engineCommands = {
 
   /**
    * The UI layer that can draw above the page (command palette, menus, sheets). While open, the
-   * engine raises it over the page view and gives it input; closed, it is out of the view tree.
+   * engine raises it over the page view and gives it input; closed, it is hidden and the page gets
+   * every click. The layer takes all pointer input inside its bounds, transparent pixels included,
+   * so `bounds: null` (the whole window) is for modal surfaces where a click outside dismisses,
+   * and a tight rectangle is for anything the page must stay clickable around.
    */
-  'overlay.setOpen': cmd(z.object({ open: z.boolean() }), Void),
+  'overlay.setOpen': cmd(z.object({ open: z.boolean(), bounds: Rect.nullable().optional() }), Void),
+
+  /** Answer a `permission.request` event. `remember` stores the decision for that origin. */
+  'permission.respond': cmd(
+    z.object({ requestId: z.string(), allow: z.boolean(), remember: z.boolean() }),
+    Void,
+  ),
 
   'suggest.query': cmd(z.object({ input: z.string().max(2000) }), z.array(Suggestion)),
 
@@ -267,6 +299,8 @@ export const engineCommands = {
   ),
   'clipboard.writeText': cmd(z.object({ text: z.string() }), Void),
 
+  /** Open another window. A private window uses a fresh in-memory session that dies with it. */
+  'window.create': cmd(z.object({ private: z.boolean().optional() }), Void),
   'window.action': cmd(
     z.object({ action: z.enum(['minimize', 'toggle-maximize', 'close', 'toggle-fullscreen']) }),
     Void,
@@ -297,6 +331,8 @@ export const engineEvents = {
     maximized: z.boolean(),
   }),
   'google.changed': GoogleConnection,
+  /** A site asked for a permission; the UI shows the prompt and answers with `permission.respond`. */
+  'permission.request': PermissionRequest,
 } as const
 
 export type EngineEventName = keyof typeof engineEvents

@@ -198,8 +198,10 @@ export const Citation = z.object({
   sourceType: SourceType,
   sharedBy: UserRef,
   sharedAt: IsoDate,
-  /** The passage the answer relied on. */
+  /** The passage the answer relied on. Emptied when the item is unshared. */
   quote: z.string().max(600),
+  /** False once the item has been unshared: the chip stays, its content is gone. */
+  available: z.boolean(),
 })
 export type Citation = z.infer<typeof Citation>
 
