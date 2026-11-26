@@ -22,6 +22,12 @@ const en = {
   captureBlocked: 'Capture refused',
   privateWindow: 'Private window',
   untitled: 'Untitled',
+  googleSignIn: 'Google sign-in',
+  googleConnect: 'Connect Google Drive',
+  googleDisconnect: 'Disconnect',
+  googleExport: 'Export to Google Docs',
+  googleNotConfigured: 'Google is not configured',
+  googleNotConnected: 'Google Drive is not connected',
 }
 
 export type Strings = typeof en
@@ -50,6 +56,12 @@ const ja: Strings = {
   captureBlocked: 'キャプチャできません',
   privateWindow: 'プライベートウィンドウ',
   untitled: '無題',
+  googleSignIn: 'Google でサインイン',
+  googleConnect: 'Google ドライブに接続',
+  googleDisconnect: '接続を解除',
+  googleExport: 'Google ドキュメントに書き出す',
+  googleNotConfigured: 'Google は設定されていません',
+  googleNotConnected: 'Google ドライブに接続していません',
 }
 
 export function strings(locale: 'ja' | 'en'): Strings {

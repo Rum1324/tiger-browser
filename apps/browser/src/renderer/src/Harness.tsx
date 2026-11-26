@@ -7,6 +7,7 @@ import type {
   TabsState,
 } from '@tiger/shared'
 import { type FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { GooglePanel } from './GooglePanel'
 import { strings } from './i18n'
 
 const tiger = window.tiger
@@ -215,6 +216,7 @@ export function Harness() {
               </pre>
             )
           ) : null}
+          <GooglePanel t={t} markdown={capture?.ok ? capture.page.markdown : null} />
           {downloads.length ? (
             <div>
               <strong>{t.downloads}</strong>

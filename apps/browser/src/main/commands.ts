@@ -1,12 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type {
-  EngineCommandName,
-  EngineRequest,
-  EngineResponse,
-  GoogleConnection,
-  Settings,
-} from '@tiger/shared'
+import type { EngineCommandName, EngineRequest, EngineResponse, Settings } from '@tiger/shared'
 import { app, clipboard, dialog } from 'electron'
 import type { Engine } from './engine'
 import { env } from './env'
@@ -26,9 +20,6 @@ type Handler<K extends EngineCommandName> = (
 
 /** One handler per contract command; a missing one is a compile error. */
 export type Handlers = { [K in EngineCommandName]: Handler<K> }
-
-/** Google account features are built later; until then the engine reports them as unavailable. */
-const GOOGLE_UNCONFIGURED: GoogleConnection = { connected: false, email: null, configured: false }
 
 export function createHandlers(engine: Engine): Handlers {
   const resolve = (input: string) => resolveInput(input, engine.settings.get().searchEngine)
@@ -157,12 +148,12 @@ export function createHandlers(engine: Engine): Handlers {
 
     'auth.getToken': () => engine.tokens.get(),
     'auth.setToken': (req) => engine.tokens.set(req.token),
-    'auth.googleSignIn': () => null,
+    'auth.googleSignIn': () => engine.google.signIn(),
 
-    'google.status': () => GOOGLE_UNCONFIGURED,
-    'google.connect': () => GOOGLE_UNCONFIGURED,
-    'google.disconnect': () => GOOGLE_UNCONFIGURED,
-    'google.exportDoc': () => ({ ok: false, error: 'not-configured', detail: null }),
+    'google.status': () => engine.google.status(),
+    'google.connect': () => engine.google.connect(),
+    'google.disconnect': () => engine.google.disconnect(),
+    'google.exportDoc': (req) => engine.google.exportDoc(req),
 
     'export.saveFile': async (req, win) => {
       const name = `${safeFileName(req.suggestedName).replace(/\.(md|txt)$/i, '')}.${req.extension}`

@@ -14,6 +14,8 @@ export interface LaunchOptions {
   downloadsDir?: string
   /** Extra Chromium switches, e.g. host resolver rules. */
   args?: string[]
+  /** Extra environment variables for the app process. */
+  env?: Record<string, string>
 }
 
 export interface TigerApp {
@@ -77,6 +79,7 @@ export async function launch(opts: LaunchOptions): Promise<TigerApp> {
       TIGER_USER_DATA_DIR: opts.userDataDir,
       TIGER_DOWNLOADS_DIR: opts.downloadsDir ?? join(opts.userDataDir, 'Downloads'),
       ELECTRON_RENDERER_URL: '',
+      ...opts.env,
     },
     timeout: 30_000,
   })

@@ -12,9 +12,11 @@ import {
   type IpcMainEvent,
   type IpcMainInvokeEvent,
   ipcMain,
+  net,
   type Session,
   safeStorage,
   session,
+  shell,
   type WebContents,
   type WebPreferences,
   webContents,
@@ -24,6 +26,8 @@ import { TAB_CAPTURE_REQUEST, TAB_CAPTURE_RESULT, TAB_NOTIFICATION_STATE } from 
 import { createHandlers, type Handlers } from './commands'
 import { DownloadManager } from './downloads'
 import { devServerUrl, env } from './env'
+import { fetchingOpener, googleConfigFromEnv, wantsFetchOpener } from './google/config'
+import { GoogleService } from './google/service'
 import { checkEvent, checkResponse, isTrustedSender, parseInvoke } from './ipc-validate'
 import { PermissionBroker } from './permission-broker'
 import { checkPermission, policyForRequest, webOrigin } from './permission-policy'
@@ -39,7 +43,7 @@ import {
 } from './store/permissions'
 import { SessionRestoreStore } from './store/session-restore'
 import { defaultSettings, SettingsStore } from './store/settings'
-import { TokenStore } from './store/token'
+import { type Cipher, TokenStore } from './store/token'
 import type { TabController } from './tab'
 import { chromeLikeUserAgent } from './user-agent'
 import { EngineWindow } from './window'
@@ -77,6 +81,7 @@ export class Engine {
   readonly settings: SettingsStore
   readonly sessionRestore: SessionRestoreStore
   readonly tokens: TokenStore
+  readonly google: GoogleService
   readonly broker: PermissionBroker
   readonly downloads: DownloadManager
   readonly uiSession: Session
@@ -95,11 +100,13 @@ export class Engine {
     this.settings = new SettingsStore(this.kv, defaultSettings(app.getLocale(), env.serverUrl))
     this.sessionRestore = new SessionRestoreStore(this.kv)
     this.persistentDecisions = new PermissionStore(db)
-    this.tokens = new TokenStore(this.kv, {
+    const cipher: Cipher = {
       isAvailable: () => safeStorage.isAsyncEncryptionAvailable(),
       encrypt: (plain) => safeStorage.encryptStringAsync(plain),
       decrypt: async (sealed) => (await safeStorage.decryptStringAsync(sealed)).result,
-    })
+    }
+    this.tokens = new TokenStore(this.kv, cipher)
+    this.google = this.createGoogle(cipher)
     this.broker = new PermissionBroker((windowId, request) => {
       this.windows.get(windowId)?.emit('permission.request', request)
     })
@@ -117,6 +124,24 @@ export class Engine {
 
     this.handlers = createHandlers(this)
     this.wireIpc()
+  }
+
+  private createGoogle(cipher: Cipher): GoogleService {
+    // Endpoint overrides and the fetching opener exist for tests; a packaged build ignores them.
+    const overrides = { allowOverrides: !app.isPackaged }
+    // Chromium's network stack: system proxy settings apply, and no cookies are sent.
+    const fetchImpl = (input: string, init?: RequestInit) =>
+      net.fetch(input, { ...init, credentials: 'omit' })
+    return new GoogleService({
+      config: googleConfigFromEnv(process.env, overrides),
+      store: new TokenStore(this.kv, cipher, 'google.account'),
+      fetch: fetchImpl,
+      openBrowser: wantsFetchOpener(process.env, overrides)
+        ? fetchingOpener(fetchImpl)
+        : (url) => shell.openExternal(url),
+      onChange: (connection) => this.broadcast('google.changed', connection),
+      log: (message) => console.warn(message),
+    })
   }
 
   // ── Web preferences ──────────────────────────────────────────────────────
