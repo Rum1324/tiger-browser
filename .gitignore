@@ -1,0 +1,21 @@
+node_modules/
+dist/
+out/
+release/
+.vite/
+*.tsbuildinfo
+coverage/
+test-results/
+playwright-report/
+
+# secrets never enter the repo
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# local data
+.data/
+*.log
+.DS_Store
