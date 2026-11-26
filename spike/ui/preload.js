@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('spike', {
   reload: () => ipcRenderer.send('nav:reload'),
   openCheck: (id) => ipcRenderer.send('check:open', id),
   setCheck: (id, patch) => ipcRenderer.send('check:set', id, patch),
+  exportTest: () => ipcRenderer.invoke('check:exportTest'),
   saveReport: () => ipcRenderer.invoke('report:save'),
   copyReport: () => ipcRenderer.invoke('report:copy'),
   revealReport: () => ipcRenderer.send('report:reveal'),

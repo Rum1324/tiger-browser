@@ -10,6 +10,19 @@ const http = require('node:http');
 const { SMOKE_TARGETS } = require('./checks');
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+// Some Electron calls (capturePage, executeJavaScript) can hang; never let one stall the run.
+const withTimeout = (p, ms, fallback = null) => Promise.race([Promise.resolve(p).catch(() => fallback), sleep(ms).then(() => fallback)]);
+async function savePng(file, capturePromise) {
+  const img = await withTimeout(capturePromise, 8000);
+  if (img && !img.isEmpty()) { fs.writeFileSync(file, img.toPNG()); return true; }
+  console.log('[smoke] screenshot failed/empty:', path.basename(file));
+  return false;
+}
+// Whole-screen grab (UI + page view composited) when running under X (Linux/xvfb) and ImageMagick exists.
+function screenGrab(file) {
+  if (process.platform !== 'linux' || !process.env.DISPLAY) return;
+  try { require('node:child_process').execFileSync('import', ['-window', 'root', file], { timeout: 10000 }); } catch { /* optional */ }
+}
 
 function startLocalServer(captured) {
   // Local pages: header echo (what UA / client hints we actually send) and a window.opener test.
@@ -46,7 +59,7 @@ function waitForStop(wc, timeoutMs) {
 async function visit(ctx, target, outDir, results) {
   const { createTab, closeTab, scanTab, tabs } = ctx;
   const tab = createTab(null, { checkId: null });
-  const wc = tab.view.webContents;
+  const wc = tab.wc;
   if (target.ua) wc.setUserAgent(target.ua);
   const navs = [];
   wc.on('did-navigate', (_e, url, code) => navs.push({ url, code }));
@@ -56,19 +69,43 @@ async function visit(ctx, target, outDir, results) {
   wc.loadURL(target.url).catch(() => {});
   const how = await stopP;
   await sleep(target.settleMs || 7000); // SPAs (Notion, Slack, M365) render after load
-  let block = await scanTab(tab);
+  if (target.click) {
+    const clicked = await withTimeout(wc.executeJavaScript(`(() => {
+      const re = new RegExp(${JSON.stringify(target.click)}, 'i');
+      const els = [...document.querySelectorAll('button, a, [role=button], div[tabindex]')];
+      const el = els.find(e => re.test((e.innerText || e.getAttribute('aria-label') || '').trim()));
+      if (!el) return null;
+      el.click();
+      return (el.innerText || el.getAttribute('aria-label') || '').trim();
+    })()`, true), 5000);
+    console.log('[smoke]   clicked:', JSON.stringify(clicked));
+    await sleep(9000);
+    // Record every other tab (popups) the click produced.
+    const popups = [];
+    for (const other of tabs.values()) {
+      if (other.id === tab.id || other.destroyed) continue;
+      const pb = await withTimeout(scanTab(other), 5000);
+      const ppng = path.join(outDir, `${target.id}-popup-${other.id}.png`);
+      await savePng(ppng, other.wc.capturePage());
+      popups.push({ url: other.wc.getURL(), title: other.wc.getTitle(), httpStatus: other.status, block: pb || other.block, opener: other.openerId === tab.id });
+      console.log(`[smoke]   popup tab: ${other.status} ${other.wc.getURL().slice(0, 140)} | ${other.wc.getTitle()} | block=${(pb || other.block || {}).id || '-'}`);
+    }
+    target._clickResult = { clicked, popups };
+  }
+  let block = await withTimeout(scanTab(tab), 5000);
   if (!block) block = tab.block;
   let text = '';
-  try { text = await wc.executeJavaScript('document.body ? document.body.innerText.replace(/\\s+/g," ").slice(0, 400) : ""'); } catch { /* ignore */ }
+  text = (await withTimeout(wc.executeJavaScript('document.body ? document.body.innerText.replace(/\\s+/g," ").slice(0, 400) : ""'), 5000)) || '';
+  const notificationPermission = await withTimeout(wc.executeJavaScript('typeof Notification !== "undefined" ? Notification.permission : null'), 3000);
   const png = path.join(outDir, `${target.id}.png`);
-  try { fs.writeFileSync(png, (await wc.capturePage()).toPNG()); } catch (e) { console.error('capture failed', e.message); }
+  await savePng(png, wc.capturePage());
   const r = {
     id: target.id, requested: target.url, finalUrl: wc.getURL(), title: wc.getTitle(), httpStatus: tab.status,
     navigations: navs, load: how, ms: Date.now() - started,
     block: block ? { id: block.id, hard: block.hard, match: block.match } : null,
     expectBlock: target.expectBlock || null,
     selftestOk: target.expectBlock ? !!(block && block.id === target.expectBlock) : undefined,
-    uaOverride: target.ua || null, textStart: text, screenshot: path.relative(path.dirname(outDir), png),
+    uaOverride: target.ua || null, notificationPermission, click: target._clickResult || null, textStart: text, screenshot: path.relative(path.dirname(outDir), png),
   };
   results.push(r);
   console.log(`[smoke] ${r.id}: ${r.httpStatus} ${r.finalUrl.slice(0, 120)} | ${r.title} | block=${r.block ? r.block.id : '-'}`);
@@ -87,13 +124,13 @@ async function run(ctx) {
     // 1. headers actually sent + navigator properties
     let t = await visit(ctx, { id: 'local-header-echo', url: `${base}/echo`, settleMs: 1500 }, outDir, results);
     try {
-      results[results.length - 1].navigator = await t.view.webContents.executeJavaScript(`(async () => ({
+      results[results.length - 1].navigator = await withTimeout(t.wc.executeJavaScript(`(async () => ({
         userAgent: navigator.userAgent, webdriver: navigator.webdriver,
         brands: navigator.userAgentData && navigator.userAgentData.brands,
         windowChromeKeys: window.chrome ? Object.keys(window.chrome) : null,
         platformAuthenticator: window.PublicKeyCredential ? await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable() : null,
         notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : null,
-        languages: navigator.languages }))()`);
+        languages: navigator.languages }))()`), 5000);
     } catch { /* ignore */ }
     results[results.length - 1].headersReceived = captured.slice();
     closeTab(t.id);
@@ -104,17 +141,20 @@ async function run(ctx) {
     const r = results[results.length - 1];
     r.tabsAfterOpen = tabs.size; r.tabsBefore = before;
     await sleep(2500);
-    r.titleAfterPopup = t.view.webContents.getTitle();
+    r.titleAfterPopup = t.wc.getTitle();
     r.tabsAfterPopupClosed = tabs.size;
-    try { fs.writeFileSync(path.join(outDir, 'window-with-ui.png'), (await win.capturePage()).toPNG()); } catch { /* ignore */ }
+    await savePng(path.join(outDir, 'window-ui-only.png'), win.webContents.capturePage());
+    screenGrab(path.join(outDir, 'screen-opener.png'));
     closeTab(t.id);
 
     // 3. real services
-    for (const target of SMOKE_TARGETS) {
+    const only = process.env.SMOKE_ONLY ? new RegExp(process.env.SMOKE_ONLY) : null; // e.g. SMOKE_ONLY=notion
+    for (const target of SMOKE_TARGETS.filter(t => !only || only.test(t.id))) {
       const tab = await visit(ctx, target, outDir, results);
       if (target.id === 'google-signin') {
-        try { fs.writeFileSync(path.join(outDir, 'window-with-ui-google.png'), (await win.capturePage()).toPNG()); } catch { /* ignore */ }
+        screenGrab(path.join(outDir, 'screen-google-signin.png'));
       }
+      if (target.id === 'slack-signin' || target.id === 'notion-login' || target.id === 'm365-word') screenGrab(path.join(outDir, `screen-${target.id}.png`));
       closeTab(tab.id);
       // close leftover popups
       for (const id of [...tabs.keys()]) closeTab(id);

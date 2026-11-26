@@ -18,11 +18,6 @@ const PARTITION = 'persist:tiger-spike';
 const TOP_H = 76;      // tab strip + toolbar height in the chrome UI (keep in sync with ui/index.html)
 const PANEL_W = 420;   // checklist panel width
 
-// Chromium refuses to start as root without --no-sandbox (only relevant in Linux containers).
-if (process.platform === 'linux' && typeof process.getuid === 'function' && process.getuid() === 0) {
-  app.commandLine.appendSwitch('no-sandbox');
-}
-
 // One profile per UA mode, so an A/B run is not polluted by cookies from the other mode.
 if (SMOKE && process.env.SPIKE_SMOKE_PROFILE) {
   app.setPath('userData', process.env.SPIKE_SMOKE_PROFILE);
@@ -152,7 +147,7 @@ function changed() {
 }
 function snapshot() {
   const t = tabs.get(activeId);
-  const nh = t && !t.view.webContents.isDestroyed() ? t.view.webContents.navigationHistory : null;
+  const nh = t && !t.destroyed && !t.wc.isDestroyed() ? t.wc.navigationHistory : null;
   return {
     uaMode: UA_MODE, env, reportPaths, panelVisible,
     activeId,
@@ -178,7 +173,8 @@ function layout() {
 
 function webPrefs() {
   // Tabs run untrusted web content: no Node, isolated, sandboxed, persistent partition.
-  return { partition: PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: true };
+  return { partition: PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: true,
+    preload: path.join(SPIKE_DIR, 'ui', 'tab-preload.js') }; // only fixes Notification.permission, see that file
 }
 
 function createTab(url, opts = {}) {
@@ -187,14 +183,14 @@ function createTab(url, opts = {}) {
     ? new WebContentsView({ webPreferences: opts.adopt.webPreferences, webContents: opts.adopt.webContents })
     : new WebContentsView({ webPreferences: webPrefs() });
   view.setBackgroundColor('#ffffff');
-  const tab = { id, view, url: url || '', title: '新しいタブ', loading: false, checkId: opts.checkId || null, status: null, block: null, openerId: opts.openerId || null };
+  const tab = { id, view, wc: view.webContents, destroyed: false, url: url || '', title: '新しいタブ', loading: false, checkId: opts.checkId || null, status: null, block: null, openerId: opts.openerId || null };
   tabs.set(id, tab);
   win.contentView.addChildView(view);
   wireTab(tab);
   activeId = id;
   layout();
-  if (url) view.webContents.loadURL(url).catch(err => logEvent('load-error', { tab: id, url, error: String(err.message || err) }));
-  view.webContents.focus();
+  if (url) tab.wc.loadURL(url).catch(err => logEvent('load-error', { tab: id, url, error: String(err.message || err) }));
+  tab.wc.focus();
   changed();
   return tab;
 }
@@ -204,7 +200,9 @@ function closeTab(id) {
   if (!t) return;
   tabs.delete(id);
   try { win.contentView.removeChildView(t.view); } catch { /* window gone */ }
-  if (!t.view.webContents.isDestroyed()) t.view.webContents.close();
+  // Never read t.view.webContents here: in Electron 45 that getter hangs the main process once an
+  // adopted popup webContents has been destroyed (found by the smoke run). Use our own t.wc ref.
+  if (!t.destroyed && !t.wc.isDestroyed()) t.wc.close();
   if (activeId === id) {
     const rest = [...tabs.keys()];
     activeId = t.openerId && tabs.has(t.openerId) ? t.openerId : (rest.length ? rest[rest.length - 1] : null);
@@ -217,12 +215,12 @@ function activate(id) {
   if (!tabs.has(id)) return;
   activeId = id;
   layout();
-  tabs.get(id).view.webContents.focus();
+  tabs.get(id).wc.focus();
   changed();
 }
 
 function wireTab(tab) {
-  const wc = tab.view.webContents; // UA comes from the session (setupSession), popups included
+  const wc = tab.wc; // UA comes from the session (setupSession), popups included
 
   // window.open / target=_blank -> new tab. We return action 'allow' with createWindow so the new
   // tab keeps window.opener: OAuth popups ("Continue with Google" in Notion/Slack, M365, Google
@@ -232,7 +230,7 @@ function wireTab(tab) {
     return {
       action: 'allow',
       outlivesOpener: true,
-      createWindow: (options) => createTab(null, { adopt: options, checkId: tab.checkId, openerId: tab.id }).view.webContents,
+      createWindow: (options) => createTab(null, { adopt: options, checkId: tab.checkId, openerId: tab.id }).wc,
     };
   });
   wc.on('did-start-loading', () => { tab.loading = true; changed(); });
@@ -248,7 +246,9 @@ function wireTab(tab) {
     if (isMain && code !== -3) logEvent('load-failed', { tab: tab.id, url, code, desc });
   });
   wc.on('render-process-gone', (_e, d) => logEvent('renderer-gone', { tab: tab.id, url: tab.url, reason: d.reason }));
-  wc.on('destroyed', () => { if (tabs.has(tab.id)) closeTab(tab.id); }); // page called window.close()
+  // A page calling window.close() destroys its webContents. Remove the tab on the next tick:
+  // touching the view synchronously inside 'destroyed' can wedge the main process.
+  wc.on('destroyed', () => { tab.destroyed = true; setImmediate(() => { if (tabs.has(tab.id)) closeTab(tab.id); }); });
   wc.on('before-input-event', (e, input) => {
     // Cmd/Ctrl+L focuses the address bar even when the page has focus.
     if (input.type === 'keyDown' && (input.meta || input.control) && input.key.toLowerCase() === 'l') {
@@ -278,8 +278,8 @@ async function captureNavigatorOnce(wc) {
 }
 
 async function scanTab(tab) {
-  const wc = tab.view.webContents;
-  if (wc.isDestroyed() || !tab.url.startsWith('http')) return null;
+  const wc = tab.wc;
+  if (tab.destroyed || wc.isDestroyed() || !tab.url.startsWith('http')) return null;
   let text = '';
   try { text = await wc.executeJavaScript('document.body ? document.body.innerText.slice(0, 30000) : ""', true); } catch { return null; }
   const hit = detectBlock(wc.getURL(), text);
@@ -308,7 +308,11 @@ function normalizeUrl(input) {
 }
 
 // ---------------------------------------------------------------- session: downloads, permissions, Firefox UA
-const permissionDecisions = new Map();
+const permissionDecisions = new Map(); // "origin permission" -> boolean (persisted in state.permissions)
+ipcMain.on('perm:notifications', (e, origin) => {
+  const d = permissionDecisions.get(origin + ' notifications');
+  e.returnValue = d === undefined ? 'default' : (d ? 'granted' : 'denied');
+});
 function setupSession(ses) {
   ses.setUserAgent(UA);
   if (UA_MODE === 'firefox-google') {
@@ -332,10 +336,17 @@ function setupSession(ses) {
       changed();
     });
   });
-  const ASK = new Set(['notifications', 'media', 'geolocation', 'clipboard-read', 'midi', 'midiSysex', 'idle-detection']);
+  for (const [k, v] of Object.entries(state.permissions || {})) permissionDecisions.set(k, v);
+  // Electron's default check handler answers 'granted' for everything; report notifications as
+  // granted only after the user allowed them here.
+  ses.setPermissionCheckHandler((_wc, permission, origin) =>
+    permission === 'notifications' ? permissionDecisions.get(origin + ' notifications') === true : true);
+  const ASK = new Set(['notifications', 'media', 'clipboard-read']);
+  const DENY = new Set(['geolocation', 'midi', 'midiSysex', 'idle-detection']); // not needed for the spike; avoid modal noise
   ses.setPermissionRequestHandler(async (wc, permission, callback, details) => {
     const origin = (() => { try { return new URL(details.requestingUrl || wc.getURL()).origin; } catch { return '?'; } })();
-    if (!ASK.has(permission)) { logEvent('permission-auto-allowed', { origin, permission }); return callback(true); }
+    if (DENY.has(permission)) { logEvent('permission-auto-denied', { origin, permission }); return callback(false); }
+    if (!ASK.has(permission)) return callback(true); // e.g. clipboard-sanitized-write, fullscreen, pointerLock
     const key = origin + ' ' + permission;
     if (permissionDecisions.has(key)) return callback(permissionDecisions.get(key));
     if (SMOKE) { logEvent('permission-request', { origin, permission, decision: 'deny (smoke)' }); return callback(false); }
@@ -345,6 +356,7 @@ function setupSession(ses) {
     });
     const ok = r.response === 0;
     permissionDecisions.set(key, ok);
+    state.permissions = Object.fromEntries(permissionDecisions);
     logEvent('permission-request', { origin, permission, decision: ok ? 'allow' : 'block' });
     if (permission === 'notifications') {
       const c = state.checks.notification;
@@ -370,7 +382,7 @@ async function recordLoginCookies(ses) {
 // ---------------------------------------------------------------- menu (Edit menu is required for Cmd+C/V/X/A on macOS)
 function buildMenu() {
   const isMac = process.platform === 'darwin';
-  const tabWc = () => { const t = tabs.get(activeId); return t ? t.view.webContents : null; };
+  const tabWc = () => { const t = tabs.get(activeId); return t ? t.wc : null; };
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     ...(isMac ? [{ role: 'appMenu' }] : []),
     { label: 'File', submenu: [
@@ -394,7 +406,7 @@ function buildMenu() {
 
 // ---------------------------------------------------------------- IPC from the chrome UI
 function wireIpc() {
-  const tabWc = () => { const t = tabs.get(activeId); return t ? t.view.webContents : null; };
+  const tabWc = () => { const t = tabs.get(activeId); return t ? t.wc : null; };
   ipcMain.handle('state:get', () => snapshot());
   ipcMain.on('tab:new', (_e, url, checkId) => createTab(normalizeUrl(url), { checkId }));
   ipcMain.on('tab:activate', (_e, id) => activate(id));
@@ -426,6 +438,46 @@ function wireIpc() {
     if (patch.status) { c.status = patch.status; c.at = new Date().toISOString(); }
     if (typeof patch.note === 'string') c.note = patch.note.slice(0, 2000);
     changed();
+  });
+  // Capture path check: Tiger plans to read a Google Doc as Markdown through the member's own signed-in
+  // session (no OAuth). Only status, content type and length are recorded, never the document text.
+  ipcMain.handle('check:exportTest', async () => {
+    const c = state.checks['docs-export'];
+    const t = tabs.get(activeId);
+    const m = t && /^https:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/([^/]+)/.exec(t.url || '');
+    if (!m) {
+      logEvent('export-test', { ok: false, reason: 'active tab is not a Google Doc' });
+      return { ok: false, message: 'Google ドキュメントのタブを開いてから押してください。' };
+    }
+    const ses = session.fromPartition(PARTITION);
+    const results = [];
+    for (const format of ['md', 'txt']) {
+      const r = { format };
+      try {
+        const res = await ses.fetch(`https://docs.google.com/document/d/${m[1]}/export?format=${format}`, { redirect: 'follow' });
+        const body = await res.text();
+        r.status = res.status;
+        r.contentType = res.headers.get('content-type') || '';
+        r.finalHost = (() => { try { return new URL(res.url).hostname; } catch { return ''; } })();
+        r.chars = body.length;
+        // A sign-in or error page comes back as HTML; a real export does not.
+        r.looksLikeExport = res.status === 200 && !/text\/html/i.test(r.contentType) && body.trim().length > 0;
+      } catch (e) {
+        r.error = String(e && e.message ? e.message : e).slice(0, 200);
+        r.looksLikeExport = false;
+      }
+      results.push(r);
+    }
+    const ok = results[0].looksLikeExport;
+    logEvent('export-test', { ok, results });
+    if (c) {
+      c.status = ok ? 'pass' : 'fail';
+      c.at = new Date().toISOString();
+      const line = results.map(r => `${r.format}: ${r.error ? 'error ' + r.error : `HTTP ${r.status}, ${r.contentType}, ${r.chars} chars`}`).join(' | ');
+      c.note = `[自動 auto] ${line}`;
+    }
+    changed();
+    return { ok, message: ok ? `成功: Markdown ${results[0].chars} 文字を取得` : '失敗: 結果をメモ欄に記録しました' };
   });
   ipcMain.handle('report:save', () => { writeReport(); return reportPaths; });
   ipcMain.handle('report:copy', () => { const md = writeReport(); clipboard.writeText(md || ''); return reportPaths; });

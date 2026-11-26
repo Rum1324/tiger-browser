@@ -22,10 +22,13 @@ function buildChecks(checks) {
     const mk = (status, text) => el('button', { class: `btn-${status}`, onclick: () => spike.setCheck(c.id, { status }) }, text);
     const pass = mk('pass', 'Pass'); const fail = mk('fail', 'Fail'); const skip = mk('skip', 'Skip');
     const auto = el('div', { class: 'auto' });
+    const actionBtn = c.action === 'export-test'
+      ? el('button', { onclick: async (e) => { const b = e.currentTarget; b.disabled = true; const r = await spike.exportTest(); b.disabled = false; auto.textContent = r.message; } }, '書き出しテスト (run)')
+      : el('button', { onclick: () => spike.openCheck(c.id), title: c.url || 'Docs タブで続ける' }, '開く (open)');
     const box = el('div', { class: 'check' },
       el('div', { class: 'row' },
         el('div', { class: 'label' }, c.ja + ' ', el('span', { class: 'en' }, `(${c.en})`)),
-        el('button', { onclick: () => spike.openCheck(c.id), title: c.url || 'Docs タブで続ける' }, '開く (open)')),
+        actionBtn),
       el('div', { class: 'hint' }, c.hint || ''),
       el('div', { class: 'row' }, pass, fail, skip),
       auto, note);
@@ -62,7 +65,7 @@ function render(s) {
     r.pass.classList.toggle('on', c.status === 'pass');
     r.fail.classList.toggle('on', c.status === 'fail');
     r.skip.classList.toggle('on', c.status === 'skip');
-    r.auto.textContent = c.auto ? `自動検出 (auto-detected): ${c.auto.id} — ${c.auto.url}` : '';
+    if (c.action !== 'export-test') r.auto.textContent = c.auto ? `自動検出 (auto-detected): ${c.auto.id} — ${c.auto.url}` : '';
     if (document.activeElement !== r.note) r.note.value = c.note || '';
   }
   $('mdpath').textContent = s.reportPaths.md;

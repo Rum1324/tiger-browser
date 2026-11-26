@@ -18,6 +18,9 @@ const CHECKS = [
     hint: '他アプリの文字と画像を Cmd+V。右クリック貼り付けも。' },
   { id: 'docs-comment', ja: 'ドキュメント: コメント', en: 'Docs: comment', url: null,
     hint: '文字を選択→コメント追加→投稿。' },
+  { id: 'docs-export', ja: 'ドキュメント: Markdown 書き出し (Tiger の取り込み経路)', en: 'Docs: Markdown export through the signed-in session', url: null,
+    action: 'export-test',
+    hint: '中身のある自分のドキュメントを開いた状態で「書き出しテスト」を押す。結果は自動で Pass / Fail。本文は記録せず、HTTP ステータスと文字数だけ記録します。' },
   { id: 'drive', ja: 'Google ドライブ', en: 'Google Drive',
     url: 'https://drive.google.com/drive/my-drive', hint: 'ファイル一覧が表示され、開けるか。' },
   { id: 'slack', ja: 'Slack: ログインしてメッセージ送信', en: 'Slack sign-in and send a message',
@@ -95,6 +98,10 @@ const SMOKE_TARGETS = [
   { id: 'notion-login', url: 'https://www.notion.so/login' },
   { id: 'm365-word', url: 'https://www.office.com/launch/word' },
   { id: 'm365-login', url: 'https://login.microsoftonline.com/' },
+  // Click "Continue with Google" (a click only, nothing typed): exercises window.open -> tab with
+  // window.opener kept, and Google's OAuth page as reached from a real third-party client.
+  { id: 'notion-continue-with-google', url: 'https://www.notion.so/login', click: '^(Google|Continue with Google|Google で続行)$' },
+  { id: 'slack-sign-in-with-google', url: 'https://slack.com/signin', click: '^(Google|Sign in with Google|Continue with Google|Google でサインイン|Google で続行)$' },
   // Detector self-tests: these pages must be detected as blocked in every UA mode.
   { id: 'selftest-google-rejected-ja', url: 'https://accounts.google.com/signin/rejected?rrk=46&hl=ja', expectBlock: 'google-insecure-browser' },
   { id: 'selftest-slack-old-chrome', url: 'https://app.slack.com/client', expectBlock: 'slack-unsupported-browser',

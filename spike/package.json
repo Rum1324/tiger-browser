@@ -5,11 +5,14 @@
   "description": "Day-1 spike: does Google / Slack / Notion / M365 sign-in work inside an Electron shell?",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "start:electron-ua": "SPIKE_UA=electron-default electron .",
+    "start": "node launch.js",
+    "start:electron-ua": "SPIKE_UA=electron-default node launch.js",
     "smoke": "node smoke.js"
   },
   "devDependencies": {
     "electron": "45.5.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
