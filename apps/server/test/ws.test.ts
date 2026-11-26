@@ -1,0 +1,166 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { spaceWithMembers } from './helpers/fixtures'
+import { connectAs, connectWs, type Harness, page, startHarness } from './helpers/harness'
+
+let h: Harness
+let port: number
+beforeAll(async () => {
+  h = await startHarness()
+  port = await h.listen()
+})
+afterAll(() => h.close())
+
+describe('/v1/ws', () => {
+  it('requires auth as the first frame', async () => {
+    const c = await connectWs(port)
+    c.send({ type: 'ping' })
+    expect((await c.closed).code).toBe(4401)
+  })
+
+  it('closes on an invalid token', async () => {
+    const c = await connectWs(port)
+    c.send({ type: 'auth', token: 'x'.repeat(43) })
+    expect((await c.closed).code).toBe(4401)
+  })
+
+  it('answers ping with pong and rejects malformed frames without closing', async () => {
+    const { token, user } = await h.login('Pinger')
+    const c = await connectWs(port)
+    c.send({ type: 'auth', token })
+    expect(await c.next('ready')).toEqual({ type: 'ready', userId: user.id })
+    c.socket.send('not json')
+    expect((await c.next('error')).code).toBe('invalid_frame')
+    await c.sync()
+    c.close()
+  })
+
+  it('subscribes only to Spaces the user belongs to, without saying which ids exist', async () => {
+    const mine = await spaceWithMembers(h, 'WsMine')
+    const theirs = await spaceWithMembers(h, 'WsTheirs')
+    const c = await connectWs(port)
+    c.send({ type: 'auth', token: mine.member.token })
+    await c.next('ready')
+    c.send({ type: 'subscribe', spaceIds: [mine.space.id, theirs.space.id] })
+    expect(await c.next('error')).toMatchObject({
+      code: 'subscribe_denied',
+      message: '1 Space(s) not found',
+    })
+    await h.ok(
+      'shareItem',
+      { params: { spaceId: theirs.space.id }, body: { page: page('https://example.com/t', 't') } },
+      theirs.owner.token,
+    )
+    await h.ok(
+      'shareItem',
+      { params: { spaceId: mine.space.id }, body: { page: page('https://example.com/m', 'm') } },
+      mine.owner.token,
+    )
+    const up = await c.next('item.upserted')
+    expect(up.item.spaceId).toBe(mine.space.id)
+    await h.settle()
+    await c.sync()
+    expect(
+      c.events
+        .filter((e) => e.type === 'item.upserted')
+        .every((e) => e.type === 'item.upserted' && e.item.spaceId === mine.space.id),
+    ).toBe(true)
+    c.close()
+  })
+
+  it('keeps one member’s private-thread events away from another member’s socket', async () => {
+    const { owner, member, space } = await spaceWithMembers(h, 'WsPriv')
+    const ownerWs = await connectAs(port, owner.token, [space.id])
+    const memberWs = await connectAs(port, member.token, [space.id])
+    const t = await h.ok(
+      'createThread',
+      { params: { spaceId: space.id }, body: { visibility: 'private' } },
+      owner.token,
+    )
+    await h.ok(
+      'postMessage',
+      { params: { threadId: t.id }, body: { content: 'secret plan', askAi: false } },
+      owner.token,
+    )
+    await h.ok('deleteThread', { params: { threadId: t.id } }, owner.token)
+    expect((await ownerWs.next('thread.created')).thread.id).toBe(t.id)
+    expect((await ownerWs.next('message.created')).message.content).toBe('secret plan')
+    expect(await ownerWs.next('thread.deleted')).toEqual({
+      type: 'thread.deleted',
+      spaceId: space.id,
+      threadId: t.id,
+    })
+    await memberWs.sync()
+    expect(JSON.stringify(memberWs.events)).not.toContain(t.id)
+    expect(memberWs.events.map((e) => e.type)).toEqual(['ready', 'pong', 'pong'])
+
+    // Once shared, the same thread's events reach the member too.
+    const t2 = await h.ok(
+      'createThread',
+      { params: { spaceId: space.id }, body: { visibility: 'private' } },
+      owner.token,
+    )
+    await h.ok('shareThread', { params: { threadId: t2.id } }, owner.token)
+    expect((await memberWs.next('thread.updated')).thread).toMatchObject({
+      id: t2.id,
+      visibility: 'space',
+    })
+    await h.ok(
+      'postMessage',
+      { params: { threadId: t2.id }, body: { content: 'now public', askAi: false } },
+      owner.token,
+    )
+    expect((await memberWs.next('message.created')).message.content).toBe('now public')
+    ownerWs.close()
+    memberWs.close()
+  })
+
+  it('stops delivering a Space to a removed member, after telling them', async () => {
+    const { owner, member, space } = await spaceWithMembers(h, 'WsRemove')
+    const memberWs = await connectAs(port, member.token, [space.id])
+    await h.ok(
+      'removeMember',
+      { params: { spaceId: space.id, userId: member.user.id } },
+      owner.token,
+    )
+    expect(await memberWs.next('member.removed')).toEqual({
+      type: 'member.removed',
+      spaceId: space.id,
+      userId: member.user.id,
+    })
+    await h.ok(
+      'createThread',
+      { params: { spaceId: space.id }, body: { visibility: 'space' } },
+      owner.token,
+    )
+    await memberWs.sync()
+    expect(memberWs.events.some((e) => e.type === 'thread.created')).toBe(false)
+    memberWs.close()
+  })
+
+  it('tells members when someone joins', async () => {
+    const { owner, space } = await spaceWithMembers(h, 'WsJoin')
+    const ownerWs = await connectAs(port, owner.token, [space.id])
+    const newcomer = await h.login('Newcomer')
+    const { token } = await h.ok(
+      'createInvite',
+      { params: { spaceId: space.id }, body: {} },
+      owner.token,
+    )
+    await h.ok('acceptInvite', { body: { token } }, newcomer.token)
+    expect((await ownerWs.next('member.joined')).user.id).toBe(newcomer.user.id)
+    expect(
+      (await ownerWs.next('audit.appended', (e) => e.event.action === 'member.joined')).event.actor
+        .id,
+    ).toBe(newcomer.user.id)
+    ownerWs.close()
+  })
+
+  it('closes sockets of a session that logs out', async () => {
+    const { token } = await h.login('Quitter')
+    const c = await connectWs(port)
+    c.send({ type: 'auth', token })
+    await c.next('ready')
+    await h.ok('authLogout', {}, token)
+    expect((await c.closed).code).toBe(4401)
+  })
+})

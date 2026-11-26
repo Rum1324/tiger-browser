@@ -1,0 +1,29 @@
+# Local Postgres for developers on a Mac (Linux dev containers use apps/server/scripts/dev-db.sh).
+#   docker compose up -d db
+#   DATABASE_URL=postgres://tiger:tiger@127.0.0.1:5432/tiger_dev   (tests use tiger_test)
+services:
+  db:
+    # pgvector >= 0.8 (iterative HNSW scans); pg_trgm ships with the image's contrib modules.
+    image: pgvector/pgvector:0.8.7-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tiger
+      POSTGRES_PASSWORD: tiger
+      POSTGRES_DB: tiger_dev
+      # pg_trgm indexes non-ASCII (Japanese) text only when the locale is not plain C.
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C.UTF-8
+      LANG: C.UTF-8
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - tiger-db:/var/lib/postgresql/data
+      - ./apps/server/scripts/docker-init.sql:/docker-entrypoint-initdb.d/10-tiger.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiger -d tiger_dev && psql -U tiger -d tiger_test -Atc 'select 1' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  tiger-db:

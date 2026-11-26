@@ -1,0 +1,867 @@
+/* Window, toolbar, the mount (frame + page + readout strip) and the inspector. Tokens only. */
+
+/* ---------- window ---------- */
+.win {
+  position: relative;
+  display: flex;
+  width: 1440px;
+  height: 900px;
+  border-radius: var(--r-window);
+  overflow: hidden;
+  background: var(--chrome);
+  color: var(--ink);
+}
+.win::after {
+  /* window edge, drawn by the OS */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 var(--hairline) var(--window-edge);
+  pointer-events: none;
+}
+.main {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- toolbar: one row, 52 px ---------- */
+.tb {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--h-toolbar);
+  padding-right: var(--s-10);
+  gap: var(--s-6);
+}
+.tl {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  width: 78px;
+  padding-left: 19px;
+}
+.tl i {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-round);
+  box-shadow: inset 0 0 0 0.5px var(--os-control-edge);
+}
+.tl i:nth-child(1) {
+  background: var(--os-close);
+}
+.tl i:nth-child(2) {
+  background: var(--os-min);
+}
+.tl i:nth-child(3) {
+  background: var(--os-zoom);
+}
+.win--back .tl i {
+  background: var(--os-idle);
+}
+
+/* Space switcher: where you are. Always top-left, always named. */
+.spacesw {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: var(--h-control);
+  padding: 0 var(--s-8) 0 var(--s-10);
+  border-radius: var(--r-control);
+  color: var(--ink-2);
+}
+.spacesw__n {
+  color: var(--ink);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+  font-feature-settings: 'palt';
+}
+.spacesw__n--none {
+  color: var(--ink-2);
+  font-weight: var(--weight-regular);
+}
+
+.nav {
+  flex: none;
+  display: flex;
+  gap: var(--s-2);
+}
+
+/* Tabs. Inactive tabs are chips; the active tab is the command field. */
+/* The tab well: one object. Chips and the field sit inside it. */
+.tabs {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-field);
+  padding: var(--s-2);
+  border-radius: var(--r-well);
+  background: var(--hover);
+}
+.tab {
+  flex: 0 1 auto;
+  min-width: 56px;
+  max-width: 132px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  height: var(--h-control);
+  padding: 0 var(--s-10) 0 var(--s-8);
+  border-radius: var(--r-control);
+  color: var(--ink-2);
+  font-size: var(--text-12);
+}
+.tab__t {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tab--tight {
+  flex: none;
+  min-width: 0;
+  width: var(--h-control);
+  justify-content: center;
+  padding: 0;
+}
+/* A shared tab wears the same ring as a shared page. */
+.tab--shared {
+  box-shadow: inset 0 0 0 var(--ring) var(--space-line);
+  color: var(--ink);
+}
+.tab--sealed {
+  color: var(--ink-3);
+}
+
+.field {
+  flex: 1 0 376px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  height: var(--h-control);
+  padding: 0 var(--s-6) 0 var(--s-10);
+  border-radius: var(--r-control);
+  background: var(--field);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+  white-space: nowrap;
+}
+.field__g {
+  display: flex;
+  margin-right: var(--s-2);
+  color: var(--ink-2);
+}
+.field__host {
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.field__sep {
+  color: var(--ink-off);
+}
+.field__title {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 48px;
+}
+.field .kbd {
+  color: var(--ink-3);
+}
+.field--shared {
+  box-shadow: inset 0 0 0 var(--ring) var(--space-line);
+}
+.field--once {
+  box-shadow: none;
+  outline: var(--ring) dashed var(--ink);
+  outline-offset: calc(var(--ring) * -1);
+}
+.field--pending {
+  box-shadow: none;
+  outline: var(--ring) dashed var(--space-line);
+  outline-offset: calc(var(--ring) * -1);
+}
+
+.acts {
+  flex: none;
+  display: flex;
+  gap: var(--s-6);
+}
+
+/* ---------- the mount ---------- */
+/*
+ * One object: a 3 px frame on three sides, the page, and a 28 px readout strip.
+ * The page rectangle is identical in every state, so a state change never resizes the web view.
+ */
+.mount {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0 var(--gutter) var(--gutter);
+  padding: var(--frame) var(--frame) 0;
+  border-radius: var(--r-mount);
+  background: var(--mount);
+}
+.mount::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 var(--hairline) var(--line);
+  pointer-events: none;
+}
+.page {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--r-page);
+  background: var(--web-bg);
+}
+.page--own {
+  background: var(--surface);
+}
+
+.strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--h-strip);
+  padding: 0 var(--s-2) 0 var(--s-10);
+  font-size: var(--text-12);
+  line-height: var(--leading-solid);
+  white-space: nowrap;
+  color: var(--ink);
+}
+.strip__state {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  width: 136px;
+  font-weight: var(--weight-strong);
+}
+.slot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: 12px;
+  padding: 0 var(--s-16) 0 var(--s-12);
+  box-shadow: inset var(--hairline) 0 0 var(--line-strong);
+}
+.slot:nth-of-type(2) {
+  width: 176px;
+}
+.slot:nth-of-type(3) {
+  width: 232px;
+}
+.strip--free .strip__state,
+.strip--free .slot {
+  width: auto;
+}
+.strip--free .strip__state {
+  padding-right: var(--s-12);
+}
+.slot b {
+  color: var(--ink-2);
+  font-size: var(--text-11);
+  letter-spacing: var(--tracking-label);
+}
+.strip__act {
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  height: var(--h-strip);
+  padding: 0 var(--s-10);
+  border-radius: var(--r-page);
+  font-weight: var(--weight-strong);
+}
+.strip__act .kbd {
+  color: var(--ink-2);
+}
+
+/* shared: the whole mount takes the Space colour */
+.mount--shared {
+  background: var(--space);
+}
+.mount--shared::after {
+  box-shadow: none;
+}
+.mount--shared .strip {
+  color: var(--on-space);
+}
+.mount--shared .slot {
+  box-shadow: inset var(--hairline) 0 0 var(--on-space-line);
+}
+.mount--shared .slot b,
+.mount--shared .strip__act .kbd {
+  color: var(--on-space-2);
+}
+.mount--shared .st {
+  --st: var(--on-space);
+}
+
+/* sealed: hatch in the frame, inverse strip */
+.mount--sealed {
+  background-image: repeating-linear-gradient(135deg, var(--hatch) 0 2px, transparent 2px 6px);
+}
+.mount--sealed .strip {
+  margin: 0 calc(var(--frame) * -1);
+  padding-left: calc(var(--s-10) + var(--frame));
+  padding-right: calc(var(--s-2) + var(--frame));
+  border-radius: 0 0 var(--r-mount) var(--r-mount);
+  background: var(--inverse);
+  color: var(--on-inverse);
+}
+.mount--sealed .slot {
+  box-shadow: inset var(--hairline) 0 0 var(--inverse-line);
+}
+.mount--sealed .slot b {
+  color: var(--on-inverse-2);
+}
+.mount--sealed .st {
+  --st: var(--on-inverse);
+}
+
+/* dashed and mid-flight rings: drawn by main.js because they need the real geometry */
+.ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  fill: none;
+  stroke-width: var(--frame);
+}
+.ring--once,
+.ring--pending {
+  stroke-width: calc(var(--frame) - 1.5px);
+}
+.ring--once {
+  stroke: var(--ink);
+}
+.ring--pending {
+  stroke: var(--space-line);
+}
+.ring--drawing {
+  stroke: var(--space);
+}
+.mount[data-ring]::after {
+  box-shadow: none;
+}
+/* mid-flight: the strip has already filled; the arms are still rising */
+.mount--drawing .strip {
+  margin: 0 calc(var(--frame) * -1);
+  padding-left: calc(var(--s-10) + var(--frame));
+  border-radius: 0 0 var(--r-mount) var(--r-mount);
+  background: var(--space);
+  color: var(--on-space);
+}
+.mount--drawing .slot {
+  box-shadow: inset var(--hairline) 0 0 var(--on-space-line);
+}
+.mount--drawing .slot b {
+  color: var(--on-space-2);
+}
+.mount--drawing .st {
+  --st: var(--on-space);
+}
+
+/* The signature, live: index.html?screen=09-signature-live (click the window to replay).
+   Only chrome pixels animate. The page view keeps its bounds, so the web content never reflows. */
+.mount--live::after {
+  box-shadow: none;
+}
+.mount--live .strip {
+  margin: 0 calc(var(--frame) * -1);
+  padding-left: calc(var(--s-10) + var(--frame));
+  border-radius: 0 0 var(--r-mount) var(--r-mount);
+  background: linear-gradient(var(--space), var(--space)) no-repeat left / 0% 100%;
+  animation:
+    strip-fill var(--dur-wipe) var(--ease-out) 100ms forwards,
+    strip-ink var(--dur-fade) linear 140ms forwards;
+}
+.mount--live .slot,
+.mount--live .slot b,
+.mount--live .strip__act .kbd {
+  color: inherit;
+}
+.mount--live .st {
+  --st: currentColor;
+}
+.ring--live {
+  stroke: var(--space);
+}
+.ring--live path {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  animation: frame-close var(--dur-frame) var(--ease-inout) 180ms forwards;
+}
+@keyframes strip-fill {
+  to {
+    background-size: 100% 100%;
+  }
+}
+@keyframes strip-ink {
+  to {
+    color: var(--on-space);
+  }
+}
+@keyframes frame-close {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mount--live .strip,
+  .ring--live path {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
+
+/* ---------- inspector ---------- */
+.insp {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: var(--w-inspector);
+  min-height: 0;
+  background: var(--pane);
+  box-shadow: inset var(--hairline) 0 0 var(--line-strong);
+}
+.insp__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--h-toolbar);
+  padding: 0 var(--s-10) 0 var(--s-16);
+}
+.insp__body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-20);
+  padding: var(--s-4) var(--s-16) var(--s-16);
+}
+
+/* messages: a question, then an answer. No bubbles. */
+.msg__h {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  color: var(--ink-3);
+  font-size: var(--text-12);
+}
+.msg__h b {
+  color: var(--ink);
+  font-size: var(--text-13);
+}
+.msg__m {
+  margin-left: var(--s-2);
+}
+.msg__q {
+  margin-top: var(--s-6);
+  line-height: var(--leading-body);
+}
+.msg__att {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-6);
+  margin-top: var(--s-8);
+  color: var(--ink-2);
+  font-size: var(--text-12);
+}
+.mention {
+  color: var(--ink);
+  font-weight: var(--weight-strong);
+}
+
+/* model output: mincho, with gothic for emphasis (the Japanese book convention) */
+.ai {
+  margin-top: var(--s-8);
+  font-family: var(--font-ai);
+  font-size: var(--text-15);
+  font-weight: var(--weight-ai);
+  line-height: var(--leading-read);
+  text-wrap: pretty;
+}
+.ai p + p,
+.ai p + ol,
+.ai ol + p {
+  margin-top: var(--s-6);
+}
+.ai ol {
+  list-style: none;
+  counter-reset: n;
+}
+.ai li {
+  position: relative;
+  padding-left: var(--s-20);
+  counter-increment: n;
+}
+.ai li + li {
+  margin-top: var(--s-4);
+}
+.ai li::before {
+  content: counter(n);
+  position: absolute;
+  left: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-13);
+  font-weight: var(--weight-strong);
+  color: var(--ink-3);
+}
+.ai strong {
+  margin-right: 0.6em;
+  font-family: var(--font-ui);
+  font-size: var(--text-13);
+  font-weight: var(--weight-strong);
+}
+
+/* sources: each [n] resolves to title, source, who shared it, when */
+.srcs {
+  margin-top: var(--s-12);
+  border-top: var(--hairline) solid var(--line);
+}
+.src {
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  height: var(--h-control-s);
+  border-bottom: var(--hairline) solid var(--line);
+  font-size: var(--text-12);
+  white-space: nowrap;
+}
+.src .cite {
+  margin: 0 var(--s-2) 0 0;
+}
+.src__t {
+  flex: none;
+  color: var(--ink);
+}
+.src__m {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  color: var(--ink-3);
+}
+/* while answering: a named step, streamed text, and a stop button. No skeletons. */
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  margin-top: var(--s-8);
+  color: var(--ink-2);
+  font-size: var(--text-12);
+}
+.step i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-round);
+  background: var(--ink);
+}
+/* a proposed change is a diff, not a paragraph: old value struck, new value in gothic 600 */
+.diff {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--s-12);
+  margin-top: var(--s-8);
+  padding: var(--s-6) 0;
+  border-top: var(--hairline) solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
+  font-family: var(--font-ui);
+  font-size: var(--text-13);
+  line-height: var(--leading-read);
+}
+.diff dt {
+  color: var(--ink-2);
+  font-size: var(--text-12);
+}
+.diff dd {
+  margin: 0;
+}
+.diff del {
+  color: var(--ink-3);
+  text-decoration-thickness: 1px;
+}
+.diff ins {
+  margin-left: var(--s-6);
+  font-weight: var(--weight-strong);
+  text-decoration: none;
+}
+.diff .arrow {
+  margin-left: var(--s-6);
+  color: var(--ink-3);
+}
+.send.send--stop {
+  width: auto;
+  white-space: nowrap;
+  gap: var(--s-6);
+  padding: 0 var(--s-10) 0 var(--s-8);
+  font-size: var(--text-12);
+  font-weight: var(--weight-strong);
+}
+.msg__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  margin-top: var(--s-12);
+}
+
+/* composer: the ledger of what the model will read sits on top of the input, in one box */
+.composer {
+  flex: none;
+  padding: 0 var(--s-12) var(--s-12);
+}
+.reads {
+  padding: var(--s-10) var(--s-12) var(--s-8);
+  border-radius: var(--r-control) var(--r-control) 0 0;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+}
+.reads__h {
+  margin-bottom: var(--s-4);
+  color: var(--ink-2);
+  font-size: var(--text-11);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-label);
+}
+.reads__row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: var(--h-control-s);
+}
+.reads__t {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.reads__t small {
+  margin-left: var(--s-8);
+  color: var(--ink-3);
+  font-size: var(--text-12);
+}
+.reads__fixed {
+  color: var(--ink-3);
+  font-size: var(--text-12);
+}
+.reads__note {
+  margin: 0 0 var(--s-4) var(--s-20);
+  color: var(--ink-2);
+  font-size: var(--text-12);
+}
+.reads__never {
+  margin-top: var(--s-6);
+  padding-top: var(--s-6);
+  border-top: var(--hairline) solid var(--line);
+  color: var(--ink-3);
+  font-size: var(--text-12);
+}
+.composer__box {
+  margin-top: calc(var(--hairline) * -1);
+  padding: var(--s-10) var(--s-8) var(--s-8) var(--s-12);
+  border-radius: 0 0 var(--r-control) var(--r-control);
+  background: var(--field);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+}
+.composer--thread .composer__box {
+  margin-top: 0;
+  border-radius: var(--r-control);
+}
+.composer__input {
+  min-height: 40px;
+  line-height: var(--leading-body);
+}
+.composer__input.is-empty {
+  color: var(--ink-3);
+}
+.composer__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-10);
+  margin-top: var(--s-4);
+}
+/* model choice, per message: three words, no chrome. The chosen one is ink; the others wait. */
+.models {
+  flex: none;
+  display: inline-flex;
+  margin-left: calc(var(--s-6) * -1);
+}
+.models button {
+  white-space: nowrap;
+  height: var(--h-control-s);
+  padding: 0 var(--s-6);
+  border-radius: var(--r-small);
+  color: var(--ink-3);
+  font-size: var(--text-12);
+}
+.models button[aria-checked='true'] {
+  color: var(--ink);
+  font-weight: var(--weight-strong);
+}
+.composer__see {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-3);
+  font-size: var(--text-12);
+}
+.send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-control-s);
+  height: var(--h-control-s);
+  border-radius: var(--r-small);
+  background: var(--inverse);
+  color: var(--on-inverse);
+}
+.is-empty ~ .composer__bar .send:not(.send--stop) {
+  background: var(--hover);
+  color: var(--ink-off);
+}
+
+/* このページ: a form, like Finder's Get Info */
+.insp__body--form {
+  gap: 0;
+  padding-top: 0;
+}
+.info {
+  padding: var(--s-12) 0 var(--s-16);
+  border-top: var(--hairline) solid var(--line);
+}
+.info:first-child {
+  border-top: 0;
+  padding-top: var(--s-4);
+}
+.info h3 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-8);
+  margin-bottom: var(--s-6);
+  color: var(--ink-2);
+  font-size: var(--text-12);
+  font-weight: var(--weight-strong);
+}
+.info h3 span {
+  color: var(--ink-3);
+  font-weight: var(--weight-regular);
+}
+.info__state {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  font-size: var(--text-15);
+}
+.info__p {
+  margin-top: var(--s-6);
+  color: var(--ink-2);
+  font-size: var(--text-12);
+  line-height: var(--leading-body);
+}
+.info .btn {
+  margin-top: var(--s-8);
+}
+.info--end .btn {
+  margin-top: 0;
+}
+.kv {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-12);
+  min-height: 24px;
+  font-size: var(--text-12);
+}
+.kv > :first-child {
+  flex: none;
+  width: 88px;
+  color: var(--ink-3);
+}
+.kv > :last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.who {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2) var(--s-12);
+}
+.who__r {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: var(--h-control-s);
+  white-space: nowrap;
+}
+.who__r small {
+  color: var(--ink-3);
+  font-size: var(--text-12);
+}
+.kinds__r {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: var(--h-control-s);
+  color: var(--ink-2);
+}
+.kinds__r.is-on {
+  color: var(--ink);
+  font-weight: var(--weight-strong);
+}
+.kinds__r small {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: var(--text-12);
+  font-weight: var(--weight-regular);
+}
+
+/* ---------- private window: the whole chrome is sealed ---------- */
+.win--private {
+  position: absolute;
+  left: 64px;
+  top: 318px;
+  width: 872px;
+  height: 520px;
+  box-shadow: var(--shadow-window);
+}
+.win--private::after {
+  display: none;
+}
+.privtag {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: var(--h-control);
+  padding: 0 var(--s-10);
+  font-weight: var(--weight-strong);
+}
+.desk {
+  position: relative;
+  width: 1440px;
+  height: 900px;
+}

@@ -1,0 +1,338 @@
+{
+  "updatedOn": "2026-11-26",
+  "models": [
+    {
+      "provider": "anthropic",
+      "id": "claude-fable-5-2",
+      "label": "Claude Fable 5.2",
+      "tier": "best",
+      "contextWindow": 1000000,
+      "maxOutput": 128000,
+      "verified": true,
+      "verifiedNote": "Streamed live on 2026-11-26 through the router with the chat settings in this entry (thinking suppressed, text returned at max_tokens=30)",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096,
+        "effort": "low"
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 8,
+          "outputPerMTok": 40,
+          "cacheReadMultiplier": 0.025,
+          "cacheWriteMultiplier": 1.25,
+          "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+        }
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "id": "claude-opus-5-5",
+      "label": "Claude Opus 5.5",
+      "tier": "best",
+      "contextWindow": 1000000,
+      "maxOutput": 128000,
+      "verified": true,
+      "verifiedNote": "Streamed live on 2026-11-26 through the router with the chat settings in this entry (thinking suppressed, text returned at max_tokens=30)",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096,
+        "effort": "low"
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 4,
+          "outputPerMTok": 20,
+          "cacheReadMultiplier": 0.05,
+          "cacheWriteMultiplier": 1.25,
+          "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+        }
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "id": "claude-sonnet-5-5",
+      "label": "Claude Sonnet 5.5",
+      "tier": "best",
+      "contextWindow": 1000000,
+      "maxOutput": 128000,
+      "verified": true,
+      "verifiedNote": "Streamed live on 2026-11-26 through the router with the chat settings in this entry (thinking suppressed, text returned at max_tokens=30)",
+      "chat": {
+        "reasoning": "between_tools",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 2048
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 2,
+          "outputPerMTok": 10,
+          "cacheReadMultiplier": 0.05,
+          "cacheWriteMultiplier": 1.25,
+          "source": "https://platform.claude.com/docs/en/about-claude/pricing"
+        }
+      ],
+      "defaultRank": 1
+    },
+    {
+      "provider": "anthropic",
+      "id": "claude-haiku-5-5",
+      "label": "Claude Haiku 5.5",
+      "tier": "fast",
+      "contextWindow": 1000000,
+      "maxOutput": 128000,
+      "verified": true,
+      "verifiedNote": "Streamed live on 2026-11-26 through the router with the chat settings in this entry (thinking suppressed, text returned at max_tokens=30)",
+      "chat": {
+        "reasoning": "off",
+        "defaultMaxOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 0.1,
+          "outputPerMTok": 0.5,
+          "cacheReadMultiplier": 0.1,
+          "cacheWriteMultiplier": 1.25,
+          "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+          "longContext": {
+            "overPromptTokens": 100000,
+            "inputPerMTok": 0.5,
+            "outputPerMTok": 2.5
+          }
+        }
+      ],
+      "defaultRank": 2
+    },
+    {
+      "provider": "openai",
+      "id": "gpt-6.2-astra",
+      "label": "GPT-6.2 Astra",
+      "tier": "best",
+      "contextWindow": 1050000,
+      "maxOutput": 128000,
+      "verified": false,
+      "verifiedNote": "",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 8,
+          "outputPerMTok": 40,
+          "cacheReadMultiplier": 0.05,
+          "cacheWriteMultiplier": 1.25,
+          "source": "https://developers.openai.com/api/docs/pricing",
+          "longContext": {
+            "overPromptTokens": 272000,
+            "inputPerMTok": 16,
+            "outputPerMTok": 60
+          }
+        }
+      ]
+    },
+    {
+      "provider": "openai",
+      "id": "gpt-6.2-sol",
+      "label": "GPT-6.2 Sol",
+      "tier": "best",
+      "contextWindow": 1050000,
+      "maxOutput": 128000,
+      "verified": false,
+      "verifiedNote": "",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 2,
+          "outputPerMTok": 10,
+          "cacheReadMultiplier": 0.05,
+          "cacheWriteMultiplier": 1.25,
+          "source": "https://developers.openai.com/api/docs/pricing",
+          "longContext": {
+            "overPromptTokens": 272000,
+            "inputPerMTok": 4,
+            "outputPerMTok": 15
+          }
+        }
+      ],
+      "defaultRank": 3
+    },
+    {
+      "provider": "openai",
+      "id": "gpt-6.1-terra",
+      "label": "GPT-6.1 Terra",
+      "tier": "fast",
+      "contextWindow": 1050000,
+      "maxOutput": 128000,
+      "verified": false,
+      "verifiedNote": "",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 1,
+          "outputPerMTok": 5,
+          "cacheReadMultiplier": 0.05,
+          "cacheWriteMultiplier": 1.25,
+          "source": "https://developers.openai.com/api/docs/pricing"
+        }
+      ]
+    },
+    {
+      "provider": "openai",
+      "id": "gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "tier": "fast",
+      "contextWindow": 1050000,
+      "maxOutput": 128000,
+      "verified": false,
+      "verifiedNote": "",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 0.1,
+          "outputPerMTok": 0.5,
+          "cacheReadMultiplier": 0.1,
+          "cacheWriteMultiplier": 1.25,
+          "source": "https://developers.openai.com/api/docs/pricing",
+          "longContext": {
+            "overPromptTokens": 272000,
+            "inputPerMTok": 0.2,
+            "outputPerMTok": 0.75
+          }
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "id": "gemini-4-carbon",
+      "label": "Gemini 4 Carbon",
+      "tier": "best",
+      "contextWindow": 1000000,
+      "maxOutput": 64000,
+      "verified": false,
+      "verifiedNote": "",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 2,
+          "outputPerMTok": 10,
+          "cacheReadMultiplier": 0.05,
+          "cacheWriteMultiplier": 1,
+          "source": "https://aistudio.google.com/docs/pricing"
+        },
+        {
+          "effectiveFrom": "2026-12-01",
+          "inputPerMTok": 4,
+          "outputPerMTok": 20,
+          "cacheReadMultiplier": 0.05,
+          "cacheWriteMultiplier": 1,
+          "source": "https://aistudio.google.com/docs/pricing"
+        }
+      ],
+      "defaultRank": 4
+    },
+    {
+      "provider": "google",
+      "id": "gemini-4-hydrogen",
+      "label": "Gemini 4 Hydrogen",
+      "tier": "fast",
+      "contextWindow": 1000000,
+      "maxOutput": 64000,
+      "verified": false,
+      "verifiedNote": "",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 1.5,
+          "outputPerMTok": 7.5,
+          "cacheReadMultiplier": 0.05,
+          "cacheWriteMultiplier": 1,
+          "source": "https://aistudio.google.com/docs/pricing"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "id": "gemini-3.5-flash-lite",
+      "label": "Gemini 3.5 Flash-Lite",
+      "tier": "fast",
+      "contextWindow": 1000000,
+      "maxOutput": 64000,
+      "verified": false,
+      "verifiedNote": "context window and max output are inferred, not documented",
+      "chat": {
+        "reasoning": "on",
+        "defaultMaxOutputTokens": 4096,
+        "minOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-11-26",
+          "inputPerMTok": 0.3,
+          "outputPerMTok": 2.5,
+          "cacheReadMultiplier": 0.1,
+          "cacheWriteMultiplier": 1,
+          "source": "https://aistudio.google.com/docs/pricing"
+        }
+      ]
+    },
+    {
+      "provider": "mock",
+      "id": "mock-chat",
+      "label": "Mock (offline)",
+      "tier": "fast",
+      "contextWindow": 100000,
+      "maxOutput": 8000,
+      "verified": true,
+      "verifiedNote": "Deterministic offline provider, exercised by the unit tests",
+      "chat": {
+        "reasoning": "off",
+        "defaultMaxOutputTokens": 4096
+      },
+      "prices": [
+        {
+          "effectiveFrom": "2026-01-01",
+          "inputPerMTok": 0,
+          "outputPerMTok": 0,
+          "cacheReadMultiplier": 0,
+          "cacheWriteMultiplier": 0,
+          "source": "none: deterministic offline provider"
+        }
+      ],
+      "defaultRank": 99
+    }
+  ]
+}

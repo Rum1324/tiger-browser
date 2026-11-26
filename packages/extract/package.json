@@ -1,0 +1,27 @@
+{
+  "name": "@tiger/extract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./google": "./src/google.ts",
+    "./pdf": "./src/pdf.ts",
+    "./finalize": "./src/finalize.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.browser.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mozilla/readability": "0.6.0",
+    "@tiger/shared": "workspace:*",
+    "pdfjs-dist": "6.5.438"
+  },
+  "devDependencies": {
+    "@types/jsdom": "30.0.0",
+    "@types/node": "^22.20.7",
+    "esbuild": "0.28.2",
+    "jsdom": "31.0.1"
+  }
+}

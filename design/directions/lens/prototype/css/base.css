@@ -1,0 +1,407 @@
+/* Reset, type, and the primitives every surface shares. Tokens only: no literal colours. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+}
+body {
+  width: 1440px;
+  height: 900px;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: var(--text-13);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-ui);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+}
+#app {
+  position: relative;
+  width: 1440px;
+  height: 900px;
+}
+[lang='ja'] {
+  line-break: strict;
+  overflow-wrap: anywhere;
+}
+h1,
+h2,
+h3,
+p,
+ol,
+ul,
+table {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-align: inherit;
+  cursor: default;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+b,
+strong {
+  font-weight: var(--weight-strong);
+}
+small {
+  font-size: inherit;
+}
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Short Japanese labels break at phrase boundaries and use proportional kana. */
+h1,
+h2,
+h3,
+.phrase {
+  word-break: auto-phrase;
+  text-wrap: balance;
+  font-feature-settings: 'palt';
+}
+
+.grow {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+}
+
+/* ---------- icons ---------- */
+.ic {
+  flex: none;
+  display: block;
+}
+/* one stroke weight at every icon size: 1.5 px on screen, whether the glyph is drawn at 16, 14 or 12 */
+.ic * {
+  vector-effect: non-scaling-stroke;
+}
+
+/* ---------- focus ---------- */
+:focus-visible,
+.is-focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- key hints ---------- */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--s-4);
+  border-radius: var(--r-chip);
+  background: color-mix(in srgb, currentColor 11%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--text-11);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-solid);
+  letter-spacing: 0.04em;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-6);
+  height: var(--h-control);
+  padding: 0 var(--s-12);
+  border-radius: var(--r-control);
+  background: var(--field);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+  color: var(--ink);
+  font-size: var(--text-13);
+  white-space: nowrap;
+}
+.btn:disabled {
+  color: var(--ink-off);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line);
+}
+.btn .kbd {
+  margin-left: var(--s-2);
+  margin-right: calc(var(--s-4) * -1);
+}
+.btn--s {
+  height: var(--h-control-s);
+  padding: 0 var(--s-10);
+  font-size: var(--text-12);
+  border-radius: var(--r-small);
+}
+.btn--l {
+  height: var(--h-field);
+  padding: 0 var(--s-16);
+}
+.btn--primary {
+  background: var(--inverse);
+  color: var(--on-inverse);
+  box-shadow: none;
+  font-weight: var(--weight-strong);
+}
+/* The one coloured button: pressing it makes a page readable by the Space. */
+.btn--space {
+  background: var(--space);
+  color: var(--on-space);
+  box-shadow: none;
+  font-weight: var(--weight-strong);
+}
+.btn--tool {
+  background: var(--hover);
+  box-shadow: none;
+}
+.btn--tool.is-on {
+  background: var(--pressed);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+  font-weight: var(--weight-strong);
+}
+.btn--tool:disabled {
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--hairline) var(--line);
+}
+
+/* icon button: 28 px target */
+.ib {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-control-s);
+  height: var(--h-control-s);
+  border-radius: var(--r-small);
+  color: var(--ink-2);
+}
+.ib:disabled {
+  color: var(--ink-off);
+}
+.ib--s {
+  color: var(--ink-3);
+}
+
+/* ---------- people ---------- */
+/* People are circles. The model is a square. Nobody gets a colour. */
+.av {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-round);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+  color: var(--ink-2);
+  font-size: var(--text-11);
+  font-weight: var(--weight-strong);
+  line-height: var(--leading-solid);
+}
+.av--s {
+  width: 20px;
+  height: 20px;
+}
+.av--ai {
+  border-radius: var(--r-small);
+  background: var(--inverse);
+  box-shadow: none;
+  color: var(--on-inverse);
+  font-family: var(--font-ai);
+  font-size: var(--text-13);
+}
+
+/* ---------- Space swatch ---------- */
+.sw {
+  flex: none;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--space);
+}
+.sw--glyph {
+  width: 12px;
+  height: 12px;
+  margin: 2px;
+  border-radius: var(--r-chip);
+}
+.sw--l {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+.sw--none {
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--ring) var(--ink-3);
+}
+
+/* ---------- state glyph: a miniature mount ---------- */
+.st {
+  --st: var(--ink-2);
+  flex: none;
+  display: inline-block;
+  width: 14px;
+  height: 12px;
+  border-radius: 3px;
+  border: var(--ring) solid var(--st);
+  border-bottom-width: 4px;
+}
+.st--once {
+  --st: var(--ink);
+  border-style: dashed dashed solid;
+}
+.st--pending {
+  --st: var(--space-line);
+  border-style: dashed dashed solid;
+}
+.st--shared {
+  --st: var(--space-line);
+  background: var(--st);
+}
+.st--sealed {
+  --st: var(--ink);
+  background: repeating-linear-gradient(135deg, var(--st) 0 1.5px, transparent 1.5px 4px);
+}
+
+/* ---------- switch ---------- */
+.switch {
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: var(--r-round);
+  background: var(--line-strong);
+}
+.switch i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-round);
+  background: var(--on-inverse);
+}
+.switch.is-on {
+  background: var(--inverse);
+}
+.switch.is-on i {
+  left: 16px;
+}
+[data-theme='dark'] .switch:not(.is-on) i {
+  background: var(--ink);
+}
+
+/* ---------- segmented control ---------- */
+.seg {
+  display: inline-flex;
+  padding: var(--s-2);
+  gap: var(--s-2);
+  border-radius: var(--r-control);
+  background: var(--hover);
+}
+.seg button {
+  height: var(--h-control-s);
+  padding: 0 var(--s-12);
+  border-radius: var(--r-small);
+  color: var(--ink-2);
+  font-size: var(--text-12);
+  white-space: nowrap;
+}
+.seg button.is-on {
+  background: var(--field);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line-strong);
+  color: var(--ink);
+  font-weight: var(--weight-strong);
+}
+.seg--s button {
+  padding: 0 var(--s-10);
+}
+
+/* ---------- citations ---------- */
+/* A citation is a shared item, so it wears the Space colour. An attachment is not shared: dashed, no colour. */
+.cite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--s-4);
+  margin: 0 var(--s-2);
+  border-radius: var(--r-chip);
+  background: var(--space-tint);
+  color: var(--space-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-11);
+  font-weight: var(--weight-strong);
+  font-style: normal;
+  line-height: var(--leading-solid);
+  vertical-align: 0.1em;
+}
+/* 16 px to the eye, 28 px to the pointer */
+.cite,
+.switch {
+  position: relative;
+}
+.cite::after,
+.switch::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--s-6) * -1);
+}
+.switch::after {
+  inset: calc((var(--h-control-s) - 18px) / -2) 0;
+}
+.cite--once {
+  background: transparent;
+  outline: var(--hairline) dashed var(--ink-3);
+  outline-offset: -1px;
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-regular);
+}
+
+/* ---------- text caret (static in the mock) ---------- */
+.caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1.15em;
+  margin-left: 1px;
+  background: var(--ink);
+  vertical-align: text-bottom;
+}
+
+/* ---------- small label used above groups ---------- */
+.lbl {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-8);
+  color: var(--ink-2);
+  font-size: var(--text-12);
+  font-weight: var(--weight-strong);
+}
+.lbl small {
+  color: var(--ink-3);
+  font-weight: var(--weight-regular);
+}

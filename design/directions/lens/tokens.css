@@ -1,0 +1,263 @@
+/*
+ * Lens: design tokens.
+ * Every colour, size, radius, shadow and duration the prototype uses is defined here.
+ * Component CSS (prototype/css/*.css) contains no literal colours.
+ *
+ * Colour rule: the chrome is neutral. A hue is always a Space colour, and it appears only on
+ * something that Space can read (frame, strip, tab ring, citation, the confirm button that shares).
+ */
+
+:root {
+  /* ---------- type ---------- */
+  /* Production (macOS): -apple-system, "SF Pro Text", "Hiragino Sans", sans-serif */
+  --font-ui: "Inter", "Noto Sans JP", sans-serif;
+  /* Production (macOS): "New York", "Hiragino Mincho ProN", serif */
+  --font-ai: "Source Serif 4", "Noto Serif JP", serif;
+  /* Production (macOS): "SF Mono", "Hiragino Sans", monospace */
+  --font-mono: "Geist Mono", "Noto Sans JP", monospace;
+
+  --text-11: 11px; /* labels, key hints, table heads */
+  --text-12: 12px; /* readout strip, meta lines */
+  --text-13: 13px; /* UI default */
+  --text-15: 15px; /* model output, section titles */
+  --text-20: 20px; /* page titles inside Tiger pages */
+  --text-28: 28px; /* generated documents only */
+
+  --weight-regular: 400;
+  --weight-strong: 600;
+  --weight-ai: 500; /* mincho needs a heavier cut than gothic at 15 px */
+
+  --leading-solid: 1; /* single-line controls */
+  --leading-tight: 1.25;
+  --leading-ui: 1.45;
+  --leading-code: 1.5;
+  --leading-body: 1.65; /* Japanese sentences in gothic */
+  --leading-read: 1.8; /* model output in mincho */
+  --tracking-label: 0.02em;
+
+  /* ---------- space ---------- */
+  --s-2: 2px;
+  --s-4: 4px;
+  --s-6: 6px;
+  --s-8: 8px;
+  --s-10: 10px;
+  --s-12: 12px;
+  --s-16: 16px;
+  --s-20: 20px;
+  --s-24: 24px;
+  --s-32: 32px;
+  --s-40: 40px;
+  --s-56: 56px;
+
+  /* ---------- geometry ---------- */
+  --h-toolbar: 52px;
+  --h-field: 36px;
+  --h-control: 32px;
+  --h-control-s: 28px;
+  --h-row: 32px;
+  --h-strip: 28px;
+  --w-inspector: 400px;
+  --gutter: 4px; /* window edge to mount */
+  --frame: 4px; /* mount edge to page: the frame itself */
+  --hairline: 1px;
+  --ring: 1.5px; /* tab ring, state glyph stroke */
+  --icon: 16px;
+  --icon-stroke: 1.5px;
+
+  /* concentric: window 18 = gutter 4 + mount 14; mount 14 = frame 4 + page 10; well 10 = inset 2 + control 8 */
+  --r-window: 18px;
+  --r-mount: 14px;
+  --r-well: 10px;
+  --r-page: 10px;
+  --r-sheet: 14px;
+  --r-pop: 12px;
+  --r-control: 8px;
+  --r-small: 6px;
+  --r-chip: 4px;
+  --r-round: 999px; /* avatars and switches only */
+
+  /* ---------- motion ---------- */
+  --dur-press: 90ms;
+  --dur-fade: 140ms;
+  --dur-wipe: 220ms;
+  --dur-frame: 420ms;
+  --dur-panel: 150ms; /* inspector: the page view resizes in 3 steps */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-inout: cubic-bezier(0.3, 0, 0.1, 1);
+
+  /* ---------- OS-drawn window controls (not ours to restyle) ---------- */
+  --os-close: #ff5f57;
+  --os-min: #febc2e;
+  --os-zoom: #28c840;
+  --os-control-edge: rgba(0, 0, 0, 0.14);
+  --os-idle: #cfcecb;
+}
+
+/* ============================== light ============================== */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* surfaces, darkest step first */
+  --mount: #e2e1dd; /* the frame and strip when nothing is shared */
+  --chrome: #efeeeb; /* window and toolbar; vibrancy sits behind this in production */
+  --pane: #f6f5f2; /* inspector */
+  --raised: #f8f8f6; /* toolbar controls on hover, segmented selection */
+  --field: #ffffff; /* command field, inputs */
+  --surface: #ffffff; /* Tiger's own pages, sheets, menus */
+  --sunken: #f4f3f0; /* Markdown preview, table heads, wells */
+  --hover: rgba(27, 27, 26, 0.06);
+  --pressed: rgba(27, 27, 26, 0.1);
+  --scrim: rgba(27, 27, 26, 0.22);
+  --window-edge: rgba(27, 27, 26, 0.22);
+
+  /* ink */
+  --ink: #1b1b1a;
+  --ink-2: #55544f;
+  --ink-3: #62615c;
+  --ink-off: #a3a29d; /* disabled glyphs only, never text that must be read */
+  --line: rgba(27, 27, 26, 0.1);
+  --line-strong: rgba(27, 27, 26, 0.18);
+
+  /* inverse: sealed things (blocked page, private window) and the default button */
+  --inverse: #232322;
+  --inverse-raised: #333332;
+  --inverse-field: #3d3d3b;
+  --on-inverse: #ffffff;
+  --on-inverse-2: #c9c8c3;
+  --inverse-line: rgba(255, 255, 255, 0.14);
+  --hatch: rgba(27, 27, 26, 0.55);
+
+  /* Space colours: fill (white text on it), line (thin rings), ink (as text), tint (quiet ground) */
+  --space-fund: #0b6e63;
+  --space-fund-line: #0b6e63;
+  --space-fund-ink: #0a6257;
+  --space-fund-tint: #e1efec;
+  --space-hire: #3d52c4;
+  --space-hire-line: #3d52c4;
+  --space-hire-ink: #3548b0;
+  --space-hire-tint: #e6e9f8;
+  --space-prod: #9a4f0a;
+  --space-prod-line: #9a4f0a;
+  --space-prod-ink: #8f4a0a;
+  --space-prod-tint: #f6ebdf;
+  --space-plum: #9a3d76;
+  --space-slate: #4a5560;
+  --on-space: #ffffff;
+  --on-space-2: rgba(255, 255, 255, 0.9);
+  --on-space-line: rgba(255, 255, 255, 0.28);
+  --on-space-hover: rgba(255, 255, 255, 0.16);
+
+  /* focus */
+  --focus: #1b1b1a;
+  --focus-gap: #ffffff;
+
+  /* elevation: floating layers only (popover, sheet, a second window). Nothing in flow casts a shadow. */
+  --shadow-pop: 0 0 0 1px rgba(27, 27, 26, 0.1), 0 10px 28px rgba(27, 27, 26, 0.14);
+  --shadow-sheet: 0 0 0 1px rgba(27, 27, 26, 0.14), 0 28px 72px rgba(27, 27, 26, 0.28);
+  --shadow-window: 0 0 0 1px rgba(27, 27, 26, 0.3), 0 30px 80px rgba(27, 27, 26, 0.38);
+}
+
+/* ============================== dark ============================== */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --mount: #0f1011;
+  --chrome: #1b1c1d;
+  --pane: #1e1f20;
+  --raised: #2a2b2d;
+  --field: #2a2b2d;
+  --surface: #202123;
+  --sunken: #17181a;
+  --hover: rgba(255, 255, 255, 0.07);
+  --pressed: rgba(255, 255, 255, 0.12);
+  --scrim: rgba(0, 0, 0, 0.45);
+  --window-edge: rgba(255, 255, 255, 0.16);
+
+  --ink: #ededea;
+  --ink-2: #b0afaa;
+  --ink-3: #9a9994;
+  --ink-off: #5f5f5c;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.18);
+
+  --inverse: #e8e7e3;
+  --inverse-raised: #d9d8d3;
+  --inverse-field: #cfcec9;
+  --on-inverse: #1b1b1a;
+  --on-inverse-2: #4a4945;
+  --inverse-line: rgba(27, 27, 26, 0.16);
+  --hatch: rgba(237, 237, 234, 0.6);
+
+  --space-fund: #197469;
+  --space-fund-line: #4fb5a5; /* a 1.5 px ring needs a lighter value than a fill does on near-black */
+  --space-fund-ink: #6ccdbd;
+  --space-fund-tint: #1b3532;
+  --space-hire: #4458c8;
+  --space-hire-line: #8494ea;
+  --space-hire-ink: #a3b0f2;
+  --space-hire-tint: #232a4d;
+  --space-prod: #9e5410;
+  --space-prod-line: #d08a45;
+  --space-prod-ink: #e3a868;
+  --space-prod-tint: #3a2a18;
+  --space-plum: #a04a7e;
+  --space-slate: #5a6672;
+  --on-space: #ffffff;
+  --on-space-2: rgba(255, 255, 255, 0.9);
+  --on-space-line: rgba(255, 255, 255, 0.26);
+  --on-space-hover: rgba(255, 255, 255, 0.14);
+
+  --focus: #ededea;
+  --focus-gap: #1b1c1d;
+
+  --shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 10px 28px rgba(0, 0, 0, 0.5);
+  --shadow-sheet: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 28px 72px rgba(0, 0, 0, 0.6);
+  --shadow-window: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 30px 80px rgba(0, 0, 0, 0.7);
+}
+
+/* The current Space. Set data-space on the window; everything else reads --space. */
+[data-space="fund"] {
+  --space: var(--space-fund);
+  --space-line: var(--space-fund-line);
+  --space-ink: var(--space-fund-ink);
+  --space-tint: var(--space-fund-tint);
+}
+[data-space="hire"] {
+  --space: var(--space-hire);
+  --space-line: var(--space-hire-line);
+  --space-ink: var(--space-hire-ink);
+  --space-tint: var(--space-hire-tint);
+}
+[data-space="prod"] {
+  --space: var(--space-prod);
+  --space-line: var(--space-prod-line);
+  --space-ink: var(--space-prod-ink);
+  --space-tint: var(--space-prod-tint);
+}
+[data-space="none"] {
+  --space: var(--ink-3);
+  --space-line: var(--ink-3);
+  --space-ink: var(--ink-2);
+  --space-tint: var(--sunken);
+}
+
+/*
+ * Third-party page mocks (Google ドキュメント, the bank, a search page).
+ * These stand in for web content Tiger does not style, so they do not follow the theme:
+ * a light site stays light inside a dark window. Kept here only so no file holds a stray hex.
+ */
+:root {
+  --web-bg: #ffffff;
+  --web-canvas: #f3f4f5;
+  --web-bar: #eef1f4;
+  --web-ink: #202124;
+  --web-ink-2: #5f6368;
+  --web-line: #dadce0;
+  --web-line-soft: #e8eaed;
+  --web-accent: #3b5b7e; /* neutral slate-blue for site chrome; deliberately not a Space colour */
+  --web-accent-soft: #e4eaf1;
+  --web-on-accent: #ffffff;
+  --web-font: "Inter", "Noto Sans JP", sans-serif;
+}

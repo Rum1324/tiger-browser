@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Retry policies - Gateway Docs</title><meta property="og:site_name" content="Gateway Docs"></head>
+<body>
+  <nav class="sidebar" role="navigation"><ul><li><a href="/docs/intro">Introduction</a></li><li><a href="/docs/retries">Retry policies</a></li><li><a href="/docs/limits">Limits</a></li></ul></nav>
+  <main role="main">
+    <article class="docs-content">
+      <h1>Retry policies</h1>
+      <p>The gateway retries failed upstream calls according to the policy attached to each route. Use <code>retry.max_attempts</code> to cap attempts; values above <code>10</code> are rejected.</p>
+      <h2>Policy fields</h2>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>max_attempts</code></td><td>integer</td><td>3</td><td>Total attempts, including the first call</td></tr>
+          <tr><td><code>backoff</code></td><td>string</td><td><code>exponential</code></td><td>One of <code>fixed</code> | <code>exponential</code></td></tr>
+          <tr><td><code>retry_on</code></td><td>list</td><td colspan="2">Status codes that trigger a retry<br>(502, 503, 504)</td></tr>
+        </tbody>
+      </table>
+      <h2>Example</h2>
+      <p>Attach a policy in TypeScript:</p>
+      <pre><code class="language-typescript">import { route } from '@gateway/sdk'
+
+export default route('/orders', {
+  retry: { max_attempts: 5, backoff: 'exponential' },
+  // ```fences``` inside code must not break the block
+})
+</code></pre>
+      <p>Or in the YAML config:</p>
+      <div class="highlight highlight-source-yaml"><pre><span class="pl-ent">routes</span>:
+  - <span class="pl-ent">path</span>: <span class="pl-s">/orders</span>
+    <span class="pl-ent">retry</span>:
+      <span class="pl-ent">max_attempts</span>: <span class="pl-c1">5</span></pre></div>
+      <p>Shell:</p>
+      <pre data-lang="bash">curl -s https://gateway.example.com/health | jq '.status'</pre>
+      <h3>Limits by plan</h3>
+      <table>
+        <tr><td>Plan</td><td>Max attempts</td></tr>
+        <tr><td>Free</td><td>3</td></tr>
+        <tr><td>Team</td><td>10</td></tr>
+      </table>
+      <p>See the <a href="/docs/limits#retries">limits page</a> and the <a href="#policy-fields">field table</a> above.</p>
+    </article>
+  </main>
+  <footer><a href="/terms">Terms</a></footer>
+</body>
+</html>
