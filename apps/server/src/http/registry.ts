@@ -1,4 +1,4 @@
-import type { RouteDef, RouteInput, User } from '@tiger/shared'
+import type { RouteDef, RouteParsed, User } from '@tiger/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { z } from 'zod'
 import { type ResolvedSession, resolveSession } from '../auth/sessions'
@@ -14,7 +14,7 @@ export interface HandlerContext {
 }
 
 export type RouteHandler<P, Q, B, R> = (
-  input: RouteInput<RouteDef<P, Q, B, R>>,
+  input: RouteParsed<RouteDef<P, Q, B, R>>,
   ctx: HandlerContext,
 ) => Promise<R>
 
@@ -78,7 +78,7 @@ export function registerRoute<P, Q, B, R>(
         params: parsePart(def.params, req.params, 'params'),
         query: parsePart(def.query, req.query, 'query'),
         body: parsePart(def.body, req.body, 'body'),
-      } as RouteInput<RouteDef<P, Q, B, R>>
+      } as RouteParsed<RouteDef<P, Q, B, R>>
 
       const ctx: HandlerContext = {
         req,

@@ -60,6 +60,11 @@ export type RouteInput<D> =
   D extends RouteDef<infer P, infer Q, infer B, unknown>
     ? Part<'params', P> & { query?: Q } & Part<'body', B>
     : never
+/** What a server handler receives after validation: every declared part is present. */
+export type RouteParsed<D> =
+  D extends RouteDef<infer P, infer Q, infer B, unknown>
+    ? Part<'params', P> & Part<'query', Q> & Part<'body', B>
+    : never
 export type RouteOutput<D> = D extends RouteDef<unknown, unknown, unknown, infer R> ? R : never
 
 const Ok = z.object({ ok: z.literal(true) })
