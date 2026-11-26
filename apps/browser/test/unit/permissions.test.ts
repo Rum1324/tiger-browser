@@ -1,20 +1,51 @@
 import type { PermissionRequest } from '@tiger/shared'
 import { describe, expect, it } from 'vitest'
 import { PermissionBroker } from '../../src/main/permission-broker'
-import { checkPermission, policyForRequest, rememberedDecision, webOrigin } from '../../src/main/permission-policy'
+import {
+  checkPermission,
+  policyForRequest,
+  rememberedDecision,
+  webOrigin,
+} from '../../src/main/permission-policy'
 import { MemoryPermissionStore } from '../../src/main/store/permissions'
 
 describe('policyForRequest', () => {
   it('asks for the contract permissions and denies everything else', () => {
-    expect(policyForRequest('notifications')).toEqual({ action: 'ask', permission: 'notifications' })
+    expect(policyForRequest('notifications')).toEqual({
+      action: 'ask',
+      permission: 'notifications',
+    })
     expect(policyForRequest('geolocation')).toEqual({ action: 'ask', permission: 'geolocation' })
-    expect(policyForRequest('clipboard-read')).toEqual({ action: 'ask', permission: 'clipboard-read' })
-    expect(policyForRequest('display-capture')).toEqual({ action: 'ask', permission: 'screen-capture' })
+    expect(policyForRequest('clipboard-read')).toEqual({
+      action: 'ask',
+      permission: 'clipboard-read',
+    })
+    expect(policyForRequest('display-capture')).toEqual({
+      action: 'ask',
+      permission: 'screen-capture',
+    })
     expect(policyForRequest('media', ['video'])).toEqual({ action: 'ask', permission: 'camera' })
-    expect(policyForRequest('media', ['audio'])).toEqual({ action: 'ask', permission: 'microphone' })
-    expect(policyForRequest('media', ['audio', 'video'])).toEqual({ action: 'ask', permission: 'camera-and-microphone' })
+    expect(policyForRequest('media', ['audio'])).toEqual({
+      action: 'ask',
+      permission: 'microphone',
+    })
+    expect(policyForRequest('media', ['audio', 'video'])).toEqual({
+      action: 'ask',
+      permission: 'camera-and-microphone',
+    })
     expect(policyForRequest('media', [])).toEqual({ action: 'deny' })
-    for (const p of ['midi', 'midiSysex', 'pointerLock', 'openExternal', 'hid', 'serial', 'usb', 'idle-detection', 'storage-access', 'something-new']) {
+    for (const p of [
+      'midi',
+      'midiSysex',
+      'pointerLock',
+      'openExternal',
+      'hid',
+      'serial',
+      'usb',
+      'idle-detection',
+      'storage-access',
+      'something-new',
+    ]) {
       expect(policyForRequest(p), p).toEqual({ action: 'deny' })
     }
     expect(policyForRequest('fullscreen')).toEqual({ action: 'grant' })
@@ -61,11 +92,22 @@ describe('PermissionBroker', () => {
   const setup = () => {
     const sent: { windowId: string; request: PermissionRequest }[] = []
     let now = 0
-    const broker = new PermissionBroker((windowId, request) => sent.push({ windowId, request }), () => now)
+    const broker = new PermissionBroker(
+      (windowId, request) => sent.push({ windowId, request }),
+      () => now,
+    )
     const decisions = new MemoryPermissionStore()
     const ask = (tabId = 't1', permission: PermissionRequest['permission'] = 'geolocation') =>
       broker.ask({ tabId, windowId: 'w1', origin: 'https://a.example', permission, decisions })
-    return { broker, sent, decisions, ask, tick: (ms: number) => { now += ms } }
+    return {
+      broker,
+      sent,
+      decisions,
+      ask,
+      tick: (ms: number) => {
+        now += ms
+      },
+    }
   }
 
   it('asks the UI and resolves with its answer', async () => {

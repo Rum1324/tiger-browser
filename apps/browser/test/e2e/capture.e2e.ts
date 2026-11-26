@@ -86,11 +86,15 @@ describe('capture', () => {
     await openTab(server.url(NEWS, '/set-cookie?name=pdfauth&value=yes'), 'Cookie set')
     const tab = await t.invoke('tabs.create', { input: server.url(NEWS, '/doc.pdf') })
     await waitForTab(t, tab.id, (x) => x.url.endsWith('/doc.pdf') && !x.isLoading, 'pdf loaded')
-    const r = await waitFor(async () => {
-      const res = await t.invoke('capture.extract', { tabId: tab.id })
-      // The viewer may still be starting; retry until the engine sees the PDF document.
-      return res.ok ? res : null
-    }, 20_000, 'pdf capture')
+    const r = await waitFor(
+      async () => {
+        const res = await t.invoke('capture.extract', { tabId: tab.id })
+        // The viewer may still be starting; retry until the engine sees the PDF document.
+        return res.ok ? res : null
+      },
+      20_000,
+      'pdf capture',
+    )
     expect(r.page.sourceType).toBe('pdf')
     expect(r.page.markdown).toContain('Quarterly report for the Tiger team')
     expect(r.page.markdown).toContain('Revenue grew in every region')
@@ -100,10 +104,14 @@ describe('capture', () => {
   it('maps a PDF without a text layer to no-text-layer', async () => {
     const tab = await t.invoke('tabs.create', { input: server.url(NEWS, '/scan.pdf') })
     await waitForTab(t, tab.id, (x) => x.url.endsWith('/scan.pdf') && !x.isLoading, 'scan loaded')
-    const r = await waitFor(async () => {
-      const res = await t.invoke('capture.extract', { tabId: tab.id })
-      return !res.ok && res.error === 'no-text-layer' ? res : null
-    }, 20_000, 'no-text-layer')
+    const r = await waitFor(
+      async () => {
+        const res = await t.invoke('capture.extract', { tabId: tab.id })
+        return !res.ok && res.error === 'no-text-layer' ? res : null
+      },
+      20_000,
+      'no-text-layer',
+    )
     expect(r).toMatchObject({ ok: false, error: 'no-text-layer', reason: null })
     await t.invoke('tabs.close', { tabId: tab.id })
   })
@@ -124,7 +132,10 @@ describe('capture', () => {
       reason: 'incognito',
     })
     // A tab id from another window is not reachable from this window's UI.
-    expect(await t.invoke('capture.extract', { tabId: tab.id })).toMatchObject({ ok: false, error: 'no-tab' })
+    expect(await t.invoke('capture.extract', { tabId: tab.id })).toMatchObject({
+      ok: false,
+      error: 'no-tab',
+    })
     // The window closes while the call is in flight, so its reply never arrives.
     await t.invokeFrom(priv, 'window.action', { action: 'close' }).catch(() => {})
     await waitFor(() => t.uiPages().length === before, 10_000, 'private window closed')

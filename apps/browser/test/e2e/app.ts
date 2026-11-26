@@ -85,17 +85,28 @@ export async function launch(opts: LaunchOptions): Promise<TigerApp> {
   await ui.waitForFunction(() => typeof window.tiger?.invoke === 'function')
 
   const invokeFrom = (async (page: Page, name: string, req?: unknown) =>
-    page.evaluate(([n, r]) => window.tiger.invoke(n as never, r as never), [name, req] as const)) as TigerApp['invokeFrom']
+    page.evaluate(
+      ([n, r]) => (window.tiger.invoke as (n: string, r?: unknown) => Promise<unknown>)(n, r),
+      [name, req] as const,
+    )) as TigerApp['invokeFrom']
 
   const t: TigerApp = {
     app,
     ui,
     invoke: ((name: EngineCommandName, req?: unknown) =>
-      (invokeFrom as (p: Page, n: string, r?: unknown) => Promise<unknown>)(ui, name, req)) as TigerApp['invoke'],
+      (invokeFrom as (p: Page, n: string, r?: unknown) => Promise<unknown>)(
+        ui,
+        name,
+        req,
+      )) as TigerApp['invoke'],
     invokeFrom,
     tabsState: (page = ui) => invokeFrom(page, 'tabs.get'),
     tabPage: (match, timeoutMs = 10_000) =>
-      waitFor(() => app.windows().find((p) => !p.url().startsWith('tiger:') && match(p.url())), timeoutMs, 'tab page'),
+      waitFor(
+        () => app.windows().find((p) => !p.url().startsWith('tiger:') && match(p.url())),
+        timeoutMs,
+        'tab page',
+      ),
     uiPages,
     close: async () => {
       await app.close().catch(() => {})
@@ -112,9 +123,13 @@ export async function waitForTab(
   label = 'tab state',
   page?: Page,
 ): Promise<TabsState['tabs'][number]> {
-  return waitFor(async () => {
-    const s = await t.tabsState(page)
-    const tab = s.tabs.find((x) => x.id === tabId)
-    return tab && pred(tab) ? tab : null
-  }, 15_000, label)
+  return waitFor(
+    async () => {
+      const s = await t.tabsState(page)
+      const tab = s.tabs.find((x) => x.id === tabId)
+      return tab && pred(tab) ? tab : null
+    },
+    15_000,
+    label,
+  )
 }

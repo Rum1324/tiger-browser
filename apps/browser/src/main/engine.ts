@@ -32,7 +32,11 @@ import { isWebUrl } from './resolve-input'
 import { BookmarkStore } from './store/bookmarks'
 import { KvStore, openDatabase } from './store/db'
 import { HistoryStore } from './store/history'
-import { MemoryPermissionStore, type PermissionDecisions, PermissionStore } from './store/permissions'
+import {
+  MemoryPermissionStore,
+  type PermissionDecisions,
+  PermissionStore,
+} from './store/permissions'
 import { SessionRestoreStore } from './store/session-restore'
 import { defaultSettings, SettingsStore } from './store/settings'
 import { TokenStore } from './store/token'
@@ -42,7 +46,6 @@ import { EngineWindow } from './window'
 
 export const TAB_PARTITION = 'persist:tabs'
 export const UI_PARTITION = 'persist:chrome-ui'
-
 
 const CAPTURE_TIMEOUT_MS = 15_000
 const MAX_FETCH_BYTES = 150 * 1024 * 1024
@@ -214,7 +217,13 @@ export class Engine {
       const origin = webOrigin(request.securityOrigin ?? request.frame?.url ?? '')
       if (!tab || !origin) return callback(null)
       this.broker
-        .ask({ tabId: tab.id, windowId: tab.window.id, origin, permission: 'screen-capture', decisions })
+        .ask({
+          tabId: tab.id,
+          windowId: tab.window.id,
+          origin,
+          permission: 'screen-capture',
+          decisions,
+        })
         .then(async (allow) => {
           if (!allow) return callback(null)
           const [source] = await desktopCapturer.getSources({ types: ['screen'] })
@@ -286,7 +295,8 @@ export class Engine {
     const others = [...this.windows.values()].filter((w) => w !== win && !w.isPrivate && !w.closed)
     // The last normal window to close is the one restored next time.
     if (others.length === 0) this.saveSession(win)
-    else if (this.lastNormalWindow === win) this.lastNormalWindow = others[others.length - 1] ?? null
+    else if (this.lastNormalWindow === win)
+      this.lastNormalWindow = others[others.length - 1] ?? null
   }
 
   windowClosed(win: EngineWindow): void {
@@ -340,7 +350,14 @@ export class Engine {
     event: E,
     payload: EngineEventPayload<E>,
   ): void {
-    const checked = checkEvent(event, payload)
+    let checked: unknown
+    try {
+      checked = checkEvent(event, payload)
+    } catch (err) {
+      // An engine bug must not reach the UI as a contract breach, nor take the main process down.
+      console.error(`tiger: dropped invalid ${event} event`, err)
+      return
+    }
     for (const wc of targets) if (!wc.isDestroyed()) wc.send(IPC_EVENT_CHANNEL, event, checked)
   }
 
@@ -379,7 +396,12 @@ export class Engine {
     if (length > MAX_FETCH_BYTES) throw new Error('resource too large')
     const body = new Uint8Array(await res.arrayBuffer())
     if (body.byteLength > MAX_FETCH_BYTES) throw new Error('resource too large')
-    return { status: res.status, contentType: res.headers.get('content-type'), finalUrl: res.url, body }
+    return {
+      status: res.status,
+      contentType: res.headers.get('content-type'),
+      finalUrl: res.url,
+      body,
+    }
   }
 
   async capture(tab: TabController) {
@@ -445,7 +467,9 @@ export class Engine {
       clearTimeout(waiter.timer)
       const parsed = DomReply.safeParse(reply)
       waiter.resolve(
-        parsed.success ? parsed.data : { kind: 'error', url: '', message: 'malformed extraction reply' },
+        parsed.success
+          ? parsed.data
+          : { kind: 'error', url: '', message: 'malformed extraction reply' },
       )
     })
 

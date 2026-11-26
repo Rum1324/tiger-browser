@@ -36,9 +36,12 @@ export function mergeSuggestions(input: string, src: SuggestSources): Suggestion
 
   const resolved = resolveInput(text, src.engine)
   const search = searchUrl(text, src.engine)
-  if (resolved && resolved !== search) push({ kind: 'url', title: resolved, url: resolved, tabId: null })
+  if (resolved && resolved !== search)
+    push({ kind: 'url', title: resolved, url: resolved, tabId: null })
 
-  for (const t of src.tabs.filter((t) => matches(t.url, q) || matches(t.title, q)).slice(0, MAX_TABS)) {
+  for (const t of src.tabs
+    .filter((t) => matches(t.url, q) || matches(t.title, q))
+    .slice(0, MAX_TABS)) {
     push({ kind: 'tab', title: t.title || t.url, url: t.url, tabId: t.id })
   }
   for (const b of src.bookmarks.slice(0, MAX_BOOKMARKS)) {

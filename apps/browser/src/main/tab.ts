@@ -8,9 +8,9 @@ import {
 } from 'electron'
 import { eligibilityFor } from './capture'
 import { pageMenuTemplate } from './menus'
-import { nextZoom } from './zoom'
 import { isWebUrl } from './resolve-input'
 import type { EngineWindow } from './window'
+import { nextZoom } from './zoom'
 
 export interface TabOptions {
   /** A popup created by the page: Chromium already made its webContents (window.opener intact). */
@@ -23,7 +23,8 @@ export interface TabOptions {
 let nextTabId = 1
 
 /** Frames may also show about:blank / about:srcdoc; anything other than http(s) is refused. */
-const frameUrlAllowed = (url: string) => isWebUrl(url) || url === 'about:blank' || url === 'about:srcdoc'
+const frameUrlAllowed = (url: string) =>
+  isWebUrl(url) || url === 'about:blank' || url === 'about:srcdoc'
 
 export class TabController {
   readonly id = `t${nextTabId++}`
@@ -71,7 +72,8 @@ export class TabController {
   /** What the UI shows. The blank new-tab page reports '' so the UI can draw its own start page. */
   displayUrl(): string {
     const committed = this.committedUrl()
-    if (this.pendingUrl) return committed && committed !== 'about:blank' ? committed : this.pendingUrl
+    if (this.pendingUrl)
+      return committed && committed !== 'about:blank' ? committed : this.pendingUrl
     return committed === 'about:blank' ? '' : committed
   }
 
@@ -250,7 +252,10 @@ export class TabController {
         engine.devToolsAllowed,
       )
       if (template.length) {
-        Menu.buildFromTemplate(template).popup({ window: this.window.base, frame: params.frame ?? undefined })
+        Menu.buildFromTemplate(template).popup({
+          window: this.window.base,
+          frame: params.frame ?? undefined,
+        })
       }
     })
     wc.on('destroyed', () => {
@@ -261,4 +266,3 @@ export class TabController {
     })
   }
 }
-

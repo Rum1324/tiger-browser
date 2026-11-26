@@ -168,12 +168,18 @@ export function Harness() {
           data-testid="capture"
           disabled={!active?.capture.allowed}
           title={active?.capture.reason ?? ''}
-          onClick={async () => active && setCapture(await tiger.invoke('capture.extract', { tabId: active.id }))}
+          onClick={async () =>
+            active && setCapture(await tiger.invoke('capture.extract', { tabId: active.id }))
+          }
         >
           {t.capture}
         </button>
         <label>
-          <input type="checkbox" checked={hidePage} onChange={(e) => setHidePage(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={hidePage}
+            onChange={(e) => setHidePage(e.target.checked)}
+          />
           {t.hidePage}
         </label>
         <button type="button" onClick={openOverlay}>

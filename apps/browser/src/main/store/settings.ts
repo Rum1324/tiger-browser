@@ -51,7 +51,8 @@ export class SettingsStore {
 
   update(patch: Partial<Settings>): Settings {
     const merged = { ...this.current, ...patch }
-    if (patch.userBlockedHosts) merged.userBlockedHosts = normalizeBlockedHosts(patch.userBlockedHosts)
+    if (patch.userBlockedHosts)
+      merged.userBlockedHosts = normalizeBlockedHosts(patch.userBlockedHosts)
     const next = Settings.parse(merged)
     this.kv.set(KEY, JSON.stringify(next))
     this.current = next

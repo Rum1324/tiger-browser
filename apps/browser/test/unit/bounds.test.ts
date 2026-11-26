@@ -45,7 +45,12 @@ describe('toViewBounds', () => {
 
 describe('fullBounds / toCornerRadius', () => {
   it('covers the whole content area', () => {
-    expect(fullBounds({ width: 1280.6, height: 799.4 })).toEqual({ x: 0, y: 0, width: 1281, height: 799 })
+    expect(fullBounds({ width: 1280.6, height: 799.4 })).toEqual({
+      x: 0,
+      y: 0,
+      width: 1281,
+      height: 799,
+    })
   })
 
   it('scales the radius and caps it at half the shorter side', () => {

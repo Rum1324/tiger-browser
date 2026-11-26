@@ -8,7 +8,11 @@ import { KvStore, migrate, openDatabase } from '../../src/main/store/db'
 import { HistoryStore, likePattern } from '../../src/main/store/history'
 import { MemoryPermissionStore, PermissionStore } from '../../src/main/store/permissions'
 import { SessionRestoreStore } from '../../src/main/store/session-restore'
-import { defaultSettings, normalizeBlockedHosts, SettingsStore } from '../../src/main/store/settings'
+import {
+  defaultSettings,
+  normalizeBlockedHosts,
+  SettingsStore,
+} from '../../src/main/store/settings'
 import { type Cipher, TokenStore } from '../../src/main/store/token'
 
 let db: DatabaseSync
@@ -59,7 +63,11 @@ describe('HistoryStore', () => {
     h.recordVisit('https://b.example/', 'Bee', new Date('2026-01-03T00:00:00Z'))
     const all = h.search('')
     expect(all.map((e) => e.url)).toEqual(['https://b.example/', 'https://a.example/'])
-    expect(all[1]).toMatchObject({ title: 'First', visitCount: 2, visitedAt: '2026-01-02T00:00:00.000Z' })
+    expect(all[1]).toMatchObject({
+      title: 'First',
+      visitCount: 2,
+      visitedAt: '2026-01-02T00:00:00.000Z',
+    })
     h.updateTitle('https://a.example/', 'Renamed')
     expect(h.search('renamed')[0]?.title).toBe('Renamed')
   })
@@ -119,7 +127,10 @@ describe('SettingsStore', () => {
     expect(defaultSettings('en-US', 'x').locale).toBe('en')
     const kv = new KvStore(db)
     const s = new SettingsStore(kv, defaults)
-    s.update({ searchEngine: 'duckduckgo', userBlockedHosts: [' https://Secret.Example.com/path ', ''] })
+    s.update({
+      searchEngine: 'duckduckgo',
+      userBlockedHosts: [' https://Secret.Example.com/path ', ''],
+    })
     const again = new SettingsStore(kv, defaults)
     expect(again.get()).toMatchObject({
       searchEngine: 'duckduckgo',
@@ -191,7 +202,13 @@ describe('SessionRestoreStore', () => {
 
   it('falls back to the last tab when the active one was dropped, and to null when empty', () => {
     const s = new SessionRestoreStore(new KvStore(db))
-    s.save([{ url: 'https://a.example/', title: 'A', pinned: false, spaceId: null }, { url: '', title: '', pinned: false, spaceId: null }], 1)
+    s.save(
+      [
+        { url: 'https://a.example/', title: 'A', pinned: false, spaceId: null },
+        { url: '', title: '', pinned: false, spaceId: null },
+      ],
+      1,
+    )
     expect(s.load()?.activeIndex).toBe(0)
     s.save([], null)
     expect(s.load()).toMatchObject({ tabs: [], activeIndex: null })

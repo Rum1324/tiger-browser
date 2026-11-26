@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:e2e": "electron-vite build && xvfb-run -a --server-args='-screen 0 1600x1000x24' vitest run -c vitest.e2e.config.ts",
     "package": "electron-vite build && electron-builder",
-    "package:dir": "electron-vite build && electron-builder --dir"
+    "package:dir": "electron-vite build && electron-builder --dir",
+    "test:package": "electron-vite build && electron-builder --dir && xvfb-run -a node test/package/smoke.mts"
   },
   "devDependencies": {
     "@tiger/extract": "workspace:*",
@@ -35,5 +36,6 @@
   },
   "dependencies": {
     "pdfjs-dist": "6.5.438"
-  }
+  },
+  "author": "Tiger"
 }

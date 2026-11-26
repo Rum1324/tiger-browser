@@ -11,11 +11,12 @@ import { app, clipboard, dialog } from 'electron'
 import type { Engine } from './engine'
 import { env } from './env'
 import { safeFileName } from './files'
+import { resolveInput } from './resolve-input'
 import { mergeSuggestions } from './suggest'
 import type { EngineWindow } from './window'
-import { resolveInput } from './resolve-input'
 
 /** Commands whose response is `undefined` may be implemented by functions returning nothing. */
+// biome-ignore lint/suspicious/noConfusingVoidType: void lets handlers end in a void call such as wc.stop()
 type Out<T> = [T] extends [undefined] ? void : T
 
 type Handler<K extends EngineCommandName> = (
@@ -45,7 +46,9 @@ export function createHandlers(engine: Engine): Handlers {
     'tabs.get': (_req, win) => win.tabsState(),
     'tabs.create': (req, win) => {
       const url = req.input ? resolve(req.input) : null
-      return win.createTab({ url, active: req.active ?? true, spaceId: req.spaceId ?? null }).state()
+      return win
+        .createTab({ url, active: req.active ?? true, spaceId: req.spaceId ?? null })
+        .state()
     },
     'tabs.close': (req, win) => win.closeTab(req.tabId),
     'tabs.activate': (req, win) => win.activate(req.tabId),
@@ -128,7 +131,11 @@ export function createHandlers(engine: Engine): Handlers {
 
     'bookmarks.list': () => engine.bookmarks.list(),
     'bookmarks.add': (req) => {
-      const bookmark = engine.bookmarks.add({ url: req.url, title: req.title, spaceId: req.spaceId })
+      const bookmark = engine.bookmarks.add({
+        url: req.url,
+        title: req.title,
+        spaceId: req.spaceId,
+      })
       engine.broadcast('bookmarks.changed', engine.bookmarks.list())
       return bookmark
     },

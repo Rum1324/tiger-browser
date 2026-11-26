@@ -9,14 +9,33 @@ import { chromeLikeUserAgent } from '../../src/main/user-agent'
 import { nextZoom } from '../../src/main/zoom'
 
 describe('mergeSuggestions', () => {
-  const bookmark = (url: string, title: string) => ({ id: url, url, title, faviconUrl: null, spaceId: null, createdAt: '2026-01-01T00:00:00.000Z' })
-  const visit = (url: string, title: string) => ({ id: url, url, title, visitedAt: '2026-01-01T00:00:00.000Z', visitCount: 1 })
+  const bookmark = (url: string, title: string) => ({
+    id: url,
+    url,
+    title,
+    faviconUrl: null,
+    spaceId: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  })
+  const visit = (url: string, title: string) => ({
+    id: url,
+    url,
+    title,
+    visitedAt: '2026-01-01T00:00:00.000Z',
+    visitCount: 1,
+  })
 
   it('orders URL, tabs, bookmarks, history, search and removes duplicates', () => {
     const out = mergeSuggestions('example.com', {
-      tabs: [{ id: 't1', url: 'https://example.com/', title: 'Example' }, { id: 't2', url: 'https://other.org/', title: 'Other' }],
+      tabs: [
+        { id: 't1', url: 'https://example.com/', title: 'Example' },
+        { id: 't2', url: 'https://other.org/', title: 'Other' },
+      ],
       bookmarks: [bookmark('https://example.com/docs', 'Docs')],
-      history: [visit('https://example.com/docs', 'Docs again'), visit('https://example.com/blog', 'Blog')],
+      history: [
+        visit('https://example.com/docs', 'Docs again'),
+        visit('https://example.com/blog', 'Blog'),
+      ],
       engine: 'google',
     })
     expect(out.map((s) => [s.kind, s.url])).toEqual([
@@ -62,7 +81,7 @@ describe('menus', () => {
     const ids = all.map((i) => i.id).filter((id): id is string => !!id?.startsWith('shortcut:'))
     expect(ids).toHaveLength(ShortcutAction.options.length)
     const find = all.find((i) => i.id === 'shortcut:find')
-    ;(find?.click as () => void)()
+    ;(find?.click as (() => void) | undefined)?.()
     expect(fired).toEqual(['find'])
   })
 
@@ -75,7 +94,16 @@ describe('menus', () => {
     hasImageContents: false,
     selectionText: '',
     isEditable: false,
-    editFlags: { canUndo: false, canRedo: false, canCut: false, canCopy: false, canPaste: true, canDelete: false, canSelectAll: true, canEditRichly: false },
+    editFlags: {
+      canUndo: false,
+      canRedo: false,
+      canCut: false,
+      canCopy: false,
+      canPaste: true,
+      canDelete: false,
+      canSelectAll: true,
+      canEditRichly: false,
+    },
     misspelledWord: '',
     dictionarySuggestions: [],
   }
@@ -95,18 +123,61 @@ describe('menus', () => {
   const ids = (t: ReturnType<typeof pageMenuTemplate>) => t.map((i) => i.id ?? i.role ?? i.type)
 
   it('page menu: navigation on empty space, link and image actions, edit roles', () => {
-    expect(ids(pageMenuTemplate(params, { canGoBack: true, canGoForward: false }, actions, false))).toEqual(['back', 'forward', 'reload'])
-    const link = pageMenuTemplate({ ...params, linkURL: 'https://a.example/x' }, { canGoBack: false, canGoForward: false }, actions, false)
+    expect(
+      ids(pageMenuTemplate(params, { canGoBack: true, canGoForward: false }, actions, false)),
+    ).toEqual(['back', 'forward', 'reload'])
+    const link = pageMenuTemplate(
+      { ...params, linkURL: 'https://a.example/x' },
+      { canGoBack: false, canGoForward: false },
+      actions,
+      false,
+    )
     expect(ids(link)).toEqual(['open-link-new-tab', 'copy-link', 'save-link'])
-    ;(link[0]?.click as () => void)()
+    ;(link[0]?.click as (() => void) | undefined)?.()
     expect(calls).toContain('open https://a.example/x')
-    const js = pageMenuTemplate({ ...params, linkURL: 'javascript:alert(1)' }, { canGoBack: false, canGoForward: false }, actions, false)
+    const js = pageMenuTemplate(
+      { ...params, linkURL: 'javascript:alert(1)' },
+      { canGoBack: false, canGoForward: false },
+      actions,
+      false,
+    )
     expect(ids(js)).not.toContain('open-link-new-tab')
-    const img = pageMenuTemplate({ ...params, mediaType: 'image', srcURL: 'https://a.example/i.png', hasImageContents: true }, { canGoBack: false, canGoForward: false }, actions, true)
-    expect(ids(img)).toEqual(['open-image-new-tab', 'save-image', 'copy-image', 'copy-image-url', 'separator', 'inspect'])
-    const edit = pageMenuTemplate({ ...params, isEditable: true }, { canGoBack: false, canGoForward: false }, actions, false)
-    expect(ids(edit)).toEqual(['undo', 'redo', 'separator', 'cut', 'copy', 'paste', 'pasteAndMatchStyle', 'selectAll'])
-    const sel = pageMenuTemplate({ ...params, selectionText: ' rice ' }, { canGoBack: false, canGoForward: false }, actions, false)
+    const img = pageMenuTemplate(
+      { ...params, mediaType: 'image', srcURL: 'https://a.example/i.png', hasImageContents: true },
+      { canGoBack: false, canGoForward: false },
+      actions,
+      true,
+    )
+    expect(ids(img)).toEqual([
+      'open-image-new-tab',
+      'save-image',
+      'copy-image',
+      'copy-image-url',
+      'separator',
+      'inspect',
+    ])
+    const edit = pageMenuTemplate(
+      { ...params, isEditable: true },
+      { canGoBack: false, canGoForward: false },
+      actions,
+      false,
+    )
+    expect(ids(edit)).toEqual([
+      'undo',
+      'redo',
+      'separator',
+      'cut',
+      'copy',
+      'paste',
+      'pasteAndMatchStyle',
+      'selectAll',
+    ])
+    const sel = pageMenuTemplate(
+      { ...params, selectionText: ' rice ' },
+      { canGoBack: false, canGoForward: false },
+      actions,
+      false,
+    )
     expect(ids(sel)).toEqual(['copy', 'search-selection'])
   })
 })
@@ -118,7 +189,9 @@ describe('protocol', () => {
     expect(resolveUiFile(root, 'tiger://ui/')).toBe(join(root, 'index.html'))
     expect(resolveUiFile(root, 'tiger://ui/assets/a.js?x=1')).toBe(join(root, 'assets/a.js'))
     expect(resolveUiFile(root, 'tiger://ui/../../etc/passwd')).toBe(join(root, 'etc/passwd'))
-    expect(resolveUiFile(root, 'tiger://ui/%2e%2e/%2e%2e/etc/passwd')).toBe(join(root, 'etc/passwd'))
+    expect(resolveUiFile(root, 'tiger://ui/%2e%2e/%2e%2e/etc/passwd')).toBe(
+      join(root, 'etc/passwd'),
+    )
     expect(resolveUiFile(root, 'tiger://ui/a%2f..%2f..%2f..%2fetc%2fpasswd')).toBeNull()
     expect(resolveUiFile(root, 'tiger://ui/a%00b')).toBeNull()
     expect(resolveUiFile(root, 'tiger://other/index.html')).toBeNull()

@@ -104,7 +104,12 @@ export function appMenuTemplate(
           click: () => actions.reload(true),
         },
         sep,
-        { id: 'zoom-in', label: 'Zoom In', accelerator: 'CmdOrCtrl+=', click: () => actions.zoom('in') },
+        {
+          id: 'zoom-in',
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+=',
+          click: () => actions.zoom('in'),
+        },
         {
           id: 'zoom-out',
           label: 'Zoom Out',
@@ -241,7 +246,11 @@ export function pageMenuTemplate(
         enabled: p.hasImageContents,
         click: () => actions.copyImageAt(p.x, p.y),
       },
-      { id: 'copy-image-url', label: 'Copy Image Address', click: () => actions.copyText(p.srcURL) },
+      {
+        id: 'copy-image-url',
+        label: 'Copy Image Address',
+        click: () => actions.copyText(p.srcURL),
+      },
     )
     groups.push(img)
   }
@@ -263,14 +272,23 @@ export function pageMenuTemplate(
     const short = text.length > 24 ? `${text.slice(0, 24)}…` : text
     groups.push([
       { role: 'copy' },
-      { id: 'search-selection', label: `Search for “${short}”`, click: () => actions.searchFor(text) },
+      {
+        id: 'search-selection',
+        label: `Search for “${short}”`,
+        click: () => actions.searchFor(text),
+      },
     ])
   }
 
   if (!p.linkURL && p.mediaType === 'none' && !p.isEditable && !p.selectionText.trim()) {
     groups.push([
       { id: 'back', label: 'Back', enabled: nav.canGoBack, click: () => actions.back() },
-      { id: 'forward', label: 'Forward', enabled: nav.canGoForward, click: () => actions.forward() },
+      {
+        id: 'forward',
+        label: 'Forward',
+        enabled: nav.canGoForward,
+        click: () => actions.forward(),
+      },
       { id: 'reload', label: 'Reload', click: () => actions.reload() },
     ])
   }

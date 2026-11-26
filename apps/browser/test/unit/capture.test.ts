@@ -1,6 +1,12 @@
 import type { PdfResult } from '@tiger/extract/pdf'
 import { describe, expect, it, vi } from 'vitest'
-import { type CaptureDeps, type CaptureTarget, captureTab, type DomReply, type FetchedResource } from '../../src/main/capture'
+import {
+  type CaptureDeps,
+  type CaptureTarget,
+  captureTab,
+  type DomReply,
+  type FetchedResource,
+} from '../../src/main/capture'
 
 const extraction = {
   title: 'Notes',
@@ -11,7 +17,10 @@ const extraction = {
   extractor: 'readability@0.6',
 }
 
-function setup(url: string, opts: { isPrivate?: boolean; blocked?: string[]; dom?: DomReply } = {}) {
+function setup(
+  url: string,
+  opts: { isPrivate?: boolean; blocked?: string[]; dom?: DomReply } = {},
+) {
   let current = url
   const target: CaptureTarget = {
     currentUrl: () => current,
@@ -22,14 +31,33 @@ function setup(url: string, opts: { isPrivate?: boolean; blocked?: string[]; dom
   const deps = {
     userBlockedHosts: () => opts.blocked ?? [],
     now: () => new Date('2026-11-26T00:00:00Z'),
-    extractDom: vi.fn(async (): Promise<DomReply> => opts.dom ?? { kind: 'dom', url: current, extraction }),
+    extractDom: vi.fn(
+      async (): Promise<DomReply> => opts.dom ?? { kind: 'dom', url: current, extraction },
+    ),
     fetchWithTabSession: vi.fn(async (u: string): Promise<FetchedResource> => {
       fetched.push(u)
-      return { status: 200, contentType: 'text/markdown', finalUrl: u, body: new TextEncoder().encode('# Doc\n\nBody text') }
+      return {
+        status: 200,
+        contentType: 'text/markdown',
+        finalUrl: u,
+        body: new TextEncoder().encode('# Doc\n\nBody text'),
+      }
     }),
-    extractPdf: vi.fn(async (): Promise<PdfResult> => ({ extraction: { ...extraction, extractor: 'pdfjs@6.5.438' }, pageCount: 1 })),
+    extractPdf: vi.fn(
+      async (): Promise<PdfResult> => ({
+        extraction: { ...extraction, extractor: 'pdfjs@6.5.438' },
+        pageCount: 1,
+      }),
+    ),
   } satisfies CaptureDeps
-  return { target, deps, fetched, navigate: (u: string) => { current = u } }
+  return {
+    target,
+    deps,
+    fetched,
+    navigate: (u: string) => {
+      current = u
+    },
+  }
 }
 
 describe('captureTab: eligibility is decided here', () => {
@@ -56,7 +84,11 @@ describe('captureTab: eligibility is decided here', () => {
 
   it('refuses non-web schemes', async () => {
     const { target, deps } = setup('about:blank')
-    expect(await captureTab(target, deps)).toMatchObject({ ok: false, error: 'blocked', reason: 'scheme' })
+    expect(await captureTab(target, deps)).toMatchObject({
+      ok: false,
+      error: 'blocked',
+      reason: 'scheme',
+    })
   })
 
   it('refuses when the tab navigated to a blocked page during extraction', async () => {
@@ -96,10 +128,18 @@ describe('captureTab: extraction paths', () => {
   })
 
   it('maps an empty extraction and an extractor error', async () => {
-    const empty = setup('https://example.com/a', { dom: { kind: 'dom', url: 'https://example.com/a', extraction: null } })
+    const empty = setup('https://example.com/a', {
+      dom: { kind: 'dom', url: 'https://example.com/a', extraction: null },
+    })
     expect(await captureTab(empty.target, empty.deps)).toMatchObject({ ok: false, error: 'empty' })
-    const err = setup('https://example.com/a', { dom: { kind: 'error', url: 'https://example.com/a', message: 'boom' } })
-    expect(await captureTab(err.target, err.deps)).toMatchObject({ ok: false, error: 'failed', detail: 'boom' })
+    const err = setup('https://example.com/a', {
+      dom: { kind: 'error', url: 'https://example.com/a', message: 'boom' },
+    })
+    expect(await captureTab(err.target, err.deps)).toMatchObject({
+      ok: false,
+      error: 'failed',
+      detail: 'boom',
+    })
   })
 
   it('reads Google Docs through the export URL with the tab session, never the DOM', async () => {
@@ -125,8 +165,15 @@ describe('captureTab: extraction paths', () => {
   })
 
   it('reads a PDF through the tab session and pdf.js', async () => {
-    const s = setup('https://example.com/report.pdf', { dom: { kind: 'pdf', url: 'https://example.com/report.pdf' } })
-    s.deps.fetchWithTabSession.mockResolvedValue({ status: 200, contentType: 'application/pdf', finalUrl: null, body: new Uint8Array([1]) })
+    const s = setup('https://example.com/report.pdf', {
+      dom: { kind: 'pdf', url: 'https://example.com/report.pdf' },
+    })
+    s.deps.fetchWithTabSession.mockResolvedValue({
+      status: 200,
+      contentType: 'application/pdf',
+      finalUrl: null,
+      body: new Uint8Array([1]),
+    })
     const r = await captureTab(s.target, s.deps)
     expect(s.fetched).toEqual([])
     expect(s.deps.fetchWithTabSession).toHaveBeenCalledWith('https://example.com/report.pdf')
@@ -135,22 +182,50 @@ describe('captureTab: extraction paths', () => {
   })
 
   it('maps a PDF without a text layer to no-text-layer', async () => {
-    const s = setup('https://example.com/scan.pdf', { dom: { kind: 'pdf', url: 'https://example.com/scan.pdf' } })
-    s.deps.fetchWithTabSession.mockResolvedValue({ status: 200, contentType: 'application/pdf', finalUrl: null, body: new Uint8Array([1]) })
-    s.deps.extractPdf.mockResolvedValue({ extraction: null, reason: 'no-text-layer', detail: '3 pages, no text', pageCount: 3 })
+    const s = setup('https://example.com/scan.pdf', {
+      dom: { kind: 'pdf', url: 'https://example.com/scan.pdf' },
+    })
+    s.deps.fetchWithTabSession.mockResolvedValue({
+      status: 200,
+      contentType: 'application/pdf',
+      finalUrl: null,
+      body: new Uint8Array([1]),
+    })
+    s.deps.extractPdf.mockResolvedValue({
+      extraction: null,
+      reason: 'no-text-layer',
+      detail: '3 pages, no text',
+      pageCount: 3,
+    })
     expect(await captureTab(s.target, s.deps)).toEqual({
       ok: false,
       error: 'no-text-layer',
       reason: null,
       detail: '3 pages, no text',
     })
-    s.deps.extractPdf.mockResolvedValue({ extraction: null, reason: 'encrypted', detail: 'password', pageCount: null })
+    s.deps.extractPdf.mockResolvedValue({
+      extraction: null,
+      reason: 'encrypted',
+      detail: 'password',
+      pageCount: null,
+    })
     expect(await captureTab(s.target, s.deps)).toMatchObject({ ok: false, error: 'failed' })
   })
 
   it('reports a failed PDF fetch', async () => {
-    const s = setup('https://example.com/r.pdf', { dom: { kind: 'pdf', url: 'https://example.com/r.pdf' } })
-    s.deps.fetchWithTabSession.mockResolvedValue({ status: 403, contentType: 'text/plain', finalUrl: null, body: new Uint8Array() })
-    expect(await captureTab(s.target, s.deps)).toMatchObject({ ok: false, error: 'failed', detail: 'HTTP 403' })
+    const s = setup('https://example.com/r.pdf', {
+      dom: { kind: 'pdf', url: 'https://example.com/r.pdf' },
+    })
+    s.deps.fetchWithTabSession.mockResolvedValue({
+      status: 403,
+      contentType: 'text/plain',
+      finalUrl: null,
+      body: new Uint8Array(),
+    })
+    expect(await captureTab(s.target, s.deps)).toMatchObject({
+      ok: false,
+      error: 'failed',
+      detail: 'HTTP 403',
+    })
   })
 })

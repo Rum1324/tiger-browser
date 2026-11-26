@@ -5,7 +5,9 @@ const g = (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q
 
 describe('resolveInput', () => {
   it('keeps typed http(s) URLs', () => {
-    expect(resolveInput('https://example.com/a?b=1#c', 'google')).toBe('https://example.com/a?b=1#c')
+    expect(resolveInput('https://example.com/a?b=1#c', 'google')).toBe(
+      'https://example.com/a?b=1#c',
+    )
     expect(resolveInput('http://example.com', 'google')).toBe('http://example.com/')
     expect(resolveInput('  HTTPS://Example.COM/Path  ', 'google')).toBe('https://example.com/Path')
   })

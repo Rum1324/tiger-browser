@@ -44,7 +44,11 @@ export class PermissionBroker {
 
     for (const p of this.pending.values()) {
       const r = p.request
-      if (r.tabId === input.tabId && r.origin === input.origin && r.permission === input.permission) {
+      if (
+        r.tabId === input.tabId &&
+        r.origin === input.origin &&
+        r.permission === input.permission
+      ) {
         return new Promise((resolve) => {
           const prev = p.resolve
           p.resolve = (allow) => {

@@ -110,7 +110,8 @@ describe('tab lifecycle and navigation state', () => {
     expect(reopened?.spaceId).toBe('space-2')
     await waitForTab(t, reopened?.id as string, (x) => x.url === url('/two'), 'reopened')
 
-    for (const id of [dup.id, reopened?.id as string, b.id]) await t.invoke('tabs.close', { tabId: id })
+    for (const id of [dup.id, reopened?.id as string, b.id])
+      await t.invoke('tabs.close', { tabId: id })
     expect((await t.tabsState()).tabs.map((x) => x.id)).toEqual([a])
   })
 
@@ -120,7 +121,12 @@ describe('tab lifecycle and navigation state', () => {
     expect(failed.loadError?.code).toBeLessThan(0)
 
     await t.invoke('tabs.navigate', { tabId: tab.id, input: url('/two') })
-    await waitForTab(t, tab.id, (x) => x.title === 'Page Two' && x.loadError === null && !x.isLoading, 'recovered')
+    await waitForTab(
+      t,
+      tab.id,
+      (x) => x.title === 'Page Two' && x.loadError === null && !x.isLoading,
+      'recovered',
+    )
 
     await t.invoke('page.setZoom', { tabId: tab.id, factor: 1.5 })
     await waitForTab(t, tab.id, (x) => Math.abs(x.zoomFactor - 1.5) < 0.01, 'zoom')
@@ -134,7 +140,8 @@ describe('tab lifecycle and navigation state', () => {
     const result = await waitFor(
       () =>
         t.ui.evaluate(() => {
-          const list = (window as unknown as { __find: { matches: number; tabId: string }[] }).__find
+          const list = (window as unknown as { __find: { matches: number; tabId: string }[] })
+            .__find
           return list.find((r) => r.matches > 0) ?? null
         }),
       10_000,
@@ -152,21 +159,33 @@ describe('tab lifecycle and navigation state', () => {
     const page = await t.tabPage((u) => u === url('/opener'))
     await page.click('#open')
 
-    const popup = await waitFor(async () => {
-      const s = await t.tabsState()
-      return s.tabs.find((x) => x.url === url('/popup') && x.title === 'HAS-OPENER') ?? null
-    }, 15_000, 'popup tab')
+    const popup = await waitFor(
+      async () => {
+        const s = await t.tabsState()
+        return s.tabs.find((x) => x.url === url('/popup') && x.title === 'HAS-OPENER') ?? null
+      },
+      15_000,
+      'popup tab',
+    )
     const s = await t.tabsState()
     // A tab in the same window, right after its opener, and active.
-    expect(s.tabs.findIndex((x) => x.id === popup.id)).toBe(s.tabs.findIndex((x) => x.id === opener.id) + 1)
+    expect(s.tabs.findIndex((x) => x.id === popup.id)).toBe(
+      s.tabs.findIndex((x) => x.id === opener.id) + 1,
+    )
     expect(s.activeTabId).toBe(popup.id)
     // The popup posted to window.opener and the opener received it.
     await waitForTab(t, opener.id, (x) => x.title === 'OPENER-OK', 'opener got the message')
 
     // window.close() from the popup closes the tab without wedging the engine.
     const popupPage = await t.tabPage((u) => u === url('/popup'))
-    await popupPage.evaluate(() => (window as unknown as { closeMe: () => void }).closeMe()).catch(() => {})
-    await waitFor(async () => !(await t.tabsState()).tabs.some((x) => x.id === popup.id), 10_000, 'popup closed')
+    await popupPage
+      .evaluate(() => (window as unknown as { closeMe: () => void }).closeMe())
+      .catch(() => {})
+    await waitFor(
+      async () => !(await t.tabsState()).tabs.some((x) => x.id === popup.id),
+      10_000,
+      'popup closed',
+    )
     expect((await t.tabsState()).activeTabId).toBe(opener.id)
     await t.invoke('tabs.close', { tabId: opener.id })
   })

@@ -55,11 +55,16 @@ describe('overlay and page layout', () => {
   let origin: { x: number; y: number }
   const at = (dx: number, dy: number) => xClick(origin.x + slot.x + dx, origin.y + slot.y + dy)
   const pageClicks = () => page.evaluate(() => (window as unknown as { __clicks: number }).__clicks)
-  const overlayClicks = async () => Number(await overlay.textContent('[data-testid="overlay-clicks"]'))
+  const overlayClicks = async () =>
+    Number(await overlay.textContent('[data-testid="overlay-clicks"]'))
 
   beforeAll(async () => {
     ;({ page } = await activeTabOn('/clicks', 'Clicks'))
-    overlay = await waitFor(() => t.app.windows().find((p) => p.url().endsWith('#overlay')), 10_000, 'overlay view')
+    overlay = await waitFor(
+      () => t.app.windows().find((p) => p.url().endsWith('#overlay')),
+      10_000,
+      'overlay view',
+    )
     slot = await t.ui.evaluate(() => {
       const r = (document.querySelector('.page-slot') as HTMLElement).getBoundingClientRect()
       return { x: r.left, y: r.top, width: r.width, height: r.height }
@@ -121,7 +126,9 @@ describe('overlay and page layout', () => {
   it('null bounds hide the page view', async () => {
     await t.invoke('page.setBounds', { bounds: null, cornerRadius: 0 })
     const visible = await t.app.evaluate(({ BaseWindow }) =>
-      (BaseWindow.getAllWindows()[0]?.contentView.children ?? []).slice(1, -1).some((v) => v.getVisible()),
+      (BaseWindow.getAllWindows()[0]?.contentView.children ?? [])
+        .slice(1, -1)
+        .some((v) => v.getVisible()),
     )
     expect(visible).toBe(false)
     await at(100, 100)
@@ -135,29 +142,50 @@ describe('downloads', () => {
   it('saves a download into the downloads folder and reports it', async () => {
     const { page } = await activeTabOn('/download-page', 'Downloads')
     await page.click('#dl')
-    const done = await waitFor(async () => {
-      const list = await t.invoke('downloads.list')
-      return list.find((d) => d.filename === 'tiger-fixture.txt' && d.state === 'completed') ?? null
-    }, 15_000, 'download completed')
+    const done = await waitFor(
+      async () => {
+        const list = await t.invoke('downloads.list')
+        return (
+          list.find((d) => d.filename === 'tiger-fixture.txt' && d.state === 'completed') ?? null
+        )
+      },
+      15_000,
+      'download completed',
+    )
     expect(done.savePath).toBe(join(dir, 'Downloads', 'tiger-fixture.txt'))
     expect(done.receivedBytes).toBe(Buffer.byteLength(DOWNLOAD_CONTENT))
     expect(readFileSync(done.savePath as string, 'utf8')).toBe(DOWNLOAD_CONTENT)
-    const seen = await events<Download[]>('downloads.changed')
-    expect(seen.some((list) => list.some((d) => d.id === done.id && d.state === 'completed'))).toBe(true)
+    // downloads.changed is coalesced, so it may arrive just after the list already says completed.
+    await waitFor(
+      async () => {
+        const seen = await events<Download[]>('downloads.changed')
+        return seen.some((list) => list.some((d) => d.id === done.id && d.state === 'completed'))
+      },
+      5_000,
+      'downloads.changed event',
+    )
   })
 
   it('cancels a running download', async () => {
     const s = await t.tabsState()
     await t.invoke('tabs.navigate', { tabId: s.activeTabId as string, input: url('/slow.bin') })
-    const running = await waitFor(async () => {
-      const list = await t.invoke('downloads.list')
-      return list.find((d) => d.filename === 'slow.bin' && d.state === 'progressing') ?? null
-    }, 15_000, 'download running')
+    const running = await waitFor(
+      async () => {
+        const list = await t.invoke('downloads.list')
+        return list.find((d) => d.filename === 'slow.bin' && d.state === 'progressing') ?? null
+      },
+      15_000,
+      'download running',
+    )
     await t.invoke('downloads.cancel', { id: running.id })
-    await waitFor(async () => {
-      const list = await t.invoke('downloads.list')
-      return list.find((d) => d.id === running.id && d.state === 'cancelled') ?? null
-    }, 10_000, 'download cancelled')
+    await waitFor(
+      async () => {
+        const list = await t.invoke('downloads.list')
+        return list.find((d) => d.id === running.id && d.state === 'cancelled') ?? null
+      },
+      10_000,
+      'download cancelled',
+    )
     expect(existsSync(running.savePath as string)).toBe(false)
     await t.invoke('downloads.clear')
     expect(await t.invoke('downloads.list')).toEqual([])
@@ -172,13 +200,19 @@ describe('permissions', () => {
       const w = window as unknown as { __perm: Promise<string> }
       w.__perm = Notification.requestPermission()
     })
-    const req = await waitFor(async () => {
-      const list = await events<PermissionRequest>('permission.request')
-      return list.find((r) => r.permission === 'notifications') ?? null
-    }, 10_000, 'permission.request')
+    const req = await waitFor(
+      async () => {
+        const list = await events<PermissionRequest>('permission.request')
+        return list.find((r) => r.permission === 'notifications') ?? null
+      },
+      10_000,
+      'permission.request',
+    )
     expect(req).toMatchObject({ tabId: id, origin: `http://127.0.0.1:${server.port}` })
     await t.invoke('permission.respond', { requestId: req.requestId, allow: true, remember: true })
-    expect(await page.evaluate(() => (window as unknown as { __perm: Promise<string> }).__perm)).toBe('granted')
+    expect(
+      await page.evaluate(() => (window as unknown as { __perm: Promise<string> }).__perm),
+    ).toBe('granted')
 
     // Remembered: a reload reports granted and asking again does not prompt.
     await t.invoke('tabs.reload', { tabId: id })
@@ -186,7 +220,11 @@ describe('permissions', () => {
     const again = await t.tabPage((u) => u === url('/perm'))
     expect(await again.evaluate(() => Notification.permission)).toBe('granted')
     expect(await again.evaluate(() => Notification.requestPermission())).toBe('granted')
-    expect((await events<PermissionRequest>('permission.request')).filter((r) => r.permission === 'notifications')).toHaveLength(1)
+    expect(
+      (await events<PermissionRequest>('permission.request')).filter(
+        (r) => r.permission === 'notifications',
+      ),
+    ).toHaveLength(1)
   })
 
   it('honours a deny', async () => {
@@ -200,11 +238,19 @@ describe('permissions', () => {
           ),
         ),
     )
-    const req = await waitFor(async () => {
-      const list = await events<PermissionRequest>('permission.request')
-      return list.find((r) => r.permission === 'geolocation') ?? null
-    }, 10_000, 'geolocation request')
-    await t.invoke('permission.respond', { requestId: req.requestId, allow: false, remember: false })
+    const req = await waitFor(
+      async () => {
+        const list = await events<PermissionRequest>('permission.request')
+        return list.find((r) => r.permission === 'geolocation') ?? null
+      },
+      10_000,
+      'geolocation request',
+    )
+    await t.invoke('permission.respond', {
+      requestId: req.requestId,
+      allow: false,
+      remember: false,
+    })
     // 1 is PERMISSION_DENIED.
     expect(await result).toBe(1)
   })
@@ -227,12 +273,17 @@ describe('menus, clipboard and export', () => {
   it('application menu accelerators emit shortcut events', async () => {
     await t.app.evaluate(({ Menu }) => {
       const item = Menu.getApplicationMenu()?.getMenuItemById('shortcut:toggle-command')
-      ;(item?.click as unknown as () => void)()
+      if (!item) throw new Error('menu item missing')
+      ;(item.click as unknown as () => void)()
     })
-    await waitFor(async () => {
-      const list = await events<{ action: string }>('shortcut')
-      return list.some((e) => e.action === 'toggle-command')
-    }, 5_000, 'shortcut event')
+    await waitFor(
+      async () => {
+        const list = await events<{ action: string }>('shortcut')
+        return list.some((e) => e.action === 'toggle-command')
+      },
+      5_000,
+      'shortcut event',
+    )
   })
 
   it('writes text to the clipboard', async () => {
@@ -244,9 +295,16 @@ describe('menus, clipboard and export', () => {
     const target = join(dir, 'export.md')
     await t.app.evaluate(({ dialog }, path) => {
       // Stand-in for the native save dialog, which cannot be driven under Xvfb.
-      dialog.showSaveDialog = (async () => ({ canceled: false, filePath: path })) as typeof dialog.showSaveDialog
+      dialog.showSaveDialog = (async () => ({
+        canceled: false,
+        filePath: path,
+      })) as typeof dialog.showSaveDialog
     }, target)
-    const r = await t.invoke('export.saveFile', { suggestedName: 'Notes', content: '# Notes\n', extension: 'md' })
+    const r = await t.invoke('export.saveFile', {
+      suggestedName: 'Notes',
+      content: '# Notes\n',
+      extension: 'md',
+    })
     expect(r).toEqual({ path: target })
     expect(readFileSync(target, 'utf8')).toBe('# Notes\n')
   })

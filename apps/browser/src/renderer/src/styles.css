@@ -9,10 +9,10 @@ body,
   margin: 0;
   height: 100%;
 }
-html[data-view='main'] body {
+html[data-view="main"] body {
   background: #e9e9ee;
 }
-html[data-view='overlay'] body {
+html[data-view="overlay"] body {
   background: transparent;
 }
 .harness {
@@ -57,7 +57,7 @@ html[data-view='overlay'] body {
   gap: 4px;
   padding: 6px 8px;
 }
-.toolbar input[type='text'] {
+.toolbar input[type="text"] {
   flex: 1;
 }
 .body {

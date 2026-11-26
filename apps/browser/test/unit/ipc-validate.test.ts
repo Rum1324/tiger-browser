@@ -18,7 +18,11 @@ import {
 describe('parseInvoke', () => {
   it('accepts a valid request and strips unknown keys', () => {
     const r = parseInvoke('tabs.navigate', { tabId: 't1', input: 'example.com', evil: true })
-    expect(r).toEqual({ ok: true, name: 'tabs.navigate', request: { tabId: 't1', input: 'example.com' } })
+    expect(r).toEqual({
+      ok: true,
+      name: 'tabs.navigate',
+      request: { tabId: 't1', input: 'example.com' },
+    })
   })
 
   it('rejects unknown command names, including prototype keys', () => {
@@ -33,7 +37,12 @@ describe('parseInvoke', () => {
     expect(parseInvoke('tabs.move', { tabId: 't1', toIndex: -1 }).ok).toBe(false)
     expect(parseInvoke('page.setZoom', { tabId: 't1', factor: 50 }).ok).toBe(false)
     expect(parseInvoke('suggest.query', { input: 'x'.repeat(2001) }).ok).toBe(false)
-    expect(parseInvoke('page.setBounds', { bounds: { x: 0, y: 0, width: -1, height: 1 }, cornerRadius: 0 }).ok).toBe(false)
+    expect(
+      parseInvoke('page.setBounds', {
+        bounds: { x: 0, y: 0, width: -1, height: 1 },
+        cornerRadius: 0,
+      }).ok,
+    ).toBe(false)
     expect(parseInvoke('capture.extract', 't1').ok).toBe(false)
   })
 

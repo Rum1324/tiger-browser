@@ -1,0 +1,66 @@
+# Packaging for macOS, Windows and Linux. Signing and notarization are driven by the environment only:
+#   macOS signing:      CSC_LINK + CSC_KEY_PASSWORD (Developer ID Application certificate), or CSC_NAME
+#   macOS notarization: APPLE_API_KEY + APPLE_API_KEY_ID + APPLE_API_ISSUER,
+#                       or APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID
+#   Windows signing:    WIN_CSC_LINK + WIN_CSC_KEY_PASSWORD
+# With none of these set the build is unsigned (macOS is ad-hoc signed by electron-builder).
+appId: app.tiger.browser
+productName: Tiger
+executableName: tiger
+copyright: Copyright © 2026 Tiger
+directories:
+  output: dist
+  buildResources: build
+# Main, preloads and renderer are bundled by electron-vite, pdf.js included. pdfjs-dist is shipped only
+# for the data @tiger/extract/pdf reads from disk (CMaps, standard fonts, wasm decoders, ICC profiles);
+# its code copies and the optional @napi-rs/canvas native module (page rendering, unused) stay out.
+files:
+  - out/**
+  - package.json
+  - "!node_modules/@napi-rs/**"
+  - "!node_modules/pdfjs-dist/{legacy,build,web,image_decoders,types}/**"
+  - "!node_modules/pdfjs-dist/*.{md,mjs}"
+asar: true
+# Release binaries cannot be repurposed as a Node runtime or debugged through NODE_OPTIONS, and only
+# load the app from the integrity-checked asar. E2E runs the unpackaged app, which keeps the defaults
+# (Playwright cannot launch a fused binary, docs/research/electron-shell.md).
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  enableEmbeddedAsarIntegrityValidation: true
+  grantFileProtocolExtraPrivileges: false
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Notarization runs only when the APPLE_* variables above are present.
+  notarize: true
+  extendInfo:
+    NSCameraUsageDescription: A website you visit asks to use the camera.
+    NSMicrophoneUsageDescription: A website you visit asks to use the microphone.
+    NSLocationUsageDescription: A website you visit asks for your location.
+dmg:
+  writeUpdateInfo: false
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Network
+  maintainer: Tiger
+  synopsis: Team AI browser
+npmRebuild: false
+publish: null

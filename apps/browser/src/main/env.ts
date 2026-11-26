@@ -5,7 +5,9 @@ import { app } from 'electron'
  *
  * TIGER_NO_SANDBOX=1 disables Chromium's OS sandbox. It exists only for tests and local runs inside
  * a root container, where Chromium refuses to start sandboxed; it is never set by the app itself.
- * Renderer-level isolation (contextIsolation, no Node, sandboxed preloads) is unaffected.
+ * Running as root also needs the `--no-sandbox` command-line switch, because Chromium checks it before
+ * any app code runs (Playwright passes it). Renderer-level isolation (contextIsolation, no Node,
+ * no bridge in pages) is unaffected.
  */
 export const env = {
   noSandbox: process.env.TIGER_NO_SANDBOX === '1',

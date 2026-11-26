@@ -46,16 +46,16 @@ export class HistoryStore {
   /** Most recent first; a blank query lists recent history. */
   search(query: string, limit = 100): HistoryEntry[] {
     const q = query.trim()
-    const rows = (
-      q
-        ? this.db
-            .prepare(
-              `SELECT * FROM history WHERE url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\'
+    const rows = (q
+      ? this.db
+          .prepare(
+            `SELECT * FROM history WHERE url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\'
                ORDER BY last_visited_at DESC LIMIT ?`,
-            )
-            .all(likePattern(q), likePattern(q), limit)
-        : this.db.prepare('SELECT * FROM history ORDER BY last_visited_at DESC LIMIT ?').all(limit)
-    ) as unknown as Row[]
+          )
+          .all(likePattern(q), likePattern(q), limit)
+      : this.db
+          .prepare('SELECT * FROM history ORDER BY last_visited_at DESC LIMIT ?')
+          .all(limit)) as unknown as Row[]
     return rows.map(toEntry)
   }
 

@@ -1,6 +1,10 @@
 import type { Extraction } from '@tiger/extract'
 import { finalizePage } from '@tiger/extract/finalize'
-import { fromGoogleExport, type GoogleExportResponse, planGoogleExport } from '@tiger/extract/google'
+import {
+  fromGoogleExport,
+  type GoogleExportResponse,
+  planGoogleExport,
+} from '@tiger/extract/google'
 import type { PdfResult } from '@tiger/extract/pdf'
 import { type CaptureEligibility, type CaptureResult, captureEligibility } from '@tiger/shared'
 import { z } from 'zod'
@@ -67,7 +71,10 @@ const blocked = (e: CaptureEligibility): CaptureResult => ({
   reason: e.reason,
   detail: e.rule,
 })
-const failure = (error: 'empty' | 'no-text-layer' | 'failed', detail: string | null): CaptureResult => ({
+const failure = (
+  error: 'empty' | 'no-text-layer' | 'failed',
+  detail: string | null,
+): CaptureResult => ({
   ok: false,
   error,
   reason: null,
@@ -148,7 +155,7 @@ export async function captureTab(target: CaptureTarget, deps: CaptureDeps): Prom
 
     const moved = stillAllowed()
     if (moved) return moved
-    if (!extraction || !extraction.markdown.trim()) return failure('empty', null)
+    if (!extraction?.markdown.trim()) return failure('empty', null)
     const page = finalizePage(extraction, { url, capturedAt: deps.now() })
     return { ok: true, page }
   } catch (err) {

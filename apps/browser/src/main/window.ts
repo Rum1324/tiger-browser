@@ -189,8 +189,7 @@ export class EngineWindow {
       pinned: opts.pinned ?? false,
     })
     if (opts.title) tab.title = opts.title
-    const index =
-      opts.index ?? (tab.pinned ? this.firstUnpinnedIndex() : this.tabs.length)
+    const index = opts.index ?? (tab.pinned ? this.firstUnpinnedIndex() : this.tabs.length)
     this.attach(tab, index, opts.active ?? true)
     if (opts.url) tab.load(opts.url)
     else tab.loadBlank()
@@ -236,7 +235,13 @@ export class EngineWindow {
     const url = tab.displayUrl()
     // Kept in memory only, so a private window can reopen tabs within its own lifetime.
     if (url && !this.closed) {
-      this.closedTabs.push({ url, title: tab.title, spaceId: tab.spaceId, pinned: tab.pinned, index })
+      this.closedTabs.push({
+        url,
+        title: tab.title,
+        spaceId: tab.spaceId,
+        pinned: tab.pinned,
+        index,
+      })
       if (this.closedTabs.length > MAX_CLOSED) this.closedTabs.shift()
     }
     this.tabs.splice(index, 1)
@@ -341,7 +346,11 @@ export class EngineWindow {
   }
 
   setHtmlFullscreen(tab: TabController, on: boolean): void {
-    this.htmlFullscreenTab = on ? tab : this.htmlFullscreenTab === tab ? null : this.htmlFullscreenTab
+    this.htmlFullscreenTab = on
+      ? tab
+      : this.htmlFullscreenTab === tab
+        ? null
+        : this.htmlFullscreenTab
     this.base.setFullScreen(on)
     this.layout()
   }
@@ -368,7 +377,9 @@ export class EngineWindow {
       if (visible && page) {
         tab.view.setBounds(page)
         tab.view.setBorderRadius(
-          this.htmlFullscreenTab === tab ? 0 : toCornerRadius(this.cornerRadius, this.uiZoom(), page),
+          this.htmlFullscreenTab === tab
+            ? 0
+            : toCornerRadius(this.cornerRadius, this.uiZoom(), page),
         )
       }
       tab.view.setVisible(visible)

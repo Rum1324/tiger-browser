@@ -26,7 +26,8 @@ ipcRenderer.on(IPC_EVENT_CHANNEL, (_e, event: string, payload: unknown) => {
  * pages run a different preload that exposes nothing.
  */
 const bridge = {
-  invoke: (name: string, request?: unknown) => ipcRenderer.invoke(IPC_INVOKE_CHANNEL, name, request),
+  invoke: (name: string, request?: unknown) =>
+    ipcRenderer.invoke(IPC_INVOKE_CHANNEL, name, request),
   on: (event: EngineEventName, listener: Listener) => {
     if (typeof listener !== 'function') throw new TypeError('listener must be a function')
     let set = listeners.get(event)

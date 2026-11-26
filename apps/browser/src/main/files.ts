@@ -3,6 +3,8 @@ import { basename, extname, join } from 'node:path'
 /** A file name that cannot escape the downloads folder and is not empty. */
 export function safeFileName(name: string): string {
   const cleaned = basename(name.replace(/\\/g, '/'))
+    // Control characters and the characters Windows forbids in file names.
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control characters is the point
     .replace(/[\u0000-\u001f<>:"/\\|?*]/g, '_')
     .replace(/^\.+/, '')
     .trim()

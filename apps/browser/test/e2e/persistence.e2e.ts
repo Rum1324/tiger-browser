@@ -29,7 +29,10 @@ describe('persistence across restart', () => {
     // ── First run ──
     const a = await launch({ userDataDir: dir })
     const first = (await a.tabsState()).tabs[0]?.id as string
-    await a.invoke('tabs.navigate', { tabId: first, input: url('/set-cookie?name=who&value=tiger') })
+    await a.invoke('tabs.navigate', {
+      tabId: first,
+      input: url('/set-cookie?name=who&value=tiger'),
+    })
     await waitForTab(a, first, (x) => x.title === 'Cookie set' && !x.isLoading, 'cookie set')
     const second = await a.invoke('tabs.create', { input: url('/two'), spaceId: 'space-9' })
     await waitForTab(a, second.id, (x) => x.title === 'Page Two' && !x.isLoading, 'two')
@@ -50,8 +53,16 @@ describe('persistence across restart', () => {
     await a.invoke('window.create', { private: true })
     const priv = await waitFor(() => a.uiPages()[before], 15_000, 'private window')
     await priv.waitForFunction(() => typeof window.tiger?.invoke === 'function')
-    const pt = await a.invokeFrom(priv, 'tabs.create', { input: url('/set-cookie?name=priv&value=secret') })
-    await waitForTab(a, pt.id, (x) => x.title === 'Cookie set' && !x.isLoading, 'private cookie', priv)
+    const pt = await a.invokeFrom(priv, 'tabs.create', {
+      input: url('/set-cookie?name=priv&value=secret'),
+    })
+    await waitForTab(
+      a,
+      pt.id,
+      (x) => x.title === 'Cookie set' && !x.isLoading,
+      'private cookie',
+      priv,
+    )
     const pv = await a.invokeFrom(priv, 'tabs.create', { input: url('/one') })
     await waitForTab(a, pv.id, (x) => x.title === 'Page One' && !x.isLoading, 'private visit', priv)
 
@@ -78,12 +89,19 @@ describe('persistence across restart', () => {
     const b = await launch({ userDataDir: dir })
     try {
       expect(b.uiPages()).toHaveLength(1)
-      const restored = await waitFor(async () => {
-        const s = await b.tabsState()
-        return s.tabs.length === 2 && s.tabs.every((x) => x.url) ? s : null
-      }, 15_000, 'restored tabs')
+      const restored = await waitFor(
+        async () => {
+          const s = await b.tabsState()
+          return s.tabs.length === 2 && s.tabs.every((x) => x.url) ? s : null
+        },
+        15_000,
+        'restored tabs',
+      )
       expect(restored.privateWindow).toBe(false)
-      expect(restored.tabs.map((x) => x.url)).toEqual([url('/two'), url('/set-cookie?name=who&value=tiger')])
+      expect(restored.tabs.map((x) => x.url)).toEqual([
+        url('/two'),
+        url('/set-cookie?name=who&value=tiger'),
+      ])
       expect(restored.tabs[0]).toMatchObject({ pinned: true, spaceId: 'space-9' })
 
       const jar = await cookieShownIn(b)
@@ -94,7 +112,10 @@ describe('persistence across restart', () => {
       expect(h.map((x) => x.url)).toContain(url('/two'))
       expect(h.map((x) => x.url)).not.toContain(url('/one'))
       expect((await b.invoke('bookmarks.list')).map((x) => x.url)).toEqual([url('/two')])
-      expect(await b.invoke('settings.get')).toMatchObject({ searchEngine: 'duckduckgo', lastSpaceId: 'space-9' })
+      expect(await b.invoke('settings.get')).toMatchObject({
+        searchEngine: 'duckduckgo',
+        lastSpaceId: 'space-9',
+      })
       if (tokenStored) expect(await b.invoke('auth.getToken')).toBe('tiger-session-token')
       expect(tokenStored).toBe(true)
     } finally {

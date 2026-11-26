@@ -76,7 +76,8 @@ const html = (res: ServerResponse, body: string, headers: Record<string, string>
 const ROUTES: Record<string, Route> = {
   '/article': (_q, res) => html(res, articleHtml()),
   '/one': (_q, res) => html(res, page('Page One', '<h1>One</h1><p>first page</p>')),
-  '/two': (_q, res) => html(res, page('Page Two', '<h1>Two</h1><p>second page apple apple apple</p>')),
+  '/two': (_q, res) =>
+    html(res, page('Page Two', '<h1>Two</h1><p>second page apple apple apple</p>')),
   '/opener': (_q, res) =>
     html(
       res,
