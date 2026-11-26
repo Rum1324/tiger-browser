@@ -145,10 +145,12 @@ describe('listMessages while an answer streams', () => {
     // Another member who lost the deltas repairs from REST.
     const during = await h.ok('listMessages', { params: { threadId: thread.id } }, member.token)
     const streaming = during.find((m) => m.id === assistantId)
+    // Two deltas ("Hello ", "world") are in the text: the next one a client applies is seq 2.
     expect(streaming).toMatchObject({
       status: 'streaming',
       content: 'Hello world',
       errorCode: null,
+      streamSeq: 2,
     })
     expect(streaming?.citations).toEqual([
       expect.objectContaining({ n: 1, itemId: shared.item.id, available: true }),
@@ -166,6 +168,7 @@ describe('listMessages while an answer streams', () => {
     expect(after.find((m) => m.id === assistantId)).toMatchObject({
       status: 'complete',
       content: 'Hello world!',
+      streamSeq: null,
     })
     expect(h.app.tiger.runningAnswers.size).toBe(0)
   })

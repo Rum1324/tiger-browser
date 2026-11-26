@@ -313,7 +313,10 @@ export const api = {
       assistantMessage: Message.nullable(),
     }),
   }),
-  /** Promote a private thread to the Space. Page attachments are not carried over. */
+  /**
+   * Promote a private thread to the Space. Refused with `thread_has_private_attachments` when any of
+   * its messages has a page attachment.
+   */
   shareThread: route({
     method: 'POST',
     path: '/v1/threads/:threadId/share',
@@ -364,6 +367,7 @@ export const API_ERROR_CODES = [
   'capture_blocked',
   'attachments_not_allowed',
   'already_shared',
+  'thread_has_private_attachments',
   'budget_exceeded',
   'model_unavailable',
   'ai_unavailable',

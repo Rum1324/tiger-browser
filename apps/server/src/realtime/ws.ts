@@ -34,7 +34,7 @@ export async function subscribeMember(
  * `unsubscribe` removes Spaces silently; a following `ping` confirms it took effect.
  */
 export function websocketRoute(app: FastifyInstance): void {
-  const { sql, hub, log, config } = app.tiger
+  const { sql, hub, log, config, shutdown } = app.tiger
 
   const sessionValid = async (hashHex: string) =>
     (
@@ -45,6 +45,10 @@ export function websocketRoute(app: FastifyInstance): void {
     ).length > 0
 
   app.get('/v1/ws', { websocket: true }, (socket: WebSocket) => {
+    if (shutdown.signal.aborted) {
+      socket.close(1001, 'server shutting down')
+      return
+    }
     let client: HubClient | null = null
     let alive = true
     // Frames are handled one at a time so a `ping` sent after `subscribe` is answered after it.
@@ -121,6 +125,11 @@ export function websocketRoute(app: FastifyInstance): void {
             const session = await resolveSession(sql, frame.token)
             if (!session || socket.readyState !== socket.OPEN) {
               socket.close(4401, 'invalid session')
+              return
+            }
+            // The hub's sockets were closed when shutdown began; this one would be missed.
+            if (shutdown.signal.aborted) {
+              socket.close(1001, 'server shutting down')
               return
             }
             clearTimeout(authTimer)

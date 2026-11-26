@@ -318,7 +318,7 @@ describe('askAi pipeline', () => {
     const ws = await connectAs(port, owner.token, [space.id])
     scripts.set('overloaded', async ({ emit }) => {
       emit({ type: 'delta', text: 'Partial' })
-      throw new AnswerError('provider_overloaded', 'Try again', {
+      throw new AnswerError('ai_busy', 'Try again', {
         inputTokens: 10,
         outputTokens: 2,
         cachedInputTokens: 0,
@@ -332,7 +332,7 @@ describe('askAi pipeline', () => {
     const failed = await ws.next('message.failed')
     expect(failed).toMatchObject({
       messageId: r.assistantMessage?.id,
-      code: 'provider_overloaded',
+      code: 'ai_busy',
       message: 'Try again',
     })
     const [m] = await h.ok(
@@ -342,7 +342,7 @@ describe('askAi pipeline', () => {
     )
     expect(m).toMatchObject({
       status: 'error',
-      errorCode: 'provider_overloaded',
+      errorCode: 'ai_busy',
       content: 'Partial',
     })
     expect(

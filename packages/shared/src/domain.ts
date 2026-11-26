@@ -246,6 +246,25 @@ export type TokenUsage = z.infer<typeof TokenUsage>
 export const MessageStatus = z.enum(['streaming', 'complete', 'error'])
 export type MessageStatus = z.infer<typeof MessageStatus>
 
+/**
+ * Every value the server can store in `Message.errorCode` (and send as `message.failed.code`). The
+ * UI keys its copy on these.
+ */
+export const MESSAGE_ERROR_CODES = [
+  'ai_aborted',
+  'ai_failed',
+  'ai_interrupted',
+  'ai_refused',
+  'ai_unavailable',
+  'ai_busy',
+  'ai_context_too_long',
+  'ai_timeout',
+  'model_unavailable',
+  'budget_exceeded',
+] as const
+export type MessageErrorCode = (typeof MESSAGE_ERROR_CODES)[number]
+export const MessageErrorCode = z.enum(MESSAGE_ERROR_CODES)
+
 export const Message = z.object({
   id: Id,
   threadId: Id,
@@ -257,13 +276,15 @@ export const Message = z.object({
   citations: z.array(Citation),
   attachments: z.array(PageAttachment),
   status: MessageStatus,
-  errorCode: z.string().nullable(),
+  /** Set when `status` is `error`: one of MESSAGE_ERROR_CODES. */
+  errorCode: MessageErrorCode.nullable(),
   usage: TokenUsage.nullable(),
   /**
-   * For a message read over REST while it is still streaming: how many deltas `content` already
-   * covers, so a client can continue from the next `message.delta` without repeating text.
+   * While `status` is `streaming`: how many deltas `content` already covers (deltas `0 .. n-1`), so a
+   * client continues from the `message.delta` with `seq = n` without repeating or losing text. Null
+   * once the message has settled.
    */
-  streamSeq: z.number().int().nonnegative().nullable().optional(),
+  streamSeq: z.number().int().nonnegative().nullable(),
   createdAt: IsoDate,
 })
 export type Message = z.infer<typeof Message>

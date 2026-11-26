@@ -1,5 +1,6 @@
 import type {
   Message,
+  MessageErrorCode,
   PostMessageBody,
   SpaceRole,
   Thread,
@@ -103,7 +104,13 @@ async function withLiveText(ctx: AppContext, messages: Message[]): Promise<Messa
       settled.push(m.id)
       return m
     }
-    return { ...m, content: live.text, citations: live.citations ?? m.citations }
+    // Read together, so the text covers exactly the deltas below streamSeq.
+    return {
+      ...m,
+      content: live.text,
+      citations: live.citations ?? m.citations,
+      streamSeq: live.seq,
+    }
   })
   if (settled.length === 0) return out
   const fresh = new Map(
@@ -232,8 +239,18 @@ export async function postMessage(
   const titled = await sql.begin(async (tx) => {
     // The access check ran outside this transaction; hold the thread so a concurrent delete either
     // finished first (404 here) or waits until these rows are in and then removes them with it.
-    const [held] = await tx`select id from threads where id = ${threadId} for share`
+    const [held] = await tx<{ visibility: ThreadVisibility }[]>`
+      select visibility from threads where id = ${threadId} for share
+    `
     if (!held) throw notFound('thread_not_found', 'Thread')
+    // Shared since the access check: pages may not land in a Space thread.
+    if (attachments.length > 0 && held.visibility !== 'private') {
+      throw new AppError(
+        400,
+        'attachments_not_allowed',
+        'Pages can be attached only in a private thread; share the page to the Space instead',
+      )
+    }
     await tx`
       insert into messages (id, thread_id, role, author_id, content, status)
       values (${messageId}, ${threadId}, 'user', ${user.id}, ${body.content}, 'complete')
@@ -277,7 +294,7 @@ export async function postMessage(
     message: assistantMessage,
   })
 
-  const fail = async (code: string, text: string) => {
+  const fail = async (code: MessageErrorCode, text: string) => {
     const updated = await sql`
       update messages set status = 'error', error_code = ${code}
       where id = ${assistantId} and status = 'streaming'
@@ -330,15 +347,34 @@ export async function postMessage(
   return { message, assistantMessage }
 }
 
-/** Promote a private thread to the Space. Attachment contents are deleted, never carried over. */
+/**
+ * Promote a private thread to the Space. Refused, changing nothing, while any of its messages has a
+ * page attachment: the answers and the title were derived from those private pages, and showing them
+ * to every member needs a product decision first.
+ */
 export async function shareThread(ctx: AppContext, user: User, threadId: string): Promise<Thread> {
   const access = await requireThreadAccess(ctx.sql, threadId, user.id)
   if (access.visibility === 'space') return getThread(ctx.sql, threadId)
   const event = await ctx.sql.begin(async (tx) => {
-    await tx`
-      delete from message_attachments
-      where message_id in (select id from messages where thread_id = ${threadId})
+    // A post with attachments holds the thread FOR SHARE until its rows are in, so this lock waits
+    // for it and the check below sees its attachments.
+    const [held] = await tx<{ visibility: ThreadVisibility }[]>`
+      select visibility from threads where id = ${threadId} for update
     `
+    if (!held) throw notFound('thread_not_found', 'Thread')
+    if (held.visibility === 'space') return null
+    const [attached] = await tx`
+      select 1 from message_attachments a join messages m on m.id = a.message_id
+      where m.thread_id = ${threadId}
+      limit 1
+    `
+    if (attached) {
+      throw new AppError(
+        409,
+        'thread_has_private_attachments',
+        'A thread with attached pages cannot be shared to the Space',
+      )
+    }
     await tx`update threads set visibility = 'space' where id = ${threadId}`
     return appendAudit(tx, {
       spaceId: access.spaceId,
@@ -348,6 +384,8 @@ export async function shareThread(ctx: AppContext, user: User, threadId: string)
     })
   })
   const thread = await getThread(ctx.sql, threadId)
+  // Shared concurrently by another request, which announced it.
+  if (!event) return thread
   ctx.hub.publishToSpace(access.spaceId, { type: 'thread.updated', thread })
   ctx.hub.publishToSpace(access.spaceId, { type: 'audit.appended', event })
   return thread

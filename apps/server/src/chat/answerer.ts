@@ -1,5 +1,5 @@
 import type { ChatErrorCode, ChatRequest, ChatUsage, Router } from '@tiger/llm'
-import type { ModelRef } from '@tiger/shared'
+import type { MessageErrorCode, ModelRef } from '@tiger/shared'
 import type { Sql } from '../db/sql'
 import { estimateTokens } from '../retrieval/chunker'
 import type { BuiltContext, ContextBuilder } from '../retrieval/context'
@@ -9,7 +9,7 @@ import { finalizeAnswer, previewCitations } from './citations'
 import { assemblePrompt } from './prompt'
 
 /** Stable error codes for the assistant message; the UI keys its copy on these. */
-export function answerErrorCode(code: ChatErrorCode): string {
+export function answerErrorCode(code: ChatErrorCode): MessageErrorCode {
   switch (code) {
     case 'aborted':
       return 'ai_aborted'

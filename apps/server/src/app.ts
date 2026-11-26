@@ -40,6 +40,26 @@ export interface BuildAppOptions {
   verifyGoogleIdToken?: VerifyGoogleIdToken
   /** Pino options or false; defaults to config.logLevel with the Authorization header redacted. */
   logger?: boolean | object
+  /**
+   * How long `close()` lets in-flight requests, settling answers and closing sockets take before it
+   * cuts the remaining connections. Default SHUTDOWN_GRACE_MS.
+   */
+  shutdownGraceMs?: number
+}
+
+export const SHUTDOWN_GRACE_MS = 3000
+
+/** Resolves true once `p` settles, or false when `ms` passes first. */
+async function within(p: Promise<unknown>, ms: number): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined
+  const timeout = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), Math.max(0, ms))
+  })
+  try {
+    return await Promise.race([p.then(() => true), timeout])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Three attachments of up to 600k characters each, at up to 3 bytes per character, plus JSON. */
@@ -90,14 +110,13 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     maxAge: 600,
   })
   await app.register(rateLimit, { global: false })
-  await app.register(websocket, { options: { maxPayload: 64 * 1024 } })
-
-  // Stop answers and indexing first, let them record their final state, then drop the sockets.
-  app.addHook('onClose', async () => {
-    ctx.shutdown.abort()
-    await ctx.background.drain()
-    ctx.hub.closeAll()
+  // Sockets are closed by the shutdown sequence below, after running answers have settled.
+  await app.register(websocket, {
+    options: { maxPayload: 64 * 1024 },
+    preClose: (done) => done(),
   })
+
+  installShutdown(app, ctx, opts.shutdownGraceMs ?? SHUTDOWN_GRACE_MS)
 
   await app.register(async (scope) => {
     metaRoutes(scope)
@@ -108,4 +127,52 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     websocketRoute(scope)
   })
   return app
+}
+
+/**
+ * A deterministic `close()`. Fastify stops routing first (new requests get 503 with
+ * `Connection: close`) and then waits in `server.close()` for every connection to end, which open
+ * keep-alive and WebSocket connections never do by themselves. So, within `graceMs` of the start:
+ *
+ * 1. Running answers and indexing are aborted and allowed to record their final state, so their
+ *    messages settle and subscribers get `message.failed` before their socket goes.
+ * 2. Every WebSocket gets a close frame (1001); idle keep-alive connections are closed, and responses
+ *    still being produced are sent with `Connection: close`.
+ * 3. At the deadline, whatever is still open (a request that has not finished, a socket that never
+ *    answered the close frame) is cut.
+ */
+function installShutdown(app: FastifyInstance, ctx: AppContext, graceMs: number): void {
+  let deadline = 0
+  let force: NodeJS.Timeout | undefined
+  const forceClose = () => {
+    for (const ws of app.websocketServer.clients) ws.terminate()
+    app.server.closeAllConnections()
+  }
+
+  app.addHook('onSend', async (_request, reply) => {
+    if (ctx.shutdown.signal.aborted) reply.header('connection', 'close')
+  })
+
+  app.addHook('preClose', async () => {
+    deadline = Date.now() + graceMs
+    ctx.shutdown.abort()
+    force = setTimeout(forceClose, graceMs)
+    if (!(await within(ctx.background.drain(), deadline - Date.now()))) {
+      ctx.log.warn({ tasks: ctx.background.size }, 'background work still running at shutdown')
+    }
+    ctx.hub.closeAll()
+    // Sockets that never authenticated are not in the hub.
+    for (const ws of app.websocketServer.clients) ws.close(1001, 'server shutting down')
+    app.server.closeIdleConnections()
+  })
+
+  // After server.close() returned: every connection is gone. Requests that finished during the grace
+  // period may have started work (an answer is aborted at once); wait for it to settle as well.
+  app.addHook('onClose', async () => {
+    clearTimeout(force)
+    if (!(await within(ctx.background.drain(), Math.max(deadline - Date.now(), 500)))) {
+      ctx.log.warn({ tasks: ctx.background.size }, 'background work still running after close')
+    }
+    ctx.hub.closeAll()
+  })
 }

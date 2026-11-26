@@ -185,7 +185,7 @@ describe('attachments', () => {
     )
   })
 
-  it('are stored on private threads, echoed as metadata only, and deleted when the thread is shared', async () => {
+  it('are stored on private threads and echoed as metadata only; such a thread cannot be shared', async () => {
     const { owner, member, space } = await spaceWithMembers(h, 'AttPriv')
     const t = await h.ok(
       'createThread',
@@ -212,6 +212,17 @@ describe('attachments', () => {
       { markdown: string }[]
     >`select markdown from message_attachments where message_id = ${r.message.id}`
     expect(stored?.markdown).toBe('private body')
+    // A later message without pages does not lift the refusal.
+    await h.ok(
+      'postMessage',
+      { params: { threadId: t.id }, body: { content: 'and then?', askAi: false } },
+      owner.token,
+    )
+    const auditBefore = await h.ok(
+      'listAudit',
+      { params: { spaceId: space.id }, query: {} },
+      owner.token,
+    )
 
     await h.fails(
       'shareThread',
@@ -220,23 +231,108 @@ describe('attachments', () => {
       404,
       'thread_not_found',
     )
+    await h.fails(
+      'shareThread',
+      { params: { threadId: t.id } },
+      owner.token,
+      409,
+      'thread_has_private_attachments',
+    )
+
+    // Nothing changed: still private, the attachment is kept, no audit event, the member sees nothing.
+    expect(
+      (await h.ok('listThreads', { params: { spaceId: space.id }, query: {} }, owner.token)).find(
+        (x) => x.id === t.id,
+      )?.visibility,
+    ).toBe('private')
+    const [kept] = await h.sql<
+      { markdown: string }[]
+    >`select markdown from message_attachments where message_id = ${r.message.id}`
+    expect(kept?.markdown).toBe('private body')
+    expect(
+      await h.ok('listAudit', { params: { spaceId: space.id }, query: {} }, owner.token),
+    ).toEqual(auditBefore)
+    await h.fails(
+      'listMessages',
+      { params: { threadId: t.id }, query: {} },
+      member.token,
+      404,
+      'thread_not_found',
+    )
+    expect(
+      (await h.ok('listThreads', { params: { spaceId: space.id }, query: {} }, member.token)).map(
+        (x) => x.id,
+      ),
+    ).not.toContain(t.id)
+  })
+
+  it('a share racing a post with pages never leaves pages in a Space thread', async () => {
+    const { owner, space } = await spaceWithMembers(h, 'AttRace')
+    for (let i = 0; i < 8; i++) {
+      const t = await h.ok(
+        'createThread',
+        { params: { spaceId: space.id }, body: { visibility: 'private' } },
+        owner.token,
+      )
+      const [post, share] = await Promise.all([
+        h.call(
+          'postMessage',
+          {
+            params: { threadId: t.id },
+            body: {
+              content: 'q',
+              askAi: false,
+              attachments: [page('https://example.com/race', 'race body')],
+            },
+          },
+          owner.token,
+        ),
+        h.call('shareThread', { params: { threadId: t.id } }, owner.token),
+      ])
+      const [row] = await h.sql<{ visibility: string; pages: number }[]>`
+        select t.visibility, (select count(*)::int from message_attachments a
+          join messages m on m.id = a.message_id where m.thread_id = t.id) as pages
+        from threads t where t.id = ${t.id}
+      `
+      // Exactly one of the two wins, and the stored state matches it.
+      if (share.status === 200) {
+        expect(post.status).toBe(400)
+        expect(row).toEqual({ visibility: 'space', pages: 0 })
+      } else {
+        expect([post.status, share.status]).toEqual([200, 409])
+        expect(row).toEqual({ visibility: 'private', pages: 1 })
+      }
+    }
+  })
+
+  it('a private thread without attachments is shared, audited, and then refuses pages', async () => {
+    const { owner, member, space } = await spaceWithMembers(h, 'NoAtt')
+    const t = await h.ok(
+      'createThread',
+      { params: { spaceId: space.id }, body: { visibility: 'private' } },
+      owner.token,
+    )
+    await h.ok(
+      'postMessage',
+      { params: { threadId: t.id }, body: { content: 'plain question', askAi: false } },
+      owner.token,
+    )
     const shared = await h.ok('shareThread', { params: { threadId: t.id } }, owner.token)
     expect(shared.visibility).toBe('space')
-    const left = await h.sql`
-      select 1 from message_attachments a join messages m on m.id = a.message_id where m.thread_id = ${t.id}
-    `
-    expect(left).toHaveLength(0)
+    // Sharing again is a no-op that succeeds.
+    expect(
+      (await h.ok('shareThread', { params: { threadId: t.id } }, owner.token)).visibility,
+    ).toBe('space')
     const seen = await h.ok('listMessages', { params: { threadId: t.id }, query: {} }, member.token)
-    expect(seen.map((m) => [m.content, m.attachments])).toEqual([['summarise', []]])
+    expect(seen.map((m) => m.content)).toEqual(['plain question'])
     const audit = await h.ok(
       'listAudit',
       { params: { spaceId: space.id }, query: {} },
       member.token,
     )
-    expect(audit[0]).toMatchObject({
-      action: 'thread.shared',
-      target: { type: 'thread', id: t.id },
-    })
+    expect(audit.filter((e) => e.action === 'thread.shared')).toEqual([
+      expect.objectContaining({ target: expect.objectContaining({ type: 'thread', id: t.id }) }),
+    ])
     // Now a Space thread: attachments are refused from here on.
     await h.fails(
       'postMessage',

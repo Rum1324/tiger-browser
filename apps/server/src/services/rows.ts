@@ -6,6 +6,7 @@ import type {
   ItemVersionRef,
   Locale,
   Message,
+  MessageErrorCode,
   PageAttachment,
   Provider,
   SourceType,
@@ -242,7 +243,7 @@ export interface MessageRow {
   content: string
   citations: StoredCitation[]
   status: string
-  error_code: string | null
+  error_code: MessageErrorCode | null
   usage: TokenUsage | null
   created_at: Date
   attachments: PageAttachment[]
@@ -298,6 +299,9 @@ export async function toMessages(sql: Sql, rows: MessageRow[]): Promise<Message[
     status: r.status as Message['status'],
     errorCode: r.error_code,
     usage: r.usage,
+    // A streaming answer's stored content is empty until it settles: it covers no delta yet.
+    // listMessages replaces both with the live text and its delta count.
+    streamSeq: r.status === 'streaming' ? 0 : null,
     createdAt: iso(r.created_at),
   }))
 }

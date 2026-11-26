@@ -51,6 +51,7 @@ function msg(role: 'user' | 'assistant', content: string, extra: Partial<Message
     status: 'complete',
     errorCode: null,
     usage: null,
+    streamSeq: null,
     createdAt: '2026-11-20T10:00:00.000Z',
     ...extra,
   }

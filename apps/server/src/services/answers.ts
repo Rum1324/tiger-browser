@@ -1,4 +1,11 @@
-import { Citation, type Message, type ModelRef, type Thread, type User } from '@tiger/shared'
+import {
+  Citation,
+  type Message,
+  type MessageErrorCode,
+  type ModelRef,
+  type Thread,
+  type User,
+} from '@tiger/shared'
 import type { AppContext, RunningAnswer } from '../context'
 import type { Sql, TxSql } from '../db/sql'
 import { AnswerError, type AttachmentContent, type CitationInput } from '../seams'
@@ -70,7 +77,9 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
   const { sql, hub } = ctx
   const controller = new AbortController()
   const onShutdown = () => controller.abort()
-  ctx.shutdown.signal.addEventListener('abort', onShutdown, { once: true })
+  // An answer started by a request that was in flight when shutdown began stops at once.
+  if (ctx.shutdown.signal.aborted) controller.abort()
+  else ctx.shutdown.signal.addEventListener('abort', onShutdown, { once: true })
 
   const spaceId = p.route.spaceId
   const threadId = p.thread.id
@@ -182,7 +191,11 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
       await sourcesChain.catch(() => {})
       // A stop always reads as ai_aborted, whatever the provider threw while being cut off.
       const aborted = controller.signal.aborted
-      const code = aborted ? 'ai_aborted' : err instanceof AnswerError ? err.code : 'ai_failed'
+      const code: MessageErrorCode = aborted
+        ? 'ai_aborted'
+        : err instanceof AnswerError
+          ? err.code
+          : 'ai_failed'
       const text = aborted
         ? 'The answer was stopped'
         : err instanceof AnswerError

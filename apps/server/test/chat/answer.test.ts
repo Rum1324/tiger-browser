@@ -395,14 +395,27 @@ describe('private attachments', () => {
     )
     expect(JSON.stringify(memberReq)).not.toContain('ZEBRA-7731')
 
-    // Promoting the thread drops the attachments; the member then sees only the answer text.
-    await h.ok('shareThread', { params: { threadId: thread.id } }, owner.token)
-    const view = await h.ok('listMessages', { params: { threadId: thread.id } }, member.token)
-    const viewJson = JSON.stringify(view)
-    expect(viewJson).not.toContain('ZEBRA-7731')
-    expect(viewJson).not.toContain('private.example')
-    expect(view.every((m) => m.attachments.length === 0)).toBe(true)
-    expect(view.flatMap((m) => m.citations).every((x) => x.url !== attachment.url)).toBe(true)
+    // The answer was built from a private page, so the thread cannot be promoted to the Space; the
+    // member still cannot read it and the attachment stays with its owner.
+    await h.fails(
+      'shareThread',
+      { params: { threadId: thread.id } },
+      owner.token,
+      409,
+      'thread_has_private_attachments',
+    )
+    await h.fails(
+      'listMessages',
+      { params: { threadId: thread.id } },
+      member.token,
+      404,
+      'thread_not_found',
+    )
+    const ownerView = await h.ok('listMessages', { params: { threadId: thread.id } }, owner.token)
+    expect(ownerView.flatMap((m) => m.attachments).map((a) => a.url)).toEqual([attachment.url])
+    expect(ownerView.flatMap((m) => m.citations).every((x) => x.url !== attachment.url)).toBe(true)
+    await memberWs.sync()
+    expect(JSON.stringify(memberWs.events)).not.toContain(thread.id)
     memberWs.close()
     ownerWs.close()
   })

@@ -1,6 +1,7 @@
 import type {
   Citation,
   Message,
+  MessageErrorCode,
   ModelInfo,
   ModelRef,
   SearchHit,
@@ -182,7 +183,7 @@ export interface Answerer {
  */
 export class AnswerError extends Error {
   constructor(
-    readonly code: string,
+    readonly code: MessageErrorCode,
     message: string,
     readonly usage?: AnswerUsage,
   ) {
