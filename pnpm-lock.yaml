@@ -22,6 +22,10 @@ importers:
         version: 5.1.2(@opentelemetry/api@1.10.0)(@types/node@22.20.7)(jsdom@31.0.1(@napi-rs/canvas@1.2.1)(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@22.20.7)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   apps/browser:
+    dependencies:
+      pdfjs-dist:
+        specifier: 6.5.438
+        version: 6.5.438
     devDependencies:
       '@tiger/extract':
         specifier: workspace:*
@@ -50,9 +54,6 @@ importers:
       electron-vite:
         specifier: 6.0.0
         version: 6.0.0(vite@8.3.8(@types/node@22.20.7)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
-      pdfjs-dist:
-        specifier: 6.5.438
-        version: 6.5.438
       playwright-core:
         specifier: 1.63.0
         version: 1.63.0
@@ -92,6 +93,9 @@ importers:
       '@huggingface/transformers':
         specifier: 4.3.2
         version: 4.3.2(@types/node@22.20.7)
+      '@tiger/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
       '@tiger/shared':
         specifier: workspace:*
         version: link:../../packages/shared

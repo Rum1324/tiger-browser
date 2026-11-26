@@ -10,6 +10,7 @@
     "test",
     "electron.vite.config.ts",
     "vitest.config.ts",
-    "vitest.e2e.config.ts"
+    "vitest.e2e.config.ts",
+    "../../packages/extract/src/pdfjs-worker.d.ts"
   ]
 }

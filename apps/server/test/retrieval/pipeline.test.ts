@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { newId } from '../../src/ids'
-import { type Embedder, keywordTerms } from '../../src/retrieval'
+import { type Embedder, fuse, keywordTerms } from '../../src/retrieval'
 import { spaceWithMembers } from '../helpers/fixtures'
 import type { Harness } from '../helpers/harness'
 import { BlindEmbedder, share, startRetrievalHarness } from './helpers'
@@ -132,6 +132,36 @@ describe('indexer + retriever', () => {
       signal,
     })
     expect(old.some((x) => x.text.includes('zebra'))).toBe(false)
+  })
+
+  it('indexes a large document in batches and an emptied document to zero chunks', async () => {
+    const { owner, space } = await spaceWithMembers(h, 'Large')
+    const sections = Array.from(
+      { length: 450 },
+      (_, i) => `## Section ${i}\n\nParagraph number ${i} has its own words${i}.`,
+    )
+    const url = 'https://example.com/large'
+    const item = await share(
+      h,
+      owner.token,
+      space.id,
+      url,
+      'Large',
+      `# Large\n\n${sections.join('\n\n')}`,
+    )
+    const rows = await chunkRows(item.id)
+    expect(rows).toHaveLength(450)
+    expect(rows.map((r) => r.ord)).toEqual(Array.from({ length: 450 }, (_, i) => i))
+    const hit = await retrieval.retriever.search({
+      spaceId: space.id,
+      query: 'words377',
+      k: 1,
+      signal,
+    })
+    expect(hit[0]?.headingPath).toBe('Large > Section 377')
+
+    await share(h, owner.token, space.id, url, 'Large', '   ')
+    expect(await chunkRows(item.id)).toHaveLength(0)
   })
 
   it('ignores a slow run for a version that is no longer current', async () => {
@@ -295,35 +325,95 @@ describe('indexer + retriever', () => {
     ).toEqual([])
   })
 
-  it('does not run the HNSW query across Spaces: every chunk of A is absent from B results', async () => {
+  it('does not let a big Space crowd a small one out of the candidate pool', async () => {
     const a = await spaceWithMembers(h, 'CrossA')
     const b = await spaceWithMembers(h, 'CrossB')
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 40; i++) {
       await share(
         h,
         a.owner.token,
         a.space.id,
         `https://example.com/a${i}`,
-        `A${i}`,
-        `# A${i}\n\ntopic apples ${i} orchard.`,
+        'Same title',
+        '# Topic\n\ntopic apples orchard "Golden Pear".',
       )
     }
-    await share(
+    const bItem = await share(
       h,
       b.owner.token,
       b.space.id,
       'https://example.com/b',
-      'B',
-      '# B\n\ntopic apples orchard.',
+      'Same title',
+      '# Topic\n\ntopic apples orchard "Golden Pear".',
     )
-    const hits = await retrieval.retriever.search({
+    // Both legs filter on the Space inside their own query: forty equally good chunks of A must not
+    // fill B's candidate pool (30 rows) before B's one chunk is considered.
+    const plain = await retrieval.retriever.search({
       spaceId: b.space.id,
       query: 'topic apples orchard',
-      k: 20,
+      k: 5,
       signal,
     })
-    expect(hits).toHaveLength(1)
-    expect(hits[0]?.title).toBe('B')
+    expect(plain.map((x) => x.itemId)).toEqual([bItem.id])
+    const quoted = await retrieval.retriever.search({
+      spaceId: b.space.id,
+      query: '"Golden Pear"',
+      k: 5,
+      signal,
+    })
+    expect(quoted.map((x) => x.itemId)).toEqual([bItem.id])
+    // Vector rank 1 (weight 1) plus keyword rank 1 (weight 0.5): the keyword leg saw B's chunk too.
+    expect(quoted[0]?.score).toBeCloseTo(1 / 61 + 0.5 / 61, 10)
+    expect(plain[0]?.score).toBeCloseTo(1 / 61, 10)
+  })
+
+  it('re-indexing the same version is idempotent', async () => {
+    const { owner, space } = await spaceWithMembers(h, 'Idem')
+    const item = await share(
+      h,
+      owner.token,
+      space.id,
+      'https://example.com/i',
+      'I',
+      '# I\n\nonly paragraph.',
+    )
+    const input = {
+      spaceId: space.id,
+      itemId: item.id,
+      itemVersionId: item.currentVersion.id,
+      url: item.url,
+      title: 'I',
+      sourceType: 'web' as const,
+      markdown: '# I\n\nonly paragraph.',
+      lang: null,
+      signal,
+    }
+    await retrieval.indexer.index(input)
+    await retrieval.indexer.index(input)
+    expect(await chunkRows(item.id)).toHaveLength(1)
+  })
+})
+
+describe('fuse', () => {
+  it('adds weighted reciprocal ranks over the union and breaks ties by id', () => {
+    const fused = fuse(
+      [
+        { ids: ['a', 'b', 'c'], weight: 1 },
+        { ids: ['c', 'd'], weight: 0.5 },
+      ],
+      60,
+    )
+    expect(fused.map((f) => f.id)).toEqual(['c', 'a', 'b', 'd'])
+    expect(fused[0]?.score).toBeCloseTo(1 / 63 + 0.5 / 61, 10)
+    expect(fused[1]?.score).toBeCloseTo(1 / 61, 10)
+    // Weight 0 contributes nothing; equal scores order by id.
+    expect(fuse([{ ids: ['y', 'x'], weight: 0 }]).map((f) => f.id)).toEqual(['x', 'y'])
+    // A heavier keyword leg changes the order.
+    const heavy = fuse([
+      { ids: ['a', 'b'], weight: 1 },
+      { ids: ['b'], weight: 2 },
+    ])
+    expect(heavy.map((f) => f.id)).toEqual(['b', 'a'])
   })
 })
 
@@ -340,6 +430,8 @@ describe('exact-token gate', () => {
     expect(keywordTerms('how do I request time off')).toEqual([])
     expect(keywordTerms('資金調達のリード投資家は誰ですか')).toEqual([])
     expect(keywordTerms('Series A round')).toEqual([])
+    expect(keywordTerms('What is the post-money valuation of our Series A round?')).toEqual([])
+    expect(keywordTerms('Report-2026 status')).toEqual(['Report-2026'])
     expect(keywordTerms('   ')).toEqual([])
   })
 

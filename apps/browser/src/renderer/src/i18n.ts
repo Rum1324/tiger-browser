@@ -1,0 +1,57 @@
+const en = {
+  newTab: 'New tab',
+  newWindow: 'New window',
+  newPrivateWindow: 'New private window',
+  close: 'Close',
+  back: 'Back',
+  forward: 'Forward',
+  reload: 'Reload',
+  stop: 'Stop',
+  go: 'Go',
+  addressPlaceholder: 'Search or enter address',
+  capture: 'Capture',
+  hidePage: 'Hide page',
+  openOverlay: 'Open overlay',
+  closeOverlay: 'Close overlay',
+  overlayTitle: 'Overlay',
+  allow: 'Allow',
+  deny: 'Deny',
+  remember: 'Remember',
+  permissionAsk: 'wants',
+  downloads: 'Downloads',
+  captureBlocked: 'Capture refused',
+  privateWindow: 'Private window',
+  untitled: 'Untitled',
+}
+
+export type Strings = typeof en
+
+const ja: Strings = {
+  newTab: '新しいタブ',
+  newWindow: '新しいウィンドウ',
+  newPrivateWindow: '新しいプライベートウィンドウ',
+  close: '閉じる',
+  back: '戻る',
+  forward: '進む',
+  reload: '再読み込み',
+  stop: '停止',
+  go: '移動',
+  addressPlaceholder: '検索またはアドレスを入力',
+  capture: 'キャプチャ',
+  hidePage: 'ページを隠す',
+  openOverlay: 'オーバーレイを開く',
+  closeOverlay: 'オーバーレイを閉じる',
+  overlayTitle: 'オーバーレイ',
+  allow: '許可',
+  deny: 'ブロック',
+  remember: '記憶する',
+  permissionAsk: 'が次を求めています:',
+  downloads: 'ダウンロード',
+  captureBlocked: 'キャプチャできません',
+  privateWindow: 'プライベートウィンドウ',
+  untitled: '無題',
+}
+
+export function strings(locale: 'ja' | 'en'): Strings {
+  return locale === 'ja' ? ja : en
+}

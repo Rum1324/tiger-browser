@@ -39,19 +39,22 @@ export const DEFAULT_MAX_TOKENS = 440
 const CJK = /[぀-ヿ㐀-䶿一-鿿豈-﫿＀-￯가-힯]/
 
 /**
- * Conservative token estimate for a SentencePiece-style tokenizer. Measured on the benchmark corpus
- * e5 needs 0.63 tokens per Japanese character and about 0.25 per Latin character; the weights below
- * sit above both so the cap holds even for numbers and code (checked against the real tokenizer in
- * test/retrieval/e5.test.ts).
+ * Conservative token estimate for e5's SentencePiece vocabulary. Measured against the real tokenizer
+ * (test/retrieval/e5.test.ts): Japanese prose 0.74 tokens per character, English prose 0.31, a
+ * numeric table 0.63, code 0.44, and a run of one repeated kana up to 1.0. The weights are an upper
+ * bound for each class so the cap holds for any mix.
  */
 export function estimateTokens(text: string): number {
   let t = 0
   for (const ch of text) {
-    if (CJK.test(ch)) t += 0.8
-    else if (ch === ' ' || ch === '\n' || ch === '\t') t += 0.1
-    else t += 0.4
+    if (CJK.test(ch)) t += 1
+    else if (ch === ' ' || ch === '\n' || ch === '\t') t += 0.15
+    else if (/[0-9]/.test(ch)) t += 0.8
+    else if (/[A-Za-z]/.test(ch)) t += 0.4
+    else t += 1
   }
-  return Math.ceil(t)
+  // 5% on top: the numeric-table and repeated-kana samples sit within a few tokens of their weights.
+  return Math.ceil(t * 1.05)
 }
 
 interface Unit {

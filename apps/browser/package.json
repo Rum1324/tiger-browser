@@ -24,7 +24,6 @@
     "electron": "45.5.0",
     "electron-builder": "26.18.0",
     "electron-vite": "6.0.0",
-    "pdfjs-dist": "6.5.438",
     "playwright-core": "1.63.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -33,5 +32,8 @@
     "vitest": "^5.1.2",
     "x11": "4.4.0",
     "zod": "^4.6.7"
+  },
+  "dependencies": {
+    "pdfjs-dist": "6.5.438"
   }
 }

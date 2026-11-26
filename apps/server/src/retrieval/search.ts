@@ -18,13 +18,16 @@ const DEFAULT_KEYWORD_WEIGHT = 0.5
 const SHORT_TERM_CHARS = 3
 
 const QUOTED = /"([^"]{1,200})"|“([^”]{1,200})”|「([^」]{1,200})」|『([^』]{1,200})』/g
-// A Latin token that is an identifier rather than a word: has a digit, or an inner - _ . / joining
-// alphanumerics (ERR-4012, v2.3.1, user_id), or is an all-caps acronym (KPI, SAFE), or camelCase.
+// A Latin token that is an identifier rather than a word: has a digit (ERR-4012, v2.3.1, 1on1), an
+// underscore (user_id), an uppercase letter around - . / : (Foo-Bar), is an all-caps acronym (KPI, SAFE),
+// or camelCase.
 const TOKEN = /[A-Za-z0-9][A-Za-z0-9_./:-]*[A-Za-z0-9]|[A-Za-z0-9]/g
 
 function isIdentifier(token: string): boolean {
   if (/\d/.test(token)) return token.length >= 2
-  if (/[_./:-]/.test(token)) return true
+  if (token.includes('_')) return true
+  // Lowercase compounds such as "post-money" or "e-mail" are ordinary words, not identifiers.
+  if (/[./:-]/.test(token)) return /[A-Z]/.test(token)
   if (/^[A-Z]{2,}$/.test(token)) return true
   return /[a-z][A-Z]/.test(token)
 }
