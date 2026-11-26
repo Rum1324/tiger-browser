@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_MARKDOWN_CHARS } from './limits'
 
 /** Server-issued identifiers are UUIDs. */
 export const Id = z.uuid()
@@ -88,8 +89,7 @@ export const SourceType = z.enum([
 ])
 export type SourceType = z.infer<typeof SourceType>
 
-/** Upper bound on one captured page. The extractor truncates and sets `truncated`. */
-export const MAX_MARKDOWN_CHARS = 600_000
+export { MAX_MARKDOWN_CHARS }
 
 /**
  * The exact payload that leaves the machine when a member shares a page.
@@ -160,7 +160,7 @@ export type ModelRef = z.infer<typeof ModelRef>
 
 export const ModelInfo = ModelRef.extend({
   label: z.string(),
-  tier: z.enum(['best', 'fast']),
+  tier: z.enum(['best', 'balanced', 'fast']),
   contextWindow: z.number().int().positive(),
   /** False when the server has no key for this provider; the picker shows it disabled. */
   available: z.boolean(),
@@ -222,6 +222,8 @@ export const TokenUsage = z.object({
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
   cachedInputTokens: z.number().int().nonnegative(),
+  /** Tokens written to the provider cache on this call; billed above the input rate. */
+  cacheWriteTokens: z.number().int().nonnegative().optional(),
 })
 export type TokenUsage = z.infer<typeof TokenUsage>
 

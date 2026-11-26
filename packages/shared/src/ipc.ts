@@ -117,8 +117,11 @@ export const CaptureResult = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), page: ExtractedPage }),
   z.object({
     ok: z.literal(false),
-    /** `blocked`: eligibility said no. `empty`: nothing readable. `failed`: the extractor threw. */
-    error: z.enum(['blocked', 'empty', 'failed', 'no-tab']),
+    /**
+     * `blocked`: eligibility said no. `empty`: nothing readable. `no-text-layer`: a scanned PDF
+     * (OCR is not supported). `failed`: the extractor threw.
+     */
+    error: z.enum(['blocked', 'empty', 'no-text-layer', 'failed', 'no-tab']),
     reason: CaptureBlockReason.nullable(),
     detail: z.string().nullable(),
   }),

@@ -58,7 +58,7 @@ type Part<K extends string, T> = [T] extends [undefined]
 
 export type RouteInput<D> =
   D extends RouteDef<infer P, infer Q, infer B, unknown>
-    ? Part<'params', P> & Part<'query', Q> & Part<'body', B>
+    ? Part<'params', P> & { query?: Q } & Part<'body', B>
     : never
 export type RouteOutput<D> = D extends RouteDef<unknown, unknown, unknown, infer R> ? R : never
 
@@ -144,7 +144,10 @@ export const api = {
   listModels: route({
     method: 'GET',
     path: '/v1/models',
-    response: z.object({ models: z.array(ModelInfo), defaultModel: ModelRef }),
+    response: z.object({
+      models: z.array(ModelInfo) /** Null when no provider is configured. */,
+      defaultModel: ModelRef.nullable(),
+    }),
   }),
 
   // ── Spaces ──
@@ -285,6 +288,7 @@ export const api = {
     path: '/v1/threads/:threadId/messages',
     params: ThreadParams,
     query: z.object({
+      /** A message id: return the messages older than it. */
       before: z.string().optional(),
       limit: z.coerce.number().int().min(1).max(200).optional(),
     }),
@@ -326,10 +330,42 @@ export const api = {
 
 export type ApiRouteName = keyof typeof api
 
+/** Every `error.code` the server can return. The UI maps each to a message. */
+export const API_ERROR_CODES = [
+  'invalid_request',
+  'unauthenticated',
+  'forbidden',
+  'not_found',
+  'space_not_found',
+  'item_not_found',
+  'thread_not_found',
+  'invite_not_found',
+  'invite_expired',
+  'invite_revoked',
+  'invite_used',
+  'invite_email_mismatch',
+  'member_not_found',
+  'last_owner',
+  'capture_blocked',
+  'attachments_not_allowed',
+  'already_shared',
+  'budget_exceeded',
+  'model_unavailable',
+  'ai_unavailable',
+  'dev_login_disabled',
+  'google_auth_unavailable',
+  'google_token_invalid',
+  'rate_limited',
+  'payload_too_large',
+  'contract_violation',
+  'internal',
+] as const
+export type ApiErrorCode = (typeof API_ERROR_CODES)[number]
+
 export const ApiError = z.object({
   error: z.object({
-    /** Stable machine code, e.g. `not_member`, `budget_exceeded`, `attachments_not_allowed`. */
-    code: z.string(),
+    /** One of API_ERROR_CODES. */
+    code: z.enum(API_ERROR_CODES),
     message: z.string(),
   }),
 })

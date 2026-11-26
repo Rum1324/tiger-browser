@@ -1,5 +1,15 @@
 import { z } from 'zod'
-import { AuditEvent, Citation, Id, Item, Message, Thread, TokenUsage, UserRef } from './domain'
+import {
+  AuditEvent,
+  Citation,
+  Id,
+  Item,
+  Message,
+  SpaceHue,
+  Thread,
+  TokenUsage,
+  UserRef,
+} from './domain'
 
 /**
  * WebSocket protocol at `/v1/ws`. The client authenticates with the first frame, then subscribes to
@@ -16,6 +26,8 @@ export type ClientEvent = z.infer<typeof ClientEvent>
 export const ServerEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ready'), userId: Id }),
   z.object({ type: z.literal('pong') }),
+  /** Sent after `subscribe`: the Spaces this socket now receives events for. */
+  z.object({ type: z.literal('subscribed'), spaceIds: z.array(Id) }),
   z.object({ type: z.literal('error'), code: z.string(), message: z.string() }),
 
   z.object({ type: z.literal('thread.created'), thread: Thread }),
@@ -60,6 +72,8 @@ export const ServerEvent = z.discriminatedUnion('type', [
 
   z.object({ type: z.literal('member.joined'), spaceId: Id, user: UserRef }),
   z.object({ type: z.literal('member.removed'), spaceId: Id, userId: Id }),
+  /** A Space was renamed or recoloured. */
+  z.object({ type: z.literal('space.updated'), spaceId: Id, name: z.string(), hue: SpaceHue }),
   z.object({ type: z.literal('audit.appended'), event: AuditEvent }),
 ])
 export type ServerEvent = z.infer<typeof ServerEvent>
