@@ -1,4 +1,11 @@
-import type { Message, PostMessageBody, Thread, ThreadVisibility, User } from '@tiger/shared'
+import type {
+  Message,
+  PostMessageBody,
+  SpaceRole,
+  Thread,
+  ThreadVisibility,
+  User,
+} from '@tiger/shared'
 import type { AppContext } from '../context'
 import type { Sql } from '../db/sql'
 import { AppError, notFound } from '../errors'
@@ -57,12 +64,13 @@ export async function createThread(
 }
 
 export async function listMessages(
-  sql: Sql,
+  ctx: AppContext,
   user: User,
   threadId: string,
   before: string | undefined,
   limit: number | undefined,
 ): Promise<Message[]> {
+  const { sql } = ctx
   await requireThreadAccess(sql, threadId, user.id)
   const n = limit ?? DEFAULT_PAGE
   let where = sql`m.thread_id = ${threadId}`
@@ -78,7 +86,104 @@ export async function listMessages(
     where,
     sql`order by m.created_at desc, m.id desc limit ${n}`,
   )
-  return toMessages(sql, rows.reverse())
+  return withLiveText(ctx, await toMessages(sql, rows.reverse()))
+}
+
+/**
+ * A streaming answer's text lives in memory until it settles (the database is written once, at the
+ * end), so a streaming message is served with the text and sources forwarded so far. One that
+ * settled between the read and now is read again, so it is never served empty.
+ */
+async function withLiveText(ctx: AppContext, messages: Message[]): Promise<Message[]> {
+  const settled: string[] = []
+  const out = messages.map((m) => {
+    if (m.status !== 'streaming') return m
+    const live = ctx.runningAnswers.get(m.id)
+    if (!live) {
+      settled.push(m.id)
+      return m
+    }
+    return { ...m, content: live.text, citations: live.citations ?? m.citations }
+  })
+  if (settled.length === 0) return out
+  const fresh = new Map(
+    (
+      await toMessages(
+        ctx.sql,
+        await selectMessages(ctx.sql, ctx.sql`m.id = any(${settled}::uuid[])`),
+      )
+    ).map((m) => [m.id, m]),
+  )
+  return out.map((m) => fresh.get(m.id) ?? m)
+}
+
+/** How long `abortMessage` waits for a stopped answer to record its final state. */
+const ABORT_SETTLE_MS = 10_000
+
+/**
+ * Stop a streaming answer: the member who asked, or a Space owner. Anyone who cannot see the thread
+ * gets the same 404 as for a message that does not exist. Stopping an answer that already settled is
+ * a no-op, so a stop that races the last delta still succeeds.
+ */
+export async function abortMessage(ctx: AppContext, user: User, messageId: string): Promise<void> {
+  const rows = await ctx.sql<
+    {
+      author_id: string
+      role: string
+      status: string
+      thread_id: string
+      space_id: string
+      visibility: 'private' | 'space'
+      owner_id: string
+      member_role: SpaceRole
+    }[]
+  >`
+    select m.author_id, m.role, m.status, m.thread_id, t.space_id, t.visibility, t.owner_id,
+           sm.role as member_role
+    from messages m
+    join threads t on t.id = m.thread_id
+    join space_members sm on sm.space_id = t.space_id and sm.user_id = ${user.id}
+    where m.id = ${messageId} and (t.visibility = 'space' or t.owner_id = ${user.id})
+  `
+  const r = rows[0]
+  if (!r) throw notFound('not_found', 'Message')
+  if (r.author_id !== user.id && r.member_role !== 'owner') {
+    throw new AppError(403, 'forbidden', 'Only the member who asked or a Space owner can stop it')
+  }
+  if (r.role !== 'assistant' || r.status !== 'streaming') return
+
+  const live = ctx.runningAnswers.get(messageId)
+  if (live) {
+    live.controller.abort()
+    let timer: NodeJS.Timeout | undefined
+    await Promise.race([
+      live.done,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, ABORT_SETTLE_MS)
+      }),
+    ])
+    clearTimeout(timer)
+    return
+  }
+  // Streaming in storage but not running here: its answer was lost (a restart mid-answer) or has
+  // not started yet. Settle it now; the answer, if it starts later, finds the row settled and stops.
+  const updated = await ctx.sql`
+    update messages set status = 'error', error_code = 'ai_aborted'
+    where id = ${messageId} and status = 'streaming'
+    returning id
+  `
+  if (updated.length === 0) return
+  ctx.hub.publishForThread(
+    { spaceId: r.space_id, visibility: r.visibility, ownerId: r.owner_id },
+    {
+      type: 'message.failed',
+      spaceId: r.space_id,
+      threadId: r.thread_id,
+      messageId,
+      code: 'ai_aborted',
+      message: 'The answer was stopped',
+    },
+  )
 }
 
 export async function postMessage(
@@ -162,7 +267,12 @@ export async function postMessage(
   })
 
   const fail = async (code: string, text: string) => {
-    await sql`update messages set status = 'error', error_code = ${code} where id = ${assistantId}`
+    const updated = await sql`
+      update messages set status = 'error', error_code = ${code}
+      where id = ${assistantId} and status = 'streaming'
+      returning id
+    `
+    if (updated.length === 0) return getMessage(sql, assistantId)
     ctx.hub.publishForThread(route, {
       type: 'message.failed',
       spaceId: access.spaceId,
@@ -238,7 +348,7 @@ export async function deleteThread(ctx: AppContext, user: User, threadId: string
   if (access.ownerId !== user.id && access.role !== 'owner') {
     throw new AppError(403, 'forbidden', 'Only the thread owner or a Space owner can delete it')
   }
-  for (const c of ctx.runningAnswers.get(threadId) ?? []) c.abort()
+  for (const a of ctx.runningAnswers.values()) if (a.threadId === threadId) a.controller.abort()
   await ctx.sql`delete from threads where id = ${threadId}`
   ctx.hub.publishForThread(routing(access), {
     type: 'thread.deleted',

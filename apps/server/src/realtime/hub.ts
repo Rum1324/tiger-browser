@@ -60,6 +60,15 @@ export class RealtimeHub {
     set.add(client)
   }
 
+  /** The client no longer wants this Space's events (it switched Space, or the UI closed it). */
+  unsubscribe(client: HubClient, spaceId: string): void {
+    client.spaces.delete(spaceId)
+    const set = this.bySpace.get(spaceId)
+    if (!set) return
+    set.delete(client)
+    if (set.size === 0) this.bySpace.delete(spaceId)
+  }
+
   /** A member left or was removed: their sockets stop receiving the Space at once. */
   dropMembership(spaceId: string, userId: string): void {
     const set = this.bySpace.get(spaceId)

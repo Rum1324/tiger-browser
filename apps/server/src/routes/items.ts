@@ -4,9 +4,9 @@ import { registerRoute } from '../http/registry'
 import { requireMember } from '../services/access'
 import {
   getItemDetail,
+  listItemIndex,
   listItems,
   listVersions,
-  lookupByUrl,
   shareItem,
   unshareItem,
 } from '../services/items'
@@ -22,9 +22,7 @@ export function itemRoutes(app: FastifyInstance): void {
   registerRoute(app, api.listItems, async ({ params }, { user }) =>
     listItems(ctx.sql, params.spaceId, user.id),
   )
-  registerRoute(app, api.lookupItemsByUrl, async ({ body }, { user }) =>
-    lookupByUrl(ctx.sql, user.id, body.urls),
-  )
+  registerRoute(app, api.listItemIndex, async (_input, { user }) => listItemIndex(ctx.sql, user.id))
   registerRoute(app, api.getItem, async ({ params }, { user }) =>
     getItemDetail(ctx.sql, params.itemId, user.id),
   )

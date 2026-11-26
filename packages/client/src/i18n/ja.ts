@@ -79,6 +79,12 @@ export const ja: Dictionary = {
   'export.google.not-connected': 'Google アカウントに接続してください。',
   'export.google.denied': 'Google へのアクセスが許可されませんでした。',
   'export.google.failed': 'Google ドキュメントを作れませんでした。',
+  'google.flow.not-configured': 'このブラウザでは Google ログインが設定されていません。',
+  'google.flow.denied': 'Google へのアクセスが許可されませんでした。',
+  'google.flow.timeout': 'Google ログインがタイムアウトしました。もう一度お試しください。',
+  'google.flow.cancelled': 'Google ログインをキャンセルしました。',
+  'google.flow.failed': 'Google ログインに失敗しました。もう一度お試しください。',
+  'invite.opened': 'スペースへの招待を開きました。参加するには「参加」を押してください。',
   'export.recordFailed': '書き出しましたが、記録を残せませんでした。',
   'export.sourcesHeading': '出典',
 

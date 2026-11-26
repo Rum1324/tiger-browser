@@ -1,5 +1,5 @@
 import { Citation, type Message, type ModelRef, type Thread, type User } from '@tiger/shared'
-import type { AppContext } from '../context'
+import type { AppContext, RunningAnswer } from '../context'
 import type { Sql } from '../db/sql'
 import { AnswerError, type AttachmentContent, type CitationInput } from '../seams'
 import { getMessage, type StoredCitation } from './rows'
@@ -62,18 +62,25 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
   const controller = new AbortController()
   const onShutdown = () => controller.abort()
   ctx.shutdown.signal.addEventListener('abort', onShutdown, { once: true })
-  let running = ctx.runningAnswers.get(p.thread.id)
-  if (!running) {
-    running = new Set()
-    ctx.runningAnswers.set(p.thread.id, running)
-  }
-  running.add(controller)
 
   const spaceId = p.route.spaceId
   const threadId = p.thread.id
   const messageId = p.assistantMessageId
-  let seq = 0
-  let streamed = ''
+  let finish!: () => void
+  const live: RunningAnswer = {
+    messageId,
+    threadId,
+    spaceId,
+    askerId: p.user.id,
+    controller,
+    text: '',
+    seq: 0,
+    citations: null,
+    done: new Promise<void>((resolve) => {
+      finish = resolve
+    }),
+  }
+  ctx.runningAnswers.set(messageId, live)
   let settled = false
   // Sources are validated asynchronously; chaining keeps them in emission order.
   let sourcesChain: Promise<void> = Promise.resolve()
@@ -81,36 +88,43 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
   const emit = (
     event: { type: 'delta'; text: string } | { type: 'sources'; citations: CitationInput[] },
   ) => {
-    if (settled) return
+    // Nothing is forwarded once the answer is stopped, so the kept text is what members saw.
+    if (settled || controller.signal.aborted) return
     if (event.type === 'delta') {
       if (!event.text) return
-      streamed += event.text
+      live.text += event.text
       hub.publishForThread(p.route, {
         type: 'message.delta',
         spaceId,
         threadId,
         messageId,
-        seq: seq++,
+        seq: live.seq++,
         text: event.text,
       })
       return
     }
     const citations = event.citations
     sourcesChain = sourcesChain.then(async () => {
-      const { stored, live } = await settleCitations(sql, spaceId, citations)
-      if (settled) return
+      const { stored, live: present } = await settleCitations(sql, spaceId, citations)
+      if (settled || controller.signal.aborted) return
+      live.citations = stored.map((c) => ({ ...c, available: present.has(c.itemId) }))
       hub.publishForThread(p.route, {
         type: 'message.sources',
         spaceId,
         threadId,
         messageId,
-        citations: stored.map((c) => ({ ...c, available: live.has(c.itemId) })),
+        citations: live.citations,
       })
     })
   }
 
   ctx.background.run(`answer ${messageId}`, async () => {
     try {
+      // A stop that arrived before this answer was registered has already settled the row.
+      const [row] = await sql<
+        { status: string }[]
+      >`select status from messages where id = ${messageId}`
+      if (row?.status !== 'streaming') return
       const result = await ctx.answerer.answer({
         thread: p.thread,
         spaceId,
@@ -137,7 +151,7 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
         const rows = await tx`
           update messages set content = ${result.content}, citations = ${tx.json(stored)},
                               status = 'complete', error_code = null, usage = ${tx.json(usage)}
-          where id = ${messageId}
+          where id = ${messageId} and status = 'streaming'
           returning id
         `
         await recordUsage(tx, {
@@ -156,20 +170,28 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
     } catch (err) {
       settled = true
       await sourcesChain.catch(() => {})
-      const code =
-        err instanceof AnswerError
-          ? err.code
-          : controller.signal.aborted
-            ? 'ai_aborted'
-            : 'ai_failed'
-      const text =
-        err instanceof AnswerError ? err.message : 'The AI provider failed to produce an answer'
-      if (!(err instanceof AnswerError)) ctx.log.error({ err, messageId }, 'answerer failed')
+      // A stop always reads as ai_aborted, whatever the provider threw while being cut off.
+      const aborted = controller.signal.aborted
+      const code = aborted ? 'ai_aborted' : err instanceof AnswerError ? err.code : 'ai_failed'
+      const text = aborted
+        ? 'The answer was stopped'
+        : err instanceof AnswerError
+          ? err.message
+          : 'The AI provider failed to produce an answer'
+      if (!aborted && !(err instanceof AnswerError)) {
+        ctx.log.error({ err, messageId }, 'answerer failed')
+      }
       const spent = err instanceof AnswerError ? err.usage : undefined
-      await sql.begin(async (tx) => {
-        await tx`
-          update messages set status = 'error', error_code = ${code}, content = ${streamed}
-          where id = ${messageId}
+      // Keep what members already saw: the streamed text and the sources its [n] markers point to.
+      const keptCitations: StoredCitation[] = (live.citations ?? []).map(
+        ({ available: _available, ...c }) => c,
+      )
+      const written = await sql.begin(async (tx) => {
+        const rows = await tx`
+          update messages set status = 'error', error_code = ${code}, content = ${live.text},
+                              citations = ${tx.json(keptCitations)}
+          where id = ${messageId} and status = 'streaming'
+          returning id
         `
         // Tokens spent before a failure still count against the budget.
         if (spent) {
@@ -182,7 +204,10 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
             usage: spent,
           })
         }
+        return rows.length > 0
       })
+      // Already settled elsewhere (a stop before the answer started, or the thread is gone).
+      if (!written) return
       hub.publishForThread(p.route, {
         type: 'message.failed',
         spaceId,
@@ -193,8 +218,8 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
       })
     } finally {
       ctx.shutdown.signal.removeEventListener('abort', onShutdown)
-      running.delete(controller)
-      if (running.size === 0) ctx.runningAnswers.delete(threadId)
+      ctx.runningAnswers.delete(messageId)
+      finish()
     }
   })
 }

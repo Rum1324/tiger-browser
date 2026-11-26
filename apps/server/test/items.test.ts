@@ -1,4 +1,4 @@
-import type { Citation } from '@tiger/shared'
+import { type Citation, canonicalUrl } from '@tiger/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { newId } from '../src/ids'
 import type { Indexer, IndexInput } from '../src/seams'
@@ -180,36 +180,118 @@ describe('shareItem', () => {
   })
 })
 
-describe('lookupItemsByUrl', () => {
-  it('matches canonical forms across the caller’s Spaces only', async () => {
-    const a = await spaceWithMembers(h, 'LookA')
-    const b = await spaceWithMembers(h, 'LookB')
+describe('listItemIndex', () => {
+  it('lists every item of the caller’s Spaces as canonical keys, and nothing of other Spaces', async () => {
+    const a = await spaceWithMembers(h, 'IdxA')
+    const b = await spaceWithMembers(h, 'IdxB')
     const doc = 'https://docs.google.com/document/d/abc123/edit?tab=t.0'
     const ia = await h.ok(
       'shareItem',
-      { params: { spaceId: a.space.id }, body: { page: page(doc, 'a') } },
+      { params: { spaceId: a.space.id }, body: { page: page(doc, 'a', 'Plan') } },
       a.owner.token,
     )
+    // A second version: the index carries the current one.
     await h.ok(
       'shareItem',
-      { params: { spaceId: b.space.id }, body: { page: page(doc, 'b') } },
-      b.owner.token,
-    )
-    const asked = 'https://docs.google.com/document/u/1/d/abc123/view'
-    const found = await h.ok(
-      'lookupItemsByUrl',
-      { body: { urls: [asked, 'https://nothing.example.com/'] } },
+      { params: { spaceId: a.space.id }, body: { page: page(doc, 'a2', 'Plan v2') } },
       a.member.token,
     )
-    expect(found).toEqual([
+    const second = await h.ok(
+      'shareItem',
       {
-        url: asked,
+        params: { spaceId: a.space.id },
+        body: { page: page('https://example.com/idx?b=2&a=1#top', 'x', 'Other') },
+      },
+      a.member.token,
+    )
+    // The same URL in a Space the caller does not belong to.
+    const ib = await h.ok(
+      'shareItem',
+      { params: { spaceId: b.space.id }, body: { page: page(doc, 'b', 'Secret') } },
+      b.owner.token,
+    )
+    await h.settle()
+
+    const index = await h.ok('listItemIndex', {}, a.member.token)
+    const current = await h.ok('getItem', { params: { itemId: ia.item.id } }, a.member.token)
+    expect(index).toEqual([
+      {
+        itemId: second.item.id,
+        spaceId: a.space.id,
+        urlKey: canonicalUrl('https://example.com/idx?b=2&a=1#top'),
+        title: 'Other',
+        sharedBy: { id: a.member.user.id, name: a.member.user.name, avatarUrl: null },
+        versionNumber: 1,
+        contentHash: second.item.currentVersion.contentHash,
+        updatedAt: second.item.updatedAt,
+      },
+      {
         itemId: ia.item.id,
         spaceId: a.space.id,
-        sharedBy: a.owner.user.id,
-        updatedAt: expect.any(String),
+        urlKey: canonicalUrl(doc),
+        title: 'Plan v2',
+        sharedBy: { id: a.owner.user.id, name: a.owner.user.name, avatarUrl: null },
+        versionNumber: 2,
+        contentHash: current.currentVersion.contentHash,
+        updatedAt: current.updatedAt,
       },
     ])
+    // A view of the Space's items also matches by the same key.
+    expect(canonicalUrl('https://docs.google.com/document/u/1/d/abc123/view')).toBe(
+      canonicalUrl(doc),
+    )
+    expect(JSON.stringify(index)).not.toContain(ib.item.id)
+    expect(JSON.stringify(index)).not.toContain(b.space.id)
+    expect(JSON.stringify(index)).not.toContain('Secret')
+
+    // The other Space's owner sees only their own item.
+    const theirs = await h.ok('listItemIndex', {}, b.owner.token)
+    expect(theirs.map((e) => e.itemId)).toEqual([ib.item.id])
+  })
+
+  it('drops a Space’s items once the caller leaves it, and an unshared item at once', async () => {
+    const { owner, member, space } = await spaceWithMembers(h, 'IdxLeave')
+    const shared = await h.ok(
+      'shareItem',
+      { params: { spaceId: space.id }, body: { page: page('https://example.com/leave', 'l') } },
+      owner.token,
+    )
+    const kept = await h.ok(
+      'shareItem',
+      { params: { spaceId: space.id }, body: { page: page('https://example.com/kept', 'k') } },
+      owner.token,
+    )
+    await h.settle()
+    expect((await h.ok('listItemIndex', {}, member.token)).map((e) => e.itemId).sort()).toEqual(
+      [shared.item.id, kept.item.id].sort(),
+    )
+    await h.ok('unshareItem', { params: { itemId: shared.item.id } }, owner.token)
+    expect((await h.ok('listItemIndex', {}, member.token)).map((e) => e.itemId)).toEqual([
+      kept.item.id,
+    ])
+    await h.ok(
+      'removeMember',
+      { params: { spaceId: space.id, userId: member.user.id } },
+      owner.token,
+    )
+    expect(await h.ok('listItemIndex', {}, member.token)).toEqual([])
+  })
+
+  it('is empty for a user with no Spaces and refuses an anonymous caller', async () => {
+    const loner = await h.login('Loner')
+    expect(await h.ok('listItemIndex', {}, loner.token)).toEqual([])
+    await h.fails('listItemIndex', {}, undefined, 401, 'unauthenticated')
+  })
+
+  it('has no lookup route any more: tab URLs are never sent to the server', async () => {
+    const { token } = await h.login('NoLookup')
+    const r = await h.app.inject({
+      method: 'POST',
+      url: '/v1/items/lookup',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { urls: ['https://example.com/'] },
+    })
+    expect(r.statusCode).toBe(404)
   })
 })
 

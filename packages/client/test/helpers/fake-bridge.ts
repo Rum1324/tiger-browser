@@ -6,6 +6,9 @@ import type {
   EngineEventPayload,
   EngineResponse,
   ExtractedPage,
+  GoogleConnection,
+  GoogleFlowError,
+  GoogleFlowResult,
   Settings,
   Tab,
   TabsState,
@@ -29,7 +32,16 @@ export class FakeBridge implements EngineBridge {
     defaultModel: null,
   }
   token: string | null = null
+  /** What `auth.googleSignIn` answers: a token, or why the flow did not complete. */
   googleIdToken: string | null = null
+  googleSignInError: GoogleFlowError = 'cancelled'
+  google: GoogleConnection = { configured: true, connected: false, email: null }
+  /** What the next `google.connect` does; `wait` holds it until `google.cancel`. */
+  googleConnect: GoogleFlowResult | 'wait' = {
+    connection: { configured: true, connected: true, email: 'a@example.com' },
+    error: null,
+  }
+  private cancelConnect: (() => void) | null = null
   captures = new Map<string, Capture>()
   tabs: TabsState = { windowId: 'w1', privateWindow: false, tabs: [], activeTabId: null }
   googleExport: EngineResponse<'google.exportDoc'> = {
@@ -58,7 +70,29 @@ export class FakeBridge implements EngineBridge {
         this.token = (r?.token as string | null) ?? null
         return undefined
       case 'auth.googleSignIn':
-        return this.googleIdToken ? { idToken: this.googleIdToken } : null
+        return this.googleIdToken
+          ? { ok: true, idToken: this.googleIdToken }
+          : { ok: false, error: this.googleSignInError }
+      case 'google.status':
+        return { ...this.google }
+      case 'google.connect': {
+        if (this.googleConnect !== 'wait') {
+          this.google = this.googleConnect.connection
+          return this.googleConnect
+        }
+        return new Promise((resolve) => {
+          this.cancelConnect = () =>
+            resolve({ connection: { ...this.google }, error: 'cancelled' } satisfies GoogleFlowResult)
+        })
+      }
+      case 'google.cancel':
+        this.cancelConnect?.()
+        this.cancelConnect = null
+        return undefined
+      case 'google.disconnect':
+        this.google = { ...this.google, connected: false, email: null }
+        this.emit('google.changed', { ...this.google })
+        return { ...this.google }
       case 'tabs.get':
         return this.tabs
       case 'capture.extract': {

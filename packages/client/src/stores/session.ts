@@ -1,4 +1,4 @@
-import { api, type Space, type User } from '@tiger/shared'
+import { api, type GoogleFlowError, type Space, type User } from '@tiger/shared'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { type ApiClientError, toClientError } from '../api'
 import type { ClientContext } from '../load'
@@ -15,6 +15,11 @@ export interface SessionState {
   user: User | null
   /** The last failure, cleared by the next attempt. A cancelled Google sign-in is not an error. */
   error: ApiClientError | null
+  /**
+   * Why the last Google sign-in did not reach the server (`not-configured`, `denied`, `timeout`,
+   * `cancelled`, `failed`), or null. Cleared by the next attempt.
+   */
+  googleError: GoogleFlowError | null
 }
 
 export interface SessionEvents {
@@ -28,7 +33,10 @@ export interface SessionController {
   token(): string | null
   boot(): Promise<void>
   devLogin(email: string, name: string): Promise<void>
-  /** Resolves false when the member closed the Google window without signing in. */
+  /**
+   * Resolves true when signed in. False when the Google flow did not complete (`googleError` says
+   * why) or the server refused the token (`error`).
+   */
   signInWithGoogle(): Promise<boolean>
   logout(): Promise<void>
   /** The server said the session is gone (401 on a call or 4401 on the socket). */
@@ -41,6 +49,7 @@ export function createSession(ctx: ClientContext, events: SessionEvents): Sessio
     status: 'booting',
     user: null,
     error: null,
+    googleError: null,
   }))
   let token: string | null = null
 
@@ -97,11 +106,11 @@ export function createSession(ctx: ClientContext, events: SessionEvents): Sessio
     },
 
     async signInWithGoogle() {
-      store.setState({ status: 'signingIn', error: null })
+      store.setState({ status: 'signingIn', error: null, googleError: null })
       try {
         const google = await ctx.bridge.invoke('auth.googleSignIn')
-        if (!google) {
-          store.setState({ status: 'signedOut', error: null })
+        if (!google.ok) {
+          store.setState({ status: 'signedOut', error: null, googleError: google.error })
           return false
         }
         const session = await ctx.api.call(api.authGoogle, { body: { idToken: google.idToken } })

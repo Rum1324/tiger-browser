@@ -13,6 +13,7 @@ const MAX_FRAME_BYTES = 64 * 1024
 /**
  * `/v1/ws`: the first frame must be `auth`. After `ready`, `subscribe` adds the Spaces the user is a
  * member of; ids that are not are reported in one generic error, never distinguished from unknown ids.
+ * `unsubscribe` removes Spaces silently; a following `ping` confirms it took effect.
  */
 export function websocketRoute(app: FastifyInstance): void {
   const { sql, hub, log } = app.tiger
@@ -122,6 +123,11 @@ export function websocketRoute(app: FastifyInstance): void {
                   message: `${ids.length - allowed.size} Space(s) not found`,
                 })
               }
+              return
+            }
+            case 'unsubscribe': {
+              // No membership check is needed to stop receiving; unknown ids are simply ignored.
+              for (const id of new Set(frame.spaceIds)) hub.unsubscribe(client, id)
               return
             }
           }

@@ -58,6 +58,7 @@ export type { ActivityController, ActivityState } from './stores/activity'
 export {
   type ItemsController,
   type ItemsState,
+  indexEntryOf,
   NOT_ELIGIBLE,
   type ShareLocation,
   tabLookupKey,
@@ -71,6 +72,7 @@ export {
   PROVIDER_COMPANY,
   type SelectedModel,
 } from './stores/models'
+export type { GoogleController, GoogleState } from './stores/google'
 export type { SessionController, SessionState, SessionStatus } from './stores/session'
 export type {
   ShareFailure,

@@ -6,6 +6,7 @@ import { requireMember } from '../services/access'
 import { appendAudit } from '../services/audit'
 import { userRef } from '../services/rows'
 import {
+  abortMessage,
   createThread,
   deleteThread,
   listMessages,
@@ -25,8 +26,12 @@ export function threadRoutes(app: FastifyInstance): void {
     createThread(ctx, user, params.spaceId, body.visibility, body.title),
   )
   registerRoute(app, api.listMessages, async ({ params, query }, { user }) =>
-    listMessages(ctx.sql, user, params.threadId, query.before, query.limit),
+    listMessages(ctx, user, params.threadId, query.before, query.limit),
   )
+  registerRoute(app, api.abortMessage, async ({ params }, { user }) => {
+    await abortMessage(ctx, user, params.messageId)
+    return ok
+  })
   registerRoute(app, api.postMessage, async ({ params, body }, { user }) =>
     postMessage(ctx, user, params.threadId, body),
   )

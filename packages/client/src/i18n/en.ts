@@ -78,6 +78,12 @@ export const en: Dictionary = {
   'export.google.not-connected': 'Connect your Google account first.',
   'export.google.denied': 'Google access was not granted.',
   'export.google.failed': 'The Google Doc could not be created.',
+  'google.flow.not-configured': 'Google sign-in is not set up in this browser.',
+  'google.flow.denied': 'Google access was not granted.',
+  'google.flow.timeout': 'Google sign-in timed out. Please try again.',
+  'google.flow.cancelled': 'Google sign-in was cancelled.',
+  'google.flow.failed': 'Google sign-in failed. Please try again.',
+  'invite.opened': 'You opened an invite to a Space. Press Join to accept it.',
   'export.recordFailed': 'Exported, but the export could not be recorded.',
   'export.sourcesHeading': 'Sources',
 

@@ -4,6 +4,7 @@ import {
   type ExtractedPage,
   type Item,
   type ItemDetail,
+  type ItemIndexEntry,
   type ItemVersionRef,
   type ShareItemResult,
   type User,
@@ -15,7 +16,15 @@ import { AppError, notFound } from '../errors'
 import { newId } from '../ids'
 import { requireItemAccess, requireMember } from './access'
 import { appendAudit } from './audit'
-import { selectItems, toItem, toItemDetail, toVersionRef, userRef, type VersionRow } from './rows'
+import {
+  iso,
+  selectItems,
+  toItem,
+  toItemDetail,
+  toVersionRef,
+  userRef,
+  type VersionRow,
+} from './rows'
 
 /**
  * Defence in depth: the browser's main process already refuses to capture these pages, but a
@@ -228,30 +237,43 @@ export async function unshareItem(ctx: AppContext, user: User, itemId: string): 
   ctx.hub.publishToSpace(access.spaceId, { type: 'audit.appended', event: result.event })
 }
 
-/** Which of the caller's Spaces already hold each URL, matched by canonical form. */
-export async function lookupByUrl(sql: Sql, userId: string, urls: string[]) {
-  const byKey = new Map<string, string[]>()
-  for (const url of urls) {
-    const key = canonicalUrl(url)
-    const list = byKey.get(key)
-    if (list) list.push(url)
-    else byKey.set(key, [url])
-  }
+/**
+ * The caller's item index: one row per item in every Space they belong to, in one query. The client
+ * matches its open tabs against it locally, so the URLs of pages a member merely has open never
+ * reach the server. Membership is the join condition, so another Space's items cannot appear.
+ */
+export async function listItemIndex(sql: Sql, userId: string): Promise<ItemIndexEntry[]> {
   const rows = await sql<
-    { id: string; space_id: string; url_key: string; shared_by: string; updated_at: Date }[]
+    {
+      id: string
+      space_id: string
+      url_key: string
+      title: string
+      sb_id: string
+      sb_name: string
+      sb_avatar: string | null
+      v_number: number
+      v_hash: string
+      updated_at: Date
+    }[]
   >`
-    select i.id, i.space_id, i.url_key, i.shared_by, i.updated_at
-    from items i join space_members m on m.space_id = i.space_id and m.user_id = ${userId}
-    where i.url_key = any(${[...byKey.keys()]}::text[])
-    order by i.updated_at desc
+    select i.id, i.space_id, i.url_key, i.title,
+           su.id as sb_id, su.name as sb_name, su.avatar_url as sb_avatar,
+           v.number as v_number, v.content_hash as v_hash, i.updated_at
+    from items i
+    join space_members m on m.space_id = i.space_id and m.user_id = ${userId}
+    join users su on su.id = i.shared_by
+    join item_versions v on v.id = i.current_version_id
+    order by i.updated_at desc, i.id desc
   `
-  return rows.flatMap((r) =>
-    (byKey.get(r.url_key) ?? []).map((url) => ({
-      url,
-      itemId: r.id,
-      spaceId: r.space_id,
-      sharedBy: r.shared_by,
-      updatedAt: r.updated_at.toISOString(),
-    })),
-  )
+  return rows.map((r) => ({
+    itemId: r.id,
+    spaceId: r.space_id,
+    urlKey: r.url_key,
+    title: r.title,
+    sharedBy: userRef(r.sb_id, r.sb_name, r.sb_avatar),
+    versionNumber: r.v_number,
+    contentHash: r.v_hash,
+    updatedAt: iso(r.updated_at),
+  }))
 }

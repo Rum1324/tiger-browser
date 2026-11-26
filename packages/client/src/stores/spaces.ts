@@ -35,6 +35,11 @@ export interface SpacesState {
   lastInvite: CreatedInvite | null
   /** State of the last mutation (create, rename, invite, accept...), for buttons and toasts. */
   mutation: Load
+  /**
+   * An invite link the member opened in a tab (engine `invite.open`), waiting for them to accept
+   * or dismiss it. Nothing is sent until `acceptPendingInvite()`.
+   */
+  pendingInvite: { token: string } | null
 }
 
 export interface SpacesController {
@@ -52,6 +57,10 @@ export interface SpacesController {
   revokeInvite(inviteId: string): Promise<boolean>
   /** Accepts a pasted invite link or bare token, then switches to the joined Space. */
   acceptInvite(linkOrToken: string): Promise<Space | null>
+  /** The engine reported an opened invite link: hold it until the member decides. */
+  offerInvite(token: string): void
+  acceptPendingInvite(): Promise<Space | null>
+  dismissPendingInvite(): void
   removeMember(userId: string): Promise<boolean>
   handleEvent(e: ServerEvent): void
   reset(): void
@@ -72,6 +81,7 @@ const initial = (): SpacesState => ({
   detailLoad: IDLE,
   lastInvite: null,
   mutation: IDLE,
+  pendingInvite: null,
 })
 
 export function createSpaces(ctx: ClientContext, hooks: SpacesHooks): SpacesController {
@@ -239,6 +249,24 @@ export function createSpaces(ctx: ClientContext, hooks: SpacesHooks): SpacesCont
         await controller.select(space.id)
       }
       return space
+    },
+
+    offerInvite(token) {
+      const parsed = parseInviteToken(token)
+      if (parsed) store.setState({ pendingInvite: { token: parsed } })
+    },
+
+    async acceptPendingInvite() {
+      const pending = store.getState().pendingInvite
+      if (!pending) return null
+      const space = await controller.acceptInvite(pending.token)
+      // A refused invite stays visible with its error until dismissed; an accepted one is done.
+      if (space) store.setState({ pendingInvite: null })
+      return space
+    },
+
+    dismissPendingInvite() {
+      store.setState({ pendingInvite: null })
     },
 
     async removeMember(userId) {

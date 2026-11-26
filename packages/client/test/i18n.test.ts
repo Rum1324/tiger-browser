@@ -1,4 +1,4 @@
-import { API_ERROR_CODES, CAPTURE_BLOCK_REASONS } from '@tiger/shared'
+import { API_ERROR_CODES, CAPTURE_BLOCK_REASONS, GoogleFlowError } from '@tiger/shared'
 import { describe, expect, it } from 'vitest'
 import {
   AI_FAILURE_CODES,
@@ -32,6 +32,7 @@ describe('message dictionaries', () => {
     'share.outcome.unchanged',
     ...AI_FAILURE_CODES.map((c) => `ai.${c}` as const),
     ...GOOGLE_EXPORT_ERRORS.map((e) => `export.google.${e}` as const),
+    ...GoogleFlowError.options.map((e) => `google.flow.${e}` as const),
   ]
 
   it('every ApiErrorCode, capture reason, capture error, connection state and share outcome has a message in both languages', () => {

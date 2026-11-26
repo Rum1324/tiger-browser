@@ -1,4 +1,4 @@
-import { API_ERROR_CODES, CAPTURE_BLOCK_REASONS } from '@tiger/shared'
+import { API_ERROR_CODES, CAPTURE_BLOCK_REASONS, GoogleFlowError } from '@tiger/shared'
 import { CAPTURE_ERRORS } from '../capture'
 import { GOOGLE_EXPORT_ERRORS } from '../export'
 import { CONNECTION_STATES } from '../realtime'
@@ -42,6 +42,8 @@ export const MESSAGE_KEYS = [
   'attach.notAllowed',
   'attach.limit',
   ...prefixed('export.google.', GOOGLE_EXPORT_ERRORS),
+  ...prefixed('google.flow.', GoogleFlowError.options),
+  'invite.opened',
   'export.recordFailed',
   'export.sourcesHeading',
   'provider.sendsTo',

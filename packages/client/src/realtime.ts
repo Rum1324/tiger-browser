@@ -132,9 +132,13 @@ export class RealtimeClient {
   setSpaces(spaceIds: readonly string[]): void {
     const next = new Set(spaceIds)
     const added = [...next].some((id) => !this.spaces.has(id))
+    const removed = [...this.spaces].filter((id) => !next.has(id))
     this.spaces = next
-    // The protocol has no unsubscribe; the server stops sending a Space when membership ends.
-    if (added && this._state === 'online') this.sendSubscribe()
+    if (this._state !== 'online') return
+    // A Space left behind (or switched away from) stops reaching this socket; the server also
+    // stops on its own when membership ends.
+    if (removed.length) this.send({ type: 'unsubscribe', spaceIds: removed.slice(0, 100) })
+    if (added) this.sendSubscribe()
   }
 
   /** Drop the current connection as if the network failed; used by the UI's "retry now" too. */

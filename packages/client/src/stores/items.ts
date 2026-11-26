@@ -3,6 +3,7 @@ import {
   canonicalUrl,
   type Item,
   type ItemDetail,
+  type ItemIndexEntry,
   type ItemVersionRef,
   type ServerEvent,
   type Tab,
@@ -37,10 +38,7 @@ export interface ItemsController {
 
 const byNewest = (a: Item, b: Item) => (a.updatedAt < b.updatedAt ? 1 : -1)
 
-export function createItems(
-  ctx: ClientContext,
-  hooks: { loaded(spaceId: string, items: Item[]): void },
-): ItemsController {
+export function createItems(ctx: ClientContext): ItemsController {
   const initial = (): ItemsState => ({ spaceId: null, items: [], load: IDLE, mutation: IDLE })
   const store = createStore<ItemsState>()(initial)
 
@@ -53,7 +51,6 @@ export function createItems(
         const items = await ctx.api.call(api.listItems, { params: { spaceId } })
         if (store.getState().spaceId !== spaceId) return
         store.setState({ items: [...items].sort(byNewest), load: READY })
-        hooks.loaded(spaceId, items)
       } catch (e) {
         if (store.getState().spaceId === spaceId) store.setState({ load: failed(toClientError(e)) })
       }
@@ -97,267 +94,279 @@ export function createItems(
   return controller
 }
 
-// ── Share state per URL (for tabs) ──────────────────────────────────────────
+// ── Share state per URL (for tabs), from the member's local item index ────────
 
-/** One Space that holds this URL. */
-export interface ShareLocation {
-  spaceId: string
-  itemId: string
-  sharedById: string
-  updatedAt: string
-  /**
-   * The full item when known: who shared it (`sharedBy.name`), which version
-   * (`currentVersion.number`, `contentHash`). Null only while that Space's list is loading.
-   */
-  item: Item | null
-}
+/** One Space that holds this URL: who shared it, at which version (the index row itself). */
+export type ShareLocation = ItemIndexEntry
 
 /**
- * `pending`: queued or in flight. `ready`: `locations` is authoritative (empty = not shared).
- * `error`: the lookup failed; `refreshAll()` retries.
+ * `pending`: the index has not loaded yet. `ready`: `locations` is authoritative (empty = not shared).
+ * `error`: the index could not be loaded; `refresh()` retries.
  */
 export interface UrlShare {
   status: 'pending' | 'ready' | 'error'
+  /** Newest change first. */
   locations: ShareLocation[]
   error: ApiClientError | null
 }
 
-/** What the UI shows for a tab whose page may never be captured: no lookup is made for it. */
-export const NOT_ELIGIBLE: UrlShare = Object.freeze({
-  status: 'ready',
-  locations: [],
-  error: null,
-}) as UrlShare
+const frozen = (u: UrlShare): UrlShare => Object.freeze(u) as UrlShare
+
+/** What the UI shows for a tab whose page may never be captured. */
+export const NOT_ELIGIBLE: UrlShare = frozen({ status: 'ready', locations: [], error: null })
+const NOT_SHARED: UrlShare = frozen({ status: 'ready', locations: [], error: null })
+const PENDING: UrlShare = frozen({ status: 'pending', locations: [], error: null })
 
 export interface UrlShareState {
-  /** Keyed by canonicalUrl. */
+  /** Every item in every Space the member belongs to, by item id. */
+  entries: Record<string, ItemIndexEntry>
+  /** canonicalUrl → its locations. Derived from `entries`; values are stable between changes. */
   byUrl: Record<string, UrlShare>
+  /** What a URL that is not in `byUrl` resolves to (pending, not shared, or the load error). */
+  missing: UrlShare
+  load: Load
   /** tabId → canonical URL, or null when the tab's page is not eligible for capture. */
   tabs: Record<string, string | null>
 }
 
 export interface UrlShareController {
   store: StoreApi<UrlShareState>
-  /** Queue URLs for lookup; resolves when they are resolved. Already known URLs cost nothing. */
-  track(urls: readonly string[]): Promise<void>
-  forUrl(url: string): UrlShare | null
+  /**
+   * Fetch the whole index again (`GET /v1/items/index`). The request carries no URL: open tabs are
+   * matched against the index on this machine only.
+   */
+  refresh(): Promise<void>
+  /** Resolves once the index has loaded (or failed) at least once since the last reset. */
+  whenReady(): Promise<void>
+  /** Signed in: remember the member's Spaces and load the index. */
+  start(spaceIds: readonly string[]): Promise<void>
+  /** The member's Spaces changed: a new Space means refetching, a lost one drops its rows. */
+  membershipChanged(spaceIds: readonly string[]): void
+  forUrl(url: string): UrlShare
   forTab(tabId: string): UrlShare | null
   /** Is this URL shared in this Space, and as which item? */
   inSpace(url: string, spaceId: string): ShareLocation | null
-  /** Follow the engine's tabs: a tab that navigates gets the state of its new URL. */
-  syncTabs(state: TabsState): Promise<void>
+  /** Follow the engine's tabs: a tab that navigates gets the state of its new URL. Local only. */
+  syncTabs(state: TabsState): void
   /** Start following `tabs.changed` from the bridge. Returns the unsubscribe. */
   attachTabs(): () => void
-  /** Look every tracked URL up again (after a reconnect). */
-  refreshAll(): Promise<void>
-  primeSpace(spaceId: string, items: Item[]): void
+  /** Apply a share result before its socket event arrives. */
+  applyItem(item: Item): void
   handleEvent(e: ServerEvent): void
   reset(): void
 }
 
-const MAX_LOOKUP = 100
-
-/** Lookups send the URL to the server, so only pages that could be shared are ever looked up. */
+/**
+ * The key a tab is matched under, or null for a page that may never be shared (private window,
+ * blocked by the capture rules, not http(s)): such a tab always shows as not shared.
+ */
 export function tabLookupKey(tab: Tab): string | null {
   if (tab.isPrivate || !tab.capture.allowed) return null
   if (!/^https?:\/\//i.test(tab.url)) return null
   return canonicalUrl(tab.url)
 }
 
-export function createUrlShare(
-  ctx: ClientContext,
-  opts: { batchDelayMs?: number } = {},
-): UrlShareController {
-  const initial = (): UrlShareState => ({ byUrl: {}, tabs: {} })
+export function indexEntryOf(item: Item): ItemIndexEntry {
+  return {
+    itemId: item.id,
+    spaceId: item.spaceId,
+    urlKey: canonicalUrl(item.url),
+    title: item.title,
+    sharedBy: item.sharedBy,
+    versionNumber: item.currentVersion.number,
+    contentHash: item.currentVersion.contentHash,
+    updatedAt: item.updatedAt,
+  }
+}
+
+type IndexEvent =
+  | { kind: 'upsert'; entry: ItemIndexEntry }
+  | { kind: 'delete'; itemId: string }
+  | { kind: 'leave'; spaceId: string }
+
+const newestFirst = (a: ItemIndexEntry, b: ItemIndexEntry) =>
+  a.updatedAt === b.updatedAt ? (a.itemId < b.itemId ? 1 : -1) : a.updatedAt < b.updatedAt ? 1 : -1
+
+export function createUrlShare(ctx: ClientContext): UrlShareController {
+  const initial = (): UrlShareState => ({
+    entries: {},
+    byUrl: {},
+    missing: PENDING,
+    load: IDLE,
+    tabs: {},
+  })
   const store = createStore<UrlShareState>()(initial)
-  const batchDelayMs = opts.batchDelayMs ?? 15
-  const itemsById = new Map<string, Item>()
-  const loadedSpaces = new Map<string, Promise<void>>()
-  let queue = new Set<string>()
-  let flushPromise: Promise<void> | null = null
-  const inflight = new Set<Promise<void>>()
   let epoch = 0
+  let fetching: Promise<void> | null = null
+  let ready: { promise: Promise<void>; resolve: () => void } = deferred()
+  let knownSpaces = new Set<string>()
+  /** Events seen while a fetch is in flight, replayed over its result so none is lost. */
+  let log: IndexEvent[] | null = null
 
-  const setUrl = (key: string, value: UrlShare) =>
-    store.setState({ byUrl: { ...store.getState().byUrl, [key]: value } })
-
-  const sortLocations = (l: ShareLocation[]) =>
-    [...l].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
-
-  function ensureSpace(spaceId: string): Promise<void> {
-    let p = loadedSpaces.get(spaceId)
-    if (!p) {
-      p = ctx.api
-        .call(api.listItems, { params: { spaceId } })
-        .then((items) => {
-          for (const i of items) itemsById.set(i.id, i)
-        })
-        .catch(() => {
-          // Leave the details empty; the next refresh tries again.
-          loadedSpaces.delete(spaceId)
-        })
-      loadedSpaces.set(spaceId, p)
-    }
-    return p
+  function deferred() {
+    let resolve: () => void = () => {}
+    const promise = new Promise<void>((r) => (resolve = r))
+    return { promise, resolve }
   }
 
-  async function resolveBatch(keys: string[], at: number): Promise<void> {
-    try {
-      const rows = await ctx.api.call(api.lookupItemsByUrl, { body: { urls: keys } })
-      const spaces = new Set(rows.filter((r) => !itemsById.has(r.itemId)).map((r) => r.spaceId))
-      await Promise.all([...spaces].map(ensureSpace))
-      if (at !== epoch) return
-      const next = { ...store.getState().byUrl }
-      for (const key of keys) {
-        const locations = rows
-          .filter((r) => r.url === key)
-          .map((r) => ({
-            spaceId: r.spaceId,
-            itemId: r.itemId,
-            sharedById: r.sharedBy,
-            updatedAt: r.updatedAt,
-            item: itemsById.get(r.itemId) ?? null,
-          }))
-        next[key] = { status: 'ready', locations: sortLocations(locations), error: null }
-      }
-      store.setState({ byUrl: next })
-    } catch (e) {
-      if (at !== epoch) return
-      const error = toClientError(e)
-      const next = { ...store.getState().byUrl }
-      for (const key of keys) next[key] = { status: 'error', locations: [], error }
-      store.setState({ byUrl: next })
+  function derive(entries: Record<string, ItemIndexEntry>): Record<string, UrlShare> {
+    const prev = store.getState().byUrl
+    const groups = new Map<string, ItemIndexEntry[]>()
+    for (const e of Object.values(entries)) {
+      const g = groups.get(e.urlKey)
+      if (g) g.push(e)
+      else groups.set(e.urlKey, [e])
+    }
+    const byUrl: Record<string, UrlShare> = {}
+    for (const [key, list] of groups) {
+      list.sort(newestFirst)
+      const old = prev[key]
+      // Keep the previous object when nothing changed, so UI selectors stay referentially stable.
+      byUrl[key] =
+        old &&
+        old.status === 'ready' &&
+        old.locations.length === list.length &&
+        old.locations.every((l, i) => l === list[i])
+          ? old
+          : frozen({ status: 'ready', locations: list, error: null })
+    }
+    return byUrl
+  }
+
+  function apply(entries: Record<string, ItemIndexEntry>, ev: IndexEvent): void {
+    if (ev.kind === 'upsert') {
+      const cur = entries[ev.entry.itemId]
+      if (!cur || cur.updatedAt <= ev.entry.updatedAt) entries[ev.entry.itemId] = ev.entry
+    } else if (ev.kind === 'delete') {
+      delete entries[ev.itemId]
+    } else {
+      for (const [id, e] of Object.entries(entries)) if (e.spaceId === ev.spaceId) delete entries[id]
     }
   }
 
-  function scheduleFlush(): Promise<void> {
-    if (flushPromise) return flushPromise
-    const at = epoch
-    flushPromise = new Promise<void>((resolve) => setTimeout(resolve, batchDelayMs)).then(
-      async () => {
-        const keys = [...queue]
-        queue = new Set()
-        flushPromise = null
-        const batches: string[][] = []
-        for (let i = 0; i < keys.length; i += MAX_LOOKUP)
-          batches.push(keys.slice(i, i + MAX_LOOKUP))
-        await Promise.all(batches.map((b) => resolveBatch(b, at)))
-      },
-    )
-    const p = flushPromise
-    inflight.add(p)
-    void p.finally(() => inflight.delete(p))
-    return p
+  function commit(entries: Record<string, ItemIndexEntry>): void {
+    store.setState({ entries, byUrl: derive(entries) })
   }
 
-  const settled = () => Promise.all([...inflight]).then(() => undefined)
+  function record(ev: IndexEvent): void {
+    log?.push(ev)
+    const entries = { ...store.getState().entries }
+    apply(entries, ev)
+    commit(entries)
+  }
 
   const controller: UrlShareController = {
     store,
-    track(urls) {
-      const byUrl = store.getState().byUrl
-      const fresh: string[] = []
-      for (const url of urls) {
-        if (!/^https?:\/\//i.test(url)) continue
-        const key = canonicalUrl(url)
-        if (byUrl[key] && byUrl[key].status !== 'error') continue
-        if (queue.has(key)) continue
-        fresh.push(key)
-      }
-      if (fresh.length === 0) return settled()
-      const next = { ...byUrl }
-      for (const key of fresh) {
-        queue.add(key)
-        next[key] = { status: 'pending', locations: [], error: null }
-      }
-      store.setState({ byUrl: next })
-      return scheduleFlush()
+
+    refresh() {
+      const at = ++epoch
+      if (!log) log = []
+      const s = store.getState()
+      store.setState({ load: LOADING, missing: s.load.status === 'ready' ? s.missing : PENDING })
+      const run = (async () => {
+        try {
+          const rows = await ctx.api.call(api.listItemIndex, {})
+          if (at !== epoch) return
+          const entries: Record<string, ItemIndexEntry> = {}
+          for (const r of rows) entries[r.itemId] = r
+          for (const ev of log ?? []) apply(entries, ev)
+          log = null
+          store.setState({ load: READY, missing: NOT_SHARED })
+          commit(entries)
+        } catch (e) {
+          if (at !== epoch) return
+          log = null
+          const error = toClientError(e)
+          store.setState({ load: failed(error), missing: frozen({ status: 'error', locations: [], error }) })
+        } finally {
+          if (at === epoch) {
+            fetching = null
+            ready.resolve()
+          }
+        }
+      })()
+      fetching = run
+      return run
     },
+
+    whenReady() {
+      return fetching ?? ready.promise
+    },
+
+    start(spaceIds) {
+      knownSpaces = new Set(spaceIds)
+      return controller.refresh()
+    },
+
+    membershipChanged(spaceIds) {
+      const next = new Set(spaceIds)
+      const added = [...next].some((id) => !knownSpaces.has(id))
+      const lost = [...knownSpaces].filter((id) => !next.has(id))
+      knownSpaces = next
+      for (const spaceId of lost) record({ kind: 'leave', spaceId })
+      if (added && store.getState().load.status !== 'idle') void controller.refresh()
+    },
+
     forUrl(url) {
-      return store.getState().byUrl[canonicalUrl(url)] ?? null
+      if (!/^https?:\/\//i.test(url)) return NOT_ELIGIBLE
+      const s = store.getState()
+      return s.byUrl[canonicalUrl(url)] ?? s.missing
     },
+
     forTab(tabId) {
-      const { tabs, byUrl } = store.getState()
-      if (!(tabId in tabs)) return null
-      const key = tabs[tabId]
+      const s = store.getState()
+      if (!(tabId in s.tabs)) return null
+      const key = s.tabs[tabId]
       if (key === null || key === undefined) return NOT_ELIGIBLE
-      return byUrl[key] ?? null
+      return s.byUrl[key] ?? s.missing
     },
+
     inSpace(url, spaceId) {
-      return controller.forUrl(url)?.locations.find((l) => l.spaceId === spaceId) ?? null
+      return controller.forUrl(url).locations.find((l) => l.spaceId === spaceId) ?? null
     },
+
     syncTabs(state) {
       const tabs: Record<string, string | null> = {}
       for (const tab of state.tabs) tabs[tab.id] = tabLookupKey(tab)
-      store.setState({ tabs })
-      return controller.track(Object.values(tabs).filter((k): k is string => k !== null))
+      const cur = store.getState().tabs
+      const same =
+        Object.keys(cur).length === Object.keys(tabs).length &&
+        Object.entries(tabs).every(([k, v]) => k in cur && cur[k] === v)
+      if (!same) store.setState({ tabs })
     },
+
     attachTabs() {
-      const off = ctx.bridge.on('tabs.changed', (s) => void controller.syncTabs(s))
+      const off = ctx.bridge.on('tabs.changed', (s) => controller.syncTabs(s))
       void ctx.bridge
         .invoke('tabs.get')
         .then((s) => controller.syncTabs(s))
         .catch(() => {})
       return off
     },
-    async refreshAll() {
-      epoch++
-      flushPromise = null
-      queue = new Set()
-      itemsById.clear()
-      loadedSpaces.clear()
-      const keys = Object.keys(store.getState().byUrl)
-      const next: Record<string, UrlShare> = {}
-      for (const k of keys) {
-        const prev = store.getState().byUrl[k]
-        // Keep showing what was known while the refresh runs.
-        next[k] = { status: 'pending', locations: prev?.locations ?? [], error: null }
-        queue.add(k)
-      }
-      store.setState({ byUrl: next })
-      if (keys.length) await scheduleFlush()
+
+    applyItem(item) {
+      record({ kind: 'upsert', entry: indexEntryOf(item) })
     },
-    primeSpace(spaceId, items) {
-      for (const i of items) itemsById.set(i.id, i)
-      loadedSpaces.set(spaceId, Promise.resolve())
-    },
+
     handleEvent(e) {
       if (e.type === 'item.upserted') {
-        const item = e.item
-        itemsById.set(item.id, item)
-        const key = canonicalUrl(item.url)
-        const cur = store.getState().byUrl[key]
-        if (!cur) return
-        const loc: ShareLocation = {
-          spaceId: item.spaceId,
-          itemId: item.id,
-          sharedById: item.sharedBy.id,
-          updatedAt: item.updatedAt,
-          item,
-        }
-        const rest = cur.locations.filter((l) => l.itemId !== item.id)
-        setUrl(key, { ...cur, locations: sortLocations([loc, ...rest]) })
+        record({ kind: 'upsert', entry: indexEntryOf(e.item) })
       } else if (e.type === 'item.deleted') {
-        itemsById.delete(e.itemId)
-        const key = canonicalUrl(e.url)
-        const cur = store.getState().byUrl[key]
-        if (!cur) return
-        setUrl(key, { ...cur, locations: cur.locations.filter((l) => l.itemId !== e.itemId) })
+        record({ kind: 'delete', itemId: e.itemId })
       } else if (e.type === 'member.removed' && e.userId === ctx.userId()) {
-        // Locations in a Space this member left are no longer visible to them.
-        const next: Record<string, UrlShare> = {}
-        for (const [k, v] of Object.entries(store.getState().byUrl)) {
-          next[k] = { ...v, locations: v.locations.filter((l) => l.spaceId !== e.spaceId) }
-        }
-        store.setState({ byUrl: next })
+        // Rows of a Space this member left are no longer theirs to see.
+        knownSpaces.delete(e.spaceId)
+        record({ kind: 'leave', spaceId: e.spaceId })
       }
     },
+
     reset() {
       epoch++
-      queue = new Set()
-      flushPromise = null
-      itemsById.clear()
-      loadedSpaces.clear()
+      fetching = null
+      log = null
+      knownSpaces = new Set()
+      ready.resolve()
+      ready = deferred()
       store.setState(initial(), true)
     },
   }

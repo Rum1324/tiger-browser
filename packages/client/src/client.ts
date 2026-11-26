@@ -12,6 +12,7 @@ import {
   type ItemsController,
   type UrlShareController,
 } from './stores/items'
+import { createGoogle, type GoogleController } from './stores/google'
 import { createModels, type ModelsController } from './stores/models'
 import { createSession, type SessionController } from './stores/session'
 import { createShareFlow, type ShareFlowController } from './stores/share'
@@ -29,8 +30,8 @@ export interface TigerClientOptions {
   validateResponses?: boolean
   /** Realtime tuning; tests shorten the backoff. */
   realtime?: { baseBackoffMs?: number; maxBackoffMs?: number; heartbeatMs?: number }
-  /** Delay used to batch per-URL share lookups. */
-  lookupBatchMs?: number
+  /** How long a gap in a streaming answer may last before it is repaired by a refetch. */
+  gapRepairMs?: number
 }
 
 export interface UiState {
@@ -53,6 +54,7 @@ export interface TigerClient {
   models: ModelsController
   activity: ActivityController
   exports: ExportController
+  google: GoogleController
   /** Restore the session from the engine's stored token and load everything. */
   start(): Promise<void>
   /** Stop the socket and detach from the engine (window closing). */
@@ -91,17 +93,24 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
 
   const models = createModels(ctx)
   const activity = createActivity(ctx)
-  const urlShare = createUrlShare(ctx, { batchDelayMs: opts.lookupBatchMs ?? 15 })
-  const items = createItems(ctx, { loaded: (spaceId, list) => urlShare.primeSpace(spaceId, list) })
-  const threads = createThreads(ctx, {
-    modelForMessage: () => models.store.getState().selected,
-    messagePosted: () => models.consumeSelection(),
-    answerFinished: (spaceId) => {
-      if (activity.store.getState().spaceId === spaceId) void activity.refreshUsage()
+  const urlShare = createUrlShare(ctx)
+  const items = createItems(ctx)
+  const threads = createThreads(
+    ctx,
+    {
+      modelForMessage: () => models.store.getState().selected,
+      messagePosted: () => models.consumeSelection(),
+      answerFinished: (spaceId) => {
+        if (activity.store.getState().spaceId === spaceId) void activity.refreshUsage()
+      },
     },
-  })
+    opts.gapRepairMs !== undefined ? { gapRepairMs: opts.gapRepairMs } : {},
+  )
   const spaces = createSpaces(ctx, {
-    listChanged: (ids) => realtime.setSpaces(ids),
+    listChanged: (ids) => {
+      realtime.setSpaces(ids)
+      urlShare.membershipChanged(ids)
+    },
     currentChanged: (spaceId) => {
       void items.load(spaceId)
       void threads.load(spaceId)
@@ -110,31 +119,30 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
   })
   const share = createShareFlow(ctx, {
     currentSpaceId: () => spaces.store.getState().currentSpaceId,
+    // Matched in the local index: the URL of the page being previewed is not sent anywhere.
     findItem: async (url, spaceId) => {
-      if (items.store.getState().spaceId === spaceId) {
-        const found = items.byUrl(url)
-        if (found) return found
-      }
-      await urlShare.track([url])
-      return urlShare.inSpace(url, spaceId)?.item ?? null
+      await urlShare.whenReady()
+      return urlShare.inSpace(url, spaceId)
     },
     shared: (result) => {
       // The socket event follows; applying the answer now avoids a flash of the old state.
       const e: ServerEvent = { type: 'item.upserted', item: result.item }
       items.handleEvent(e)
-      urlShare.handleEvent(e)
+      urlShare.applyItem(result.item)
     },
   })
   const exports = createExport(ctx)
+  const google = createGoogle(ctx)
 
   session = createSession(ctx, {
     signedIn: (_user, list) => {
+      // The index first, so that setList below sees no new Space and does not fetch it twice.
+      void urlShare.start(list.map((s) => s.id))
       spaces.setList(list)
       realtime.setSpaces(list.map((s) => s.id))
       realtime.start()
       void models.load()
       void spaces.restoreCurrent()
-      void urlShare.refreshAll()
     },
     signedOut: () => {
       realtime.stop()
@@ -165,7 +173,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
       // Anything could have happened while the socket was down: refetch what the stores show.
       void spaces.refresh()
       void items.reload()
-      void urlShare.refreshAll()
+      void urlShare.refresh()
       void threads.resync()
       void activity.reload()
       void spaces.loadDetail()
@@ -190,6 +198,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
     models,
     activity,
     exports,
+    google,
     async start() {
       try {
         const settings = await bridge.invoke('settings.get')
@@ -199,8 +208,11 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
       }
       offs.push(
         bridge.on('settings.changed', (s) => ui.setState({ locale: s.locale })),
+        bridge.on('invite.open', ({ token }) => spaces.offerInvite(token)),
         urlShare.attachTabs(),
+        google.attach(),
       )
+      void google.refresh()
       await session?.boot()
     },
     dispose() {

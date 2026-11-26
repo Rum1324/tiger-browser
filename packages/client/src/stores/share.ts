@@ -4,6 +4,7 @@ import { type ApiClientError, toClientError } from '../api'
 import { type CaptureOutcome, extractTab, userBlockedHosts } from '../capture'
 import { sha256Hex } from '../hash'
 import type { ClientContext } from '../load'
+import type { ShareLocation } from './items'
 
 /**
  * The share flow as an explicit state machine:
@@ -30,8 +31,11 @@ export type ShareFlowState =
       spaceId: string
       /** Exactly what `confirm()` sends. */
       page: ExtractedPage
-      /** The item this URL already is in the target Space, if any (a re-share makes a version). */
-      existing: Item | null
+      /**
+       * The index row of this URL in the target Space, if any (a re-share makes a version). Looked
+       * up in the local index: finding it sends nothing.
+       */
+      existing: ShareLocation | null
       /** Whether the content differs from `existing`'s current version; null when not shared yet. */
       changed: boolean | null
     }
@@ -46,8 +50,8 @@ export type ShareFlowState =
 
 export type StaleCheck =
   | { status: 'not-shared' }
-  | { status: 'fresh'; item: Item }
-  | { status: 'stale'; item: Item; page: ExtractedPage }
+  | { status: 'fresh'; item: ShareLocation }
+  | { status: 'stale'; item: ShareLocation; page: ExtractedPage }
   | { status: 'unavailable'; outcome: Extract<CaptureOutcome, { ok: false }> }
 
 export interface ShareFlowController {
@@ -67,8 +71,8 @@ export interface ShareFlowController {
 
 export interface ShareDeps {
   currentSpaceId(): string | null
-  /** The item for this URL in this Space, from the stores (null when not shared there). */
-  findItem(url: string, spaceId: string): Item | null | Promise<Item | null>
+  /** The index row for this URL in this Space (null when not shared there). Must send nothing. */
+  findItem(url: string, spaceId: string): ShareLocation | null | Promise<ShareLocation | null>
   /** Called with the server's answer so the stores can update before the socket event arrives. */
   shared(result: ShareItemResult): void
 }
@@ -97,7 +101,7 @@ export function createShareFlow(ctx: ClientContext, deps: ShareDeps): ShareFlowC
       const existing = await deps.findItem(outcome.page.url, spaceId)
       if (my !== run) return
       const changed = existing
-        ? (await sha256Hex(outcome.page.markdown)) !== existing.currentVersion.contentHash
+        ? (await sha256Hex(outcome.page.markdown)) !== existing.contentHash
         : null
       if (my !== run) return
       store.setState(
@@ -142,7 +146,7 @@ export function createShareFlow(ctx: ClientContext, deps: ShareDeps): ShareFlowC
       const item = spaceId ? await deps.findItem(outcome.page.url, spaceId) : null
       if (!item) return { status: 'not-shared' }
       const hash = await sha256Hex(outcome.page.markdown)
-      return hash === item.currentVersion.contentHash
+      return hash === item.contentHash
         ? { status: 'fresh', item }
         : { status: 'stale', item, page: outcome.page }
     },

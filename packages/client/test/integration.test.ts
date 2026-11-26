@@ -58,12 +58,21 @@ describe('session', () => {
     await B.client.start()
     B.bridge.googleIdToken = null
     expect(await B.client.session.signInWithGoogle()).toBe(false)
-    expect(B.client.session.store.getState()).toMatchObject({ status: 'signedOut', error: null })
+    expect(B.client.session.store.getState()).toMatchObject({
+      status: 'signedOut',
+      error: null,
+      googleError: 'cancelled',
+    })
+    // The engine's reason reaches the store, for every way a flow can fail.
+    B.bridge.googleSignInError = 'timeout'
+    expect(await B.client.session.signInWithGoogle()).toBe(false)
+    expect(B.client.session.store.getState().googleError).toBe('timeout')
     expect(B.count('POST', /\/auth\/google$/)).toBe(0)
 
     B.bridge.googleIdToken = 'forged-token-value'
     expect(await B.client.session.signInWithGoogle()).toBe(false)
     expect(B.client.session.store.getState().error?.code).toBe('google_token_invalid')
+    expect(B.client.session.store.getState().googleError).toBeNull()
 
     B.bridge.googleIdToken = googleToken(emailB, 'Ben')
     expect(await B.client.session.signInWithGoogle()).toBe(true)
@@ -139,7 +148,7 @@ describe('spaces and invites', () => {
 })
 
 describe('sharing', () => {
-  it('per-URL share state starts as not shared for both members', async () => {
+  it('per-URL share state starts as not shared for both members, from the local index', async () => {
     A.bridge.captures.set('t1', { ok: true, page: articleV1 })
     A.bridge.setTabs([makeTab('t1', ARTICLE_URL)])
     B.bridge.setTabs([makeTab('b1', ARTICLE_URL_B)])
@@ -207,11 +216,7 @@ describe('sharing', () => {
     const check = (c: TestClient, tabId: string) => {
       const st = c.client.urlShare.forTab(tabId)
       const loc = st?.locations[0]
-      return (
-        loc?.spaceId === spaceId &&
-        loc.item?.sharedBy.name === 'Aiko' &&
-        loc.item.currentVersion.number === 1
-      )
+      return loc?.spaceId === spaceId && loc.sharedBy.name === 'Aiko' && loc.versionNumber === 1
     }
     await waitFor(() => check(A, 't1'), 5000, 'A url state')
     await waitFor(() => check(B, 'b1'), 5000, 'B url state')
@@ -221,7 +226,7 @@ describe('sharing', () => {
   it('re-sharing the same content is unchanged; a stale check sends nothing; changed content is a version', async () => {
     await A.client.share.begin('t1')
     const p = A.client.share.store.getState()
-    expect(p.phase === 'preview' && p.existing?.id).toBe(item.id)
+    expect(p.phase === 'preview' && p.existing?.itemId).toBe(item.id)
     expect(p.phase === 'preview' && p.changed).toBe(false)
     await A.client.share.confirm()
     const s1 = A.client.share.store.getState()
@@ -244,39 +249,32 @@ describe('sharing', () => {
     const s2 = A.client.share.store.getState()
     expect(s2.phase === 'done' && s2.outcome).toBe('version')
     await waitFor(
-      () => B.client.urlShare.forTab('b1')?.locations[0]?.item?.currentVersion.number === 2,
+      () => B.client.urlShare.forTab('b1')?.locations[0]?.versionNumber === 2,
       5000,
       'B sees version 2',
     )
     await server.settle()
   })
 
-  it('a tab that navigates gets the new URL state; many tabs resolve in one batched lookup', async () => {
-    const lookups = () => A.count('POST', /\/items\/lookup$/)
-    const before = lookups()
+  it('a tab that navigates gets the new URL state without any request', async () => {
+    const before = A.requests.length
     A.bridge.setTabs([
       makeTab('t1', 'https://news.example.com/other'),
       ...Array.from({ length: 6 }, (_, i) => makeTab(`x${i}`, `https://site${i}.example.org/p`)),
       makeTab('bank', 'https://direct.bk.mufg.jp/account'),
       makeTab('priv', 'https://news.example.com/article?id=7', { isPrivate: true }),
     ])
-    await waitFor(() => A.client.urlShare.forTab('x5')?.status === 'ready')
-    await waitFor(() => A.client.urlShare.forTab('t1')?.status === 'ready')
-    expect(A.client.urlShare.forTab('t1')?.locations).toEqual([])
-    expect(lookups() - before).toBe(1)
-    // Pages that can never be captured are not looked up: their URLs never reach the server.
-    const sentUrls = A.requests
-      .filter((r) => /\/items\/lookup$/.test(r.path))
-      .flatMap((r) => (r.body as { urls: string[] }).urls)
-    expect(sentUrls.some((u) => u.includes('mufg'))).toBe(false)
+    expect(A.client.urlShare.forTab('x5')).toMatchObject({ status: 'ready', locations: [] })
+    expect(A.client.urlShare.forTab('t1')).toMatchObject({ status: 'ready', locations: [] })
+    // A private tab on a shared URL still shows as not shared: it may never be captured.
     expect(A.client.urlShare.forTab('priv')?.locations).toEqual([])
     expect(A.client.urlShare.forTab('bank')?.locations).toEqual([])
 
-    // Navigating back to the shared article shows it as shared again, without a new lookup.
-    const n = lookups()
+    // Navigating back to the shared article shows it as shared again.
     A.bridge.setTabs([makeTab('t1', ARTICLE_URL)])
     expect(A.client.urlShare.forTab('t1')?.locations[0]?.itemId).toBe(item.id)
-    expect(lookups()).toBe(n)
+    await sleep(50)
+    expect(A.requests.length).toBe(before)
   })
 
   it('a blocked capture result never reaches the network', async () => {

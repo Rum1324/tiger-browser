@@ -183,6 +183,56 @@ describe('/v1/ws', () => {
     ownerWs.close()
   })
 
+  it('stops delivering a Space after unsubscribe, keeps the others, and can subscribe again', async () => {
+    const a = await spaceWithMembers(h, 'WsUnsubA')
+    const owner = a.owner
+    const b = await h.ok('createSpace', { body: { name: 'WsUnsubB' } }, owner.token)
+    const ws = await connectAs(port, owner.token, [a.space.id, b.id])
+    // Unknown ids and repeats are ignored without an error frame.
+    ws.send({
+      type: 'unsubscribe',
+      spaceIds: [a.space.id, a.space.id, '01900000-0000-7000-8000-000000000000'],
+    })
+    await ws.sync()
+    const before = ws.events.length
+    await h.ok(
+      'updateSpace',
+      { params: { spaceId: a.space.id }, body: { name: 'A2' } },
+      owner.token,
+    )
+    await h.ok('updateSpace', { params: { spaceId: b.id }, body: { name: 'B2' } }, owner.token)
+    expect((await ws.next('space.updated')).spaceId).toBe(b.id)
+    await ws.sync()
+    const after = ws.events.slice(before)
+    expect(after.some((e) => e.type === 'error')).toBe(false)
+    expect(JSON.stringify(after)).not.toContain(a.space.id)
+
+    // Another socket of the same user is unaffected.
+    const other = await connectAs(port, owner.token, [a.space.id])
+    ws.send({ type: 'unsubscribe', spaceIds: [a.space.id] })
+    await ws.sync()
+    await h.ok(
+      'updateSpace',
+      { params: { spaceId: a.space.id }, body: { name: 'A3' } },
+      owner.token,
+    )
+    expect((await other.next('space.updated')).name).toBe('A3')
+
+    ws.send({ type: 'subscribe', spaceIds: [a.space.id] })
+    expect(await ws.next('subscribed', (e) => e.spaceIds.length === 1)).toEqual({
+      type: 'subscribed',
+      spaceIds: [a.space.id],
+    })
+    await h.ok(
+      'updateSpace',
+      { params: { spaceId: a.space.id }, body: { name: 'A4' } },
+      owner.token,
+    )
+    expect((await ws.next('space.updated', (e) => e.spaceId === a.space.id)).name).toBe('A4')
+    ws.close()
+    other.close()
+  })
+
   it('closes sockets of a session that logs out', async () => {
     const { token } = await h.login('Quitter')
     const c = await connectWs(port)

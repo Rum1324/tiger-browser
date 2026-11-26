@@ -108,6 +108,12 @@ export interface ThreadsController {
   promote(threadId: string): Promise<Thread | null>
   remove(threadId: string): Promise<boolean>
   thread(threadId: string): Thread | null
+  /**
+   * Stop an answer that is still streaming (allowed for the member who asked and Space owners).
+   * The message ends as `aborted` and keeps the text generated so far. Resolves false when the
+   * server refused (see `mutation.error`).
+   */
+  stop(messageId: string): Promise<boolean>
   handleEvent(e: ServerEvent): void
   reset(): void
 }
@@ -121,12 +127,99 @@ export interface ThreadsDeps {
   answerFinished(spaceId: string): void
 }
 
+export interface ThreadsOptions {
+  /**
+   * How long a gap in the delta sequence may last before the thread's messages are refetched to
+   * repair it (the server returns a streaming message with the text generated so far).
+   */
+  gapRepairMs?: number
+}
+
+/**
+ * The assembled stream of one assistant message. Text = `base` (what the server reported in a
+ * listMessages snapshot, covering deltas `0 .. baseSeq-1`) + `text` (the contiguous deltas from
+ * `baseSeq` on). `baseSeq` is null when the snapshot covers more deltas than this client has seen;
+ * the next delta that arrives then starts the run.
+ */
 interface StreamBuffer {
   threadId: string
-  nextSeq: number
+  /** Every delta received, by seq (kept so a snapshot can be aligned with them). */
+  received: Map<number, string>
+  base: string
+  baseSeq: number | null
   text: string
-  pending: Map<number, string>
+  nextSeq: number
+  maxSeq: number
   sources: Citation[] | null
+  repairTimer: ReturnType<typeof setTimeout> | null
+}
+
+const newBuffer = (threadId: string): StreamBuffer => ({
+  threadId,
+  received: new Map(),
+  base: '',
+  baseSeq: 0,
+  text: '',
+  nextSeq: 0,
+  maxSeq: -1,
+  sources: null,
+  repairTimer: null,
+})
+
+const shown = (b: StreamBuffer) => b.base + b.text
+const hasGap = (b: StreamBuffer) => b.baseSeq !== null && b.maxSeq >= b.nextSeq
+
+function advance(b: StreamBuffer): void {
+  for (let next = b.received.get(b.nextSeq); next !== undefined; next = b.received.get(b.nextSeq)) {
+    b.text += next
+    b.nextSeq++
+  }
+}
+
+function concat(b: StreamBuffer, from: number, to: number): string {
+  let out = ''
+  for (let i = from; i < to; i++) out += b.received.get(i) ?? ''
+  return out
+}
+
+/**
+ * Line a server snapshot `snapshot` (the text of deltas `0 .. k-1`, for an unknown k) up with the
+ * deltas this client holds, so that nothing is shown twice and nothing is dropped. Picks the largest
+ * k whose received deltas just below it match the end of the snapshot (and, when they reach seq 0,
+ * the whole snapshot).
+ */
+function alignStream(b: StreamBuffer, snapshot: string): void {
+  let chosen: number | null = null
+  if (snapshot === '') {
+    chosen = 0
+  } else {
+    let prefixEnd = 0
+    while (b.received.has(prefixEnd)) prefixEnd++
+    const prefix = concat(b, 0, prefixEnd)
+    for (let k = b.maxSeq + 1; k >= 0 && chosen === null; k--) {
+      let r = k
+      while (r > 0 && b.received.has(r - 1)) r--
+      const run = concat(b, r, k)
+      const fits =
+        r === 0
+          ? snapshot === run
+          : snapshot.startsWith(prefix) &&
+            snapshot.endsWith(run) &&
+            snapshot.length >= prefix.length + run.length
+      if (fits) chosen = k
+    }
+  }
+  b.base = snapshot
+  b.text = ''
+  if (chosen === null) {
+    // The snapshot covers deltas this client never saw; the next new delta starts the run.
+    b.baseSeq = null
+    b.nextSeq = b.maxSeq + 1
+    return
+  }
+  b.baseSeq = chosen
+  b.nextSeq = chosen
+  advance(b)
 }
 
 const activity = (t: Thread) => t.lastMessageAt ?? t.createdAt
@@ -134,7 +227,12 @@ const byActivity = (a: Thread, b: Thread) => (activity(a) < activity(b) ? 1 : -1
 
 const PAGE = 50
 
-export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsController {
+export function createThreads(
+  ctx: ClientContext,
+  deps: ThreadsDeps,
+  opts: ThreadsOptions = {},
+): ThreadsController {
+  const gapRepairMs = opts.gapRepairMs ?? 400
   const initial = (): ThreadsState => ({
     spaceId: null,
     threads: [],
@@ -158,6 +256,37 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
   const pendingFailures = new Map<string, string>()
   let attachRun = 0
 
+  function dropStream(messageId: string): StreamBuffer | undefined {
+    const buf = streams.get(messageId)
+    if (buf?.repairTimer) clearTimeout(buf.repairTimer)
+    streams.delete(messageId)
+    return buf
+  }
+
+  function bufferFor(messageId: string, threadId: string): StreamBuffer {
+    let buf = streams.get(messageId)
+    if (!buf) {
+      buf = newBuffer(threadId)
+      streams.set(messageId, buf)
+    }
+    return buf
+  }
+
+  /** A streaming copy from the server carries the text so far: line the local stream up with it. */
+  function absorbSnapshot(message: Message): void {
+    if (message.status !== 'streaming') return
+    alignStream(bufferFor(message.id, message.threadId), message.content)
+  }
+
+  function scheduleRepair(messageId: string, buf: StreamBuffer): void {
+    if (buf.repairTimer || !hasGap(buf)) return
+    buf.repairTimer = setTimeout(() => {
+      buf.repairTimer = null
+      if (streams.get(messageId) !== buf || !hasGap(buf)) return
+      if (store.getState().messages[buf.threadId]) void controller.loadMessages(buf.threadId)
+    }, gapRepairMs)
+  }
+
   function project(message: Message): ViewMessage {
     const buf = streams.get(message.id)
     const base = { id: message.id, threadId: message.threadId, message }
@@ -165,7 +294,7 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
       return {
         ...base,
         phase: 'streaming',
-        text: message.content + (buf?.text ?? ''),
+        text: buf ? shown(buf) : message.content,
         citations: buf?.sources ?? [],
         failure: null,
       }
@@ -254,7 +383,7 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
     const s = store.getState()
     const { [threadId]: _m, ...messages } = s.messages
     const { [threadId]: _d, ...drafts } = s.drafts
-    for (const [id, b] of streams) if (b.threadId === threadId) streams.delete(id)
+    for (const [id, b] of streams) if (b.threadId === threadId) dropStream(id)
     store.setState({
       threads: s.threads.filter((t) => t.id !== threadId),
       messages,
@@ -322,7 +451,7 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
     store,
 
     async load(spaceId) {
-      streams.clear()
+      for (const id of [...streams.keys()]) dropStream(id)
       store.setState({ ...initial(), spaceId, load: spaceId ? LOADING : IDLE }, true)
       if (!spaceId) return
       try {
@@ -360,10 +489,14 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
           params: { threadId },
           query: { limit: PAGE },
         })
-        // A message the server reports as settled has no use for a stream buffer any more.
-        for (const m of list) if (m.status !== 'streaming') streams.delete(m.id)
+        // A message the server reports as settled has no use for a stream buffer any more; a
+        // streaming one carries the text so far, which repairs any deltas this client lost.
+        for (const m of list) {
+          if (m.status !== 'streaming') dropStream(m.id)
+          else if (!settled.has(m.id)) absorbSnapshot(m)
+        }
         setMessages(threadId, {
-          list: list.map(project),
+          list: list.map((m) => project(m.status === 'streaming' ? (settled.get(m.id) ?? m) : m)),
           load: READY,
           hasMore: list.length === PAGE,
         })
@@ -383,6 +516,7 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
         })
         const now = store.getState().messages[threadId]
         if (!now) return
+        for (const m of older) if (m.status === 'streaming' && !settled.has(m.id)) absorbSnapshot(m)
         const ids = new Set(now.list.map((m) => m.id))
         setMessages(threadId, {
           list: [...older.filter((m) => !ids.has(m.id)).map(project), ...now.list],
@@ -539,6 +673,18 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
       return store.getState().threads.find((t) => t.id === threadId) ?? null
     },
 
+    async stop(messageId) {
+      const ok = await mutate(() => ctx.api.call(api.abortMessage, { params: { messageId } }))
+      if (ok === null) return false
+      // The server answers once the final state is stored. If its message.failed has not reached
+      // this client (socket down), read the settled message instead of waiting.
+      const view = Object.values(store.getState().messages)
+        .flatMap((tm) => tm.list)
+        .find((m) => m.id === messageId)
+      if (view?.phase === 'streaming') await controller.loadMessages(view.threadId)
+      return true
+    },
+
     handleEvent(e) {
       const spaceId = store.getState().spaceId
       switch (e.type) {
@@ -553,56 +699,54 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
           upsertMessage(e.message)
           return
         case 'message.delta': {
-          let buf = streams.get(e.messageId)
-          if (!buf) {
-            // Deltas can arrive before the placeholder message itself; buffer them.
-            buf = { threadId: e.threadId, nextSeq: 0, text: '', pending: new Map(), sources: null }
-            streams.set(e.messageId, buf)
+          if (settled.has(e.messageId)) return
+          // Deltas can arrive before the placeholder message itself; buffer them.
+          const buf = bufferFor(e.messageId, e.threadId)
+          if (buf.received.has(e.seq)) return // duplicate
+          buf.received.set(e.seq, e.text)
+          buf.maxSeq = Math.max(buf.maxSeq, e.seq)
+          if (buf.baseSeq === null) {
+            // After a snapshot that covered more than this client had seen, the first new delta
+            // continues it.
+            buf.baseSeq = e.seq
+            buf.nextSeq = e.seq
           }
-          if (e.seq < buf.nextSeq || buf.pending.has(e.seq)) return // duplicate
-          buf.pending.set(e.seq, e.text)
-          // Append only the contiguous run; a gap waits for the missing delta or the final message.
-          for (
-            let next = buf.pending.get(buf.nextSeq);
-            next !== undefined;
-            next = buf.pending.get(buf.nextSeq)
-          ) {
-            buf.text += next
-            buf.pending.delete(buf.nextSeq)
-            buf.nextSeq++
-          }
+          // Append only the contiguous run; a gap waits for the missing delta, a refetch, or the
+          // final message.
+          if (e.seq >= buf.nextSeq) advance(buf)
+          scheduleRepair(e.messageId, buf)
           reproject(e.threadId, e.messageId)
           return
         }
         case 'message.sources': {
-          let buf = streams.get(e.messageId)
-          if (!buf) {
-            buf = { threadId: e.threadId, nextSeq: 0, text: '', pending: new Map(), sources: null }
-            streams.set(e.messageId, buf)
-          }
+          if (settled.has(e.messageId)) return
+          const buf = bufferFor(e.messageId, e.threadId)
           buf.sources = e.citations
           reproject(e.threadId, e.messageId)
           return
         }
         case 'message.completed':
-          streams.delete(e.message.id)
+          dropStream(e.message.id)
           upsertMessage(e.message)
           deps.answerFinished(e.spaceId)
           return
         case 'message.failed': {
-          const buf = streams.get(e.messageId)
-          streams.delete(e.messageId)
+          const buf = dropStream(e.messageId)
           failures.set(e.messageId, { code: e.code, message: e.message })
+          const partial = buf ? shown(buf) : ''
           const cur = store.getState().messages[e.threadId]?.list.find((m) => m.id === e.messageId)
           if (cur) {
             upsertMessage({
               ...cur.message,
               status: 'error',
               errorCode: e.code,
-              content: cur.message.content || buf?.text || '',
+              content: partial || cur.message.content,
             })
+            // The server keeps exactly the text it had sent. If this client missed some of it,
+            // read the stored message.
+            if (buf && hasGap(buf)) void controller.loadMessages(e.threadId)
           } else {
-            pendingFailures.set(e.messageId, buf?.text ?? '')
+            pendingFailures.set(e.messageId, partial)
           }
           deps.answerFinished(e.spaceId)
           return
@@ -616,7 +760,7 @@ export function createThreads(ctx: ClientContext, deps: ThreadsDeps): ThreadsCon
     },
 
     reset() {
-      streams.clear()
+      for (const id of [...streams.keys()]) dropStream(id)
       failures.clear()
       settled.clear()
       pendingFailures.clear()

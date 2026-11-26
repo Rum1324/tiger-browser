@@ -1,4 +1,4 @@
-import type { Locale } from '@tiger/shared'
+import type { GoogleFlowError, Locale } from '@tiger/shared'
 import type { ApiClientError } from '../api'
 import type { CaptureOutcome } from '../capture'
 import type { GoogleExportError } from '../export'
@@ -61,4 +61,8 @@ export function aiFailureKey(code: string | null): MessageKey {
 
 export function googleExportKey(error: GoogleExportError): MessageKey {
   return `export.google.${error}`
+}
+
+export function googleFlowKey(error: GoogleFlowError): MessageKey {
+  return `google.flow.${error}`
 }
