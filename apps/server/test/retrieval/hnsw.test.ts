@@ -105,7 +105,7 @@ describe('filtered HNSW search when the Space is 1% of the table', () => {
       embedQueries: async () => [queryVector],
     }
     const retriever = createRetriever({
-      sql: db.sql,
+      sql: forced,
       embedder: { ...new HashEmbedder(), ...fixed },
     })
     const hits = await retriever.search({ spaceId: target, query: 'anything', k: 20, signal })
