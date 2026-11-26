@@ -23,10 +23,17 @@ apps/server     Fastify REST + WebSocket, Postgres (pgvector), retrieval, LLM ro
 packages/shared zod schemas + types: domain, REST contract, IPC contract, blocklist
 packages/extract page -> Markdown (+ Google Docs handler); pure TS, no Electron/Node APIs
 packages/llm    provider-agnostic chat router: Anthropic / OpenAI / Gemini / mock
+packages/client everything the UI needs below the pixels: typed API client, realtime client, stores and
+                controllers (session, Spaces, items, per-URL share state, share and attach flows, threads
+                with streaming, models, export), ja/en messages. No Electron or React at its core.
 design/         design research, directions (HTML prototypes + screenshots), chosen tokens
 spike/          standalone day-1 login check (own package.json, not in the pnpm workspace)
-docs/           HANDOFF.md
+docs/           HANDOFF.md, research/ (what was run and measured, by topic)
 ```
+
+The renderer in `apps/browser/src/renderer` is a plain developer harness wired to `@tiger/client`; the
+designed UI replaces it. `@tiger/server/testing` starts an in-process server (mock model, hash embedder)
+for other packages' tests. `README.md` has the commands for running, testing and packaging.
 
 ## Architecture decisions (evidence in `docs/research/*.md`)
 
@@ -80,6 +87,9 @@ docs/           HANDOFF.md
 
 - Do not run `git commit`, `git push`, `git checkout`, or `git stash`. The orchestrator owns git.
 - Stay inside the directories your brief names. Other agents are editing the rest in parallel.
+- Only one agent at a time may build or run the e2e suite in `apps/browser` (they share `out/`).
+- The URL of a page a member merely has open is private too: no request may carry it. Open tabs are
+  matched against the local item index, never looked up on the server.
 - Wrap every dependency install: `flock /tmp/tiger-pnpm.lock pnpm <args>`.
 - Your knowledge may be stale (today is 2026-11-26). Check versions and API shapes against the registry or
   official docs before relying on memory.
