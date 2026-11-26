@@ -147,6 +147,15 @@ describe('AnthropicProvider request shape', () => {
     expect(params?.model).toBe('claude-haiku-5-5')
   })
 
+  it('sends the context without a breakpoint when the caller says it will not repeat', async () => {
+    const f = fake([start(), msgDelta('end_turn'), stop])
+    await run(f, { context: '[1] Retrieved passage', system: 'Be exact.', cacheContext: false })
+    expect(f.calls[0]?.params.system).toEqual([
+      { type: 'text', text: '[1] Retrieved passage' },
+      { type: 'text', text: 'Be exact.' },
+    ])
+  })
+
   it('sends no breakpoint without a context', async () => {
     const f = fake([start(), msgDelta('end_turn'), stop])
     await run(f)

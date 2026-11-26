@@ -191,8 +191,7 @@ export class EngineWindow {
     if (opts.title) tab.title = opts.title
     const index = opts.index ?? (tab.pinned ? this.firstUnpinnedIndex() : this.tabs.length)
     this.attach(tab, index, opts.active ?? true)
-    if (opts.url) tab.load(opts.url)
-    else tab.loadBlank()
+    if (!opts.url || !tab.load(opts.url)) tab.loadBlank()
     if (opts.active ?? true) this.focusActive()
     return tab
   }

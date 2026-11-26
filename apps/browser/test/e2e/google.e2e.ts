@@ -64,9 +64,10 @@ describe('Google account through window.tiger', () => {
 
       // Sign-in: an ID token for the server, nothing stored.
       const signIn = await a.invoke('auth.googleSignIn')
-      expect(signIn?.idToken.split('.')).toHaveLength(3)
+      if (!signIn.ok) throw new Error(`sign-in failed: ${signIn.error}`)
+      expect(signIn.idToken.split('.')).toHaveLength(3)
       const claims = JSON.parse(
-        Buffer.from(signIn?.idToken.split('.')[1] ?? '', 'base64url').toString(),
+        Buffer.from(signIn.idToken.split('.')[1] ?? '', 'base64url').toString(),
       )
       expect(claims).toMatchObject({ email: 'hanako@example.co.jp', aud: google.clientId })
       expect(google.liveRefreshTokens).toEqual([])
@@ -75,7 +76,7 @@ describe('Google account through window.tiger', () => {
       // Connect: Drive grant, sealed refresh token, broadcast.
       const connected = await a.invoke('google.connect')
       const expected = { configured: true, connected: true, email: 'hanako@example.co.jp' }
-      expect(connected).toEqual(expected)
+      expect(connected).toEqual({ connection: expected, error: null })
       expect(await a.invoke('google.status')).toEqual(expected)
       expect(await waitFor(async () => (await events()).length === 1 && events())).toEqual([
         expected,
@@ -152,9 +153,13 @@ describe('Google account through window.tiger', () => {
       const events = await recordGoogleEvents(t)
       const none = { configured: false, connected: false, email: null }
       expect(await t.invoke('google.status')).toEqual(none)
-      expect(await t.invoke('google.connect')).toEqual(none)
+      expect(await t.invoke('google.connect')).toEqual({
+        connection: none,
+        error: 'not-configured',
+      })
       expect(await t.invoke('google.disconnect')).toEqual(none)
-      expect(await t.invoke('auth.googleSignIn')).toBeNull()
+      expect(await t.invoke('auth.googleSignIn')).toEqual({ ok: false, error: 'not-configured' })
+      await t.invoke('google.cancel')
       expect(await t.invoke('google.exportDoc', { title: 't', markdown: '# m' })).toEqual({
         ok: false,
         error: 'not-configured',

@@ -82,7 +82,10 @@ export class FakeBridge implements EngineBridge {
         }
         return new Promise((resolve) => {
           this.cancelConnect = () =>
-            resolve({ connection: { ...this.google }, error: 'cancelled' } satisfies GoogleFlowResult)
+            resolve({
+              connection: { ...this.google },
+              error: 'cancelled',
+            } satisfies GoogleFlowResult)
         })
       }
       case 'google.cancel':

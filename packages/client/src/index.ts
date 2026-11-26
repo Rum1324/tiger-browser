@@ -55,6 +55,7 @@ export {
   type WebSocketLike,
 } from './realtime'
 export type { ActivityController, ActivityState } from './stores/activity'
+export type { GoogleController, GoogleState } from './stores/google'
 export {
   type ItemsController,
   type ItemsState,
@@ -72,7 +73,6 @@ export {
   PROVIDER_COMPANY,
   type SelectedModel,
 } from './stores/models'
-export type { GoogleController, GoogleState } from './stores/google'
 export type { SessionController, SessionState, SessionStatus } from './stores/session'
 export type {
   ShareFailure,

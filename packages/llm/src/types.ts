@@ -16,6 +16,12 @@ export interface ChatRequest {
    * and, where the provider allows it, behind an explicit cache breakpoint.
    */
   context?: string
+  /**
+   * Whether `context` is worth a cache breakpoint. Default true. Pass false when the context changes
+   * with every question (retrieved passages): a breakpoint there is billed as a cache write (1.25x on
+   * Anthropic) and is almost never read back.
+   */
+  cacheContext?: boolean
   /** Conversation so far; the last entry must be a user message. */
   messages: ChatMessage[]
   maxOutputTokens?: number

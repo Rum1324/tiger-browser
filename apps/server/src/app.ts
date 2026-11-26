@@ -9,6 +9,7 @@ import type { Config } from './config'
 import type { AppContext } from './context'
 import type { Sql } from './db/sql'
 import { installErrorHandlers } from './http/errors'
+import { SlidingWindowLimiter } from './http/limiter'
 import { RealtimeHub } from './realtime/hub'
 import { websocketRoute } from './realtime/ws'
 import { authRoutes } from './routes/auth'
@@ -76,6 +77,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
       (config.googleClientId ? googleIdTokenVerifier(config.googleClientId) : null),
     shutdown: new AbortController(),
     runningAnswers: new Map(),
+    shareLimiter: new SlidingWindowLimiter(config.shareRateLimitPerMinute, 60_000),
   }
   app.decorate('tiger', ctx)
   app.decorate('contractRoutes', new Set<RouteDef<unknown, unknown, unknown, unknown>>())

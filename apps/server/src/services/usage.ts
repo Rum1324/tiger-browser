@@ -56,3 +56,46 @@ export async function recordUsage(
             ${u.costUsd ?? null})
   `
 }
+
+/** A reservation older than this no longer holds budget (an answer never runs this long). */
+const RESERVATION_TTL = '30 minutes'
+
+/**
+ * Hold `tokens` of the Space's monthly budget for one answer before the provider is called. The
+ * Space row is locked, so concurrent answers are checked one after another against the tokens
+ * already spent plus those reserved by answers still running. Returns false when nothing is left;
+ * the answer must then not call the provider. An unlimited Space reserves nothing.
+ */
+export async function reserveBudget(
+  sql: Sql,
+  r: { spaceId: string; messageId: string; tokens: number },
+): Promise<boolean> {
+  return sql.begin(async (tx) => {
+    const [space] = await tx<{ budget: number | null }[]>`
+      select token_budget::float8 as budget from spaces where id = ${r.spaceId} for update
+    `
+    if (!space) return false
+    if (space.budget === null) return true
+    const [row] = await tx<{ used: number; reserved: number }[]>`
+      select
+        coalesce((select sum(input_tokens + output_tokens) from llm_usage
+                  where space_id = ${r.spaceId}
+                    and at >= (date_trunc('month', now() at time zone 'UTC') at time zone 'UTC')), 0)::float8 as used,
+        coalesce((select sum(tokens) from llm_reservations
+                  where space_id = ${r.spaceId} and message_id <> ${r.messageId}
+                    and at > now() - ${RESERVATION_TTL}::interval), 0)::float8 as reserved
+    `
+    if ((row?.used ?? 0) + (row?.reserved ?? 0) >= space.budget) return false
+    await tx`
+      insert into llm_reservations (message_id, space_id, tokens)
+      values (${r.messageId}, ${r.spaceId}, ${Math.max(1, Math.ceil(r.tokens))})
+      on conflict (message_id) do update set tokens = excluded.tokens, at = now()
+    `
+    return true
+  })
+}
+
+/** Drop an answer's reservation; call in the transaction that records its real usage. */
+export async function releaseReservation(tx: Sql | TxSql, messageId: string): Promise<void> {
+  await tx`delete from llm_reservations where message_id = ${messageId}`
+}

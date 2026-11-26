@@ -276,3 +276,13 @@ describe('language detection', () => {
     ).toBeNull()
   })
 })
+
+describe('Forum thread whose answers are in the replies', () => {
+  const url = 'https://forum.example.com/t/gateway-retries/42'
+  const r = extract('forum-thread.html', url)
+
+  it('keeps every reply instead of accepting a Readability result that dropped them', () => {
+    for (let i = 0; i < 20; i++) expect(r.markdown).toContain(`REPLY-${String(i).padStart(2, '0')}`)
+    expect(r.markdown).toContain('Gateway retries hang after upgrade')
+  })
+})

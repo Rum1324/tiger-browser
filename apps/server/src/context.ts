@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from 'fastify'
 import type { BackgroundTasks } from './background'
 import type { Config } from './config'
 import type { Sql } from './db/sql'
+import type { SlidingWindowLimiter } from './http/limiter'
 import type { RealtimeHub } from './realtime/hub'
 import type { Answerer, Indexer, ModelDirectory, Retriever, VerifyGoogleIdToken } from './seams'
 
@@ -26,6 +27,8 @@ export interface AppContext {
    * them, and `listMessages` serves their text so far from here instead of the database.
    */
   runningAnswers: Map<string, RunningAnswer>
+  /** Shares per member per minute (each share can queue a whole document's embedding work). */
+  shareLimiter: SlidingWindowLimiter
 }
 
 export interface RunningAnswer {

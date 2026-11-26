@@ -69,7 +69,11 @@ export function buildAnthropicParams(
   // Context first: it is the part that stays identical across questions, so the breakpoint after it
   // keeps hitting even when the instructions change.
   if (req.context) {
-    system.push({ type: 'text', text: req.context, cache_control: { type: 'ephemeral' } })
+    system.push(
+      req.cacheContext === false
+        ? { type: 'text', text: req.context }
+        : { type: 'text', text: req.context, cache_control: { type: 'ephemeral' } },
+    )
   }
   system.push({ type: 'text', text: req.system })
 

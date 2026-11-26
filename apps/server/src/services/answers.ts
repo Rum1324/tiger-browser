@@ -1,9 +1,9 @@
 import { Citation, type Message, type ModelRef, type Thread, type User } from '@tiger/shared'
 import type { AppContext, RunningAnswer } from '../context'
-import type { Sql } from '../db/sql'
+import type { Sql, TxSql } from '../db/sql'
 import { AnswerError, type AttachmentContent, type CitationInput } from '../seams'
 import { getMessage, type StoredCitation } from './rows'
-import { recordUsage } from './usage'
+import { recordUsage, releaseReservation } from './usage'
 
 const StoredCitationSchema = Citation.omit({ available: true })
 
@@ -22,11 +22,16 @@ export interface RunAnswerParams {
  * Keep only citations of items in this Space. A cited item that was unshared meanwhile keeps its chip
  * (the audit tombstone proves it belonged here) but loses its quote. Anything else is dropped, so an
  * answerer bug cannot point a chip at another Space's item.
+ *
+ * Inside the transaction that stores the citations, pass `lock`: the cited item rows are then held
+ * FOR SHARE until commit, so an unshare either committed first (its item is missing here and the
+ * quote is emptied) or waits for this commit and then scrubs the stored row itself.
  */
 export async function settleCitations(
-  sql: Sql,
+  sql: Sql | TxSql,
   spaceId: string,
   input: CitationInput[],
+  lock = false,
 ): Promise<{ stored: StoredCitation[]; live: Set<string> }> {
   const parsed: StoredCitation[] = []
   for (const c of input) {
@@ -36,10 +41,14 @@ export async function settleCitations(
   const ids = [...new Set(parsed.map((c) => c.itemId))]
   if (ids.length === 0) return { stored: [], live: new Set() }
   const live = new Set(
-    (
-      await sql<{ id: string }[]>`
-        select id from items where space_id = ${spaceId} and id = any(${ids}::uuid[])
-      `
+    (lock
+      ? await sql<{ id: string }[]>`
+          select id from items where space_id = ${spaceId} and id = any(${ids}::uuid[])
+          order by id for share
+        `
+      : await sql<{ id: string }[]>`
+          select id from items where space_id = ${spaceId} and id = any(${ids}::uuid[])
+        `
     ).map((r) => r.id),
   )
   const tombstoned = new Set(
@@ -140,7 +149,6 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
       await sourcesChain.catch(() => {})
       settled = true
       if (controller.signal.aborted) throw new AnswerError('ai_aborted', 'The answer was stopped')
-      const { stored } = await settleCitations(sql, spaceId, result.citations)
       const usage = {
         inputTokens: result.usage.inputTokens,
         outputTokens: result.usage.outputTokens,
@@ -148,12 +156,14 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
         cacheWriteTokens: result.usage.cacheWriteTokens ?? 0,
       }
       const written = await sql.begin(async (tx) => {
+        const { stored } = await settleCitations(tx, spaceId, result.citations, true)
         const rows = await tx`
           update messages set content = ${result.content}, citations = ${tx.json(stored)},
                               status = 'complete', error_code = null, usage = ${tx.json(usage)}
           where id = ${messageId} and status = 'streaming'
           returning id
         `
+        await releaseReservation(tx, messageId)
         await recordUsage(tx, {
           spaceId,
           userId: p.user.id,
@@ -182,17 +192,20 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
         ctx.log.error({ err, messageId }, 'answerer failed')
       }
       const spent = err instanceof AnswerError ? err.usage : undefined
-      // Keep what members already saw: the streamed text and the sources its [n] markers point to.
-      const keptCitations: StoredCitation[] = (live.citations ?? []).map(
+      // Keep what members already saw: the streamed text and the sources its [n] markers point to,
+      // minus the quotes of items unshared since (invariant 3).
+      const shown: CitationInput[] = (live.citations ?? []).map(
         ({ available: _available, ...c }) => c,
       )
       const written = await sql.begin(async (tx) => {
+        const { stored: keptCitations } = await settleCitations(tx, spaceId, shown, true)
         const rows = await tx`
           update messages set status = 'error', error_code = ${code}, content = ${live.text},
                               citations = ${tx.json(keptCitations)}
           where id = ${messageId} and status = 'streaming'
           returning id
         `
+        await releaseReservation(tx, messageId)
         // Tokens spent before a failure still count against the budget.
         if (spent) {
           await recordUsage(tx, {

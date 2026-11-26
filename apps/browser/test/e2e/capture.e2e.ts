@@ -101,6 +101,42 @@ describe('capture', () => {
     await t.invoke('tabs.close', { tabId: tab.id })
   })
 
+  async function capturePdfOnce(path: string) {
+    const tab = await t.invoke('tabs.create', { input: server.url(NEWS, path) })
+    await waitForTab(t, tab.id, (x) => x.url.includes('.pdf') && !x.isLoading, `load ${path}`)
+    // Wait until the viewer is up (the DOM extractor reports the PDF), without re-reading the bytes.
+    const r = await waitFor(
+      async () => {
+        const res = await t.invoke('capture.extract', { tabId: tab.id })
+        // Until the viewer document exists the DOM extractor sees an empty page.
+        return !res.ok && (res.error === 'empty' || /timed out/.test(res.detail ?? '')) ? null : res
+      },
+      20_000,
+      `capture ${path}`,
+    )
+    await t.invoke('tabs.close', { tabId: tab.id })
+    return r
+  }
+
+  it('never follows a redirect on the PDF re-read: a bank document cannot ride on a PDF URL', async () => {
+    const r = await capturePdfOnce(`/swap.pdf?key=bank&then=bank&bank=${BANK}:${server.port}`)
+    expect(JSON.stringify(r)).not.toContain('Bank statement')
+    expect(r.ok).toBe(false)
+  })
+
+  it('refuses a PDF whose bytes are no longer the ones displayed (no-store re-read)', async () => {
+    const r = await capturePdfOnce('/swap.pdf?key=dynamic')
+    expect(JSON.stringify(r)).not.toContain('Substituted document')
+    expect(r).toMatchObject({ ok: false, error: 'failed' })
+    if (!r.ok) expect(r.detail).toMatch(/cache/i)
+  })
+
+  it('reads a cacheable PDF from the copy the tab displayed', async () => {
+    const r = await capturePdfOnce('/cached.pdf')
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.page.markdown).toContain('Cacheable document text')
+  })
+
   it('maps a PDF without a text layer to no-text-layer', async () => {
     const tab = await t.invoke('tabs.create', { input: server.url(NEWS, '/scan.pdf') })
     await waitForTab(t, tab.id, (x) => x.url.endsWith('/scan.pdf') && !x.isLoading, 'scan loaded')

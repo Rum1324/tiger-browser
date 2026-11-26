@@ -148,6 +148,38 @@ describe('PermissionBroker', () => {
     expect(() => s.broker.respond('nope', true, false, 'w1')).not.toThrow()
   })
 
+  it('never remembers or reuses a screen-capture grant: every capture asks again', async () => {
+    const s = setup()
+    const first = s.ask('t1', 'screen-capture')
+    s.broker.respond(s.sent[0]?.request.requestId as string, true, true, 'w1')
+    expect(await first).toBe(true)
+    expect(s.decisions.get('https://a.example', 'screen-capture')).toBeUndefined()
+    // Within the 3-second reuse window: still a new prompt.
+    const second = s.ask('t1', 'screen-capture')
+    expect(s.sent).toHaveLength(2)
+    s.broker.respond(s.sent[1]?.request.requestId as string, false, false, 'w1')
+    expect(await second).toBe(false)
+  })
+
+  it('ignores a screen-capture allow stored before grants stopped being persisted', async () => {
+    const s = setup()
+    s.decisions.set('https://a.example', 'screen-capture', true)
+    expect(rememberedDecision(s.decisions, 'https://a.example', 'screen-capture')).toBeUndefined()
+    expect(checkPermission(s.decisions, 'display-capture', 'https://a.example')).toBe(false)
+    void s.ask('t1', 'screen-capture')
+    expect(s.sent).toHaveLength(1)
+  })
+
+  it('remembers a screen-capture block', async () => {
+    const s = setup()
+    const p = s.ask('t1', 'screen-capture')
+    s.broker.respond(s.sent[0]?.request.requestId as string, false, true, 'w1')
+    expect(await p).toBe(false)
+    s.tick(60_000)
+    expect(await s.ask('t2', 'screen-capture')).toBe(false)
+    expect(s.sent).toHaveLength(1)
+  })
+
   it('denies open requests when the tab navigates away', async () => {
     const s = setup()
     const p = s.ask()

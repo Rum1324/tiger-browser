@@ -100,6 +100,63 @@ describe('HTML to Markdown', () => {
     expect(md('<dl><dt>Term</dt><dd>Meaning</dd></dl><hr>')).toBe('**Term**\n\nMeaning\n\n---')
   })
 
+  it('keeps cells under their headers when an earlier row spans rows (rowspan)', () => {
+    expect(
+      md(
+        '<table><tr><th>地域</th><th>月</th><th>売上</th></tr>' +
+          '<tr><td rowspan="2">東京</td><td>1月</td><td>100</td></tr>' +
+          '<tr><td>2月</td><td>200</td></tr>' +
+          '<tr><td>大阪</td><td>1月</td><td>50</td></tr></table>',
+      ),
+    ).toBe(
+      [
+        '| 地域 | 月 | 売上 |',
+        '| --- | --- | --- |',
+        '| 東京 | 1月 | 100 |',
+        '| 東京 | 2月 | 200 |',
+        '| 大阪 | 1月 | 50 |',
+      ].join('\n'),
+    )
+  })
+
+  it('combines rowspan and colspan, and a rowspan in the middle column', () => {
+    expect(
+      md(
+        '<table><tr><th>a</th><th>b</th><th>c</th><th>d</th></tr>' +
+          '<tr><td>1</td><td rowspan="3" colspan="2">wide</td><td>x</td></tr>' +
+          '<tr><td>2</td><td>y</td></tr>' +
+          '<tr><td>3</td><td>z</td></tr></table>',
+      ),
+    ).toBe(
+      [
+        '| a | b | c | d |',
+        '| --- | --- | --- | --- |',
+        '| 1 | wide |  | x |',
+        '| 2 | wide |  | y |',
+        '| 3 | wide |  | z |',
+      ].join('\n'),
+    )
+  })
+
+  it('keeps a rowspan in the last column in place when the next row is short', () => {
+    expect(
+      md(
+        '<table><tr><th>a</th><th>b</th><th>c</th></tr>' +
+          '<tr><td>1</td><td>2</td><td rowspan="3">note</td></tr>' +
+          '<tr><td>3</td></tr><tr><td>4</td><td>5</td></tr><tr><td>6</td><td>7</td><td>8</td></tr></table>',
+      ),
+    ).toBe(
+      [
+        '| a | b | c |',
+        '| --- | --- | --- |',
+        '| 1 | 2 | note |',
+        '| 3 |  | note |',
+        '| 4 | 5 | note |',
+        '| 6 | 7 | 8 |',
+      ].join('\n'),
+    )
+  })
+
   it('flattens layout tables into blocks instead of a grid', () => {
     expect(
       md('<table role="presentation"><tr><td><p>left</p></td><td><p>right</p></td></tr></table>'),

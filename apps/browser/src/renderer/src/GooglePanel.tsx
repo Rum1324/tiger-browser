@@ -22,7 +22,14 @@ export function GooglePanel({ t, markdown }: { t: Strings; markdown: string | nu
   const signIn = async () => {
     const r = await tiger.invoke('auth.googleSignIn')
     // Show only the shape: the ID token is a credential for the server.
-    setResult(r ? `ID token (${r.idToken.length} chars)` : 'sign-in did not complete')
+    setResult(
+      r.ok ? `ID token (${r.idToken.length} chars)` : `sign-in did not complete: ${r.error}`,
+    )
+  }
+  const connect = async () => {
+    const r = await tiger.invoke('google.connect')
+    setConn(r.connection)
+    setResult(r.error ? `connect did not complete: ${r.error}` : '')
   }
   const exportDoc = async () => {
     const r = await tiger.invoke('google.exportDoc', {
@@ -51,9 +58,14 @@ export function GooglePanel({ t, markdown }: { t: Strings; markdown: string | nu
           </button>
         </>
       ) : (
-        <button type="button" onClick={async () => setConn(await tiger.invoke('google.connect'))}>
-          {t.googleConnect}
-        </button>
+        <>
+          <button type="button" onClick={connect}>
+            {t.googleConnect}
+          </button>
+          <button type="button" onClick={() => tiger.invoke('google.cancel')}>
+            {t.googleCancel}
+          </button>
+        </>
       )}
       {result ? <pre>{result}</pre> : null}
     </div>

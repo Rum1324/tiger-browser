@@ -52,8 +52,14 @@ export interface CaptureDeps {
   now(): Date
   /** Run the isolated-world extractor in the tab. */
   extractDom(): Promise<DomReply>
-  /** GET with the tab's own session, cookies included. */
-  fetchWithTabSession(url: string): Promise<FetchedResource>
+  /**
+   * GET with the tab's own session, cookies included.
+   * - `export`: a fresh network read (Google exports must be current); redirects are followed and
+   *   the caller checks where they ended.
+   * - `displayed-copy`: the bytes the tab already loaded, from the HTTP cache only, never from the
+   *   network, and never through a redirect. Rejects when the cache no longer holds them.
+   */
+  fetchWithTabSession(url: string, mode: 'export' | 'displayed-copy'): Promise<FetchedResource>
   extractPdf(bytes: Uint8Array): Promise<PdfResult>
 }
 
@@ -83,6 +89,28 @@ const failure = (
 
 const GOOGLE_EXPORT_HOST = 'docs.google.com'
 
+function isGoogleSignIn(url: string): boolean {
+  try {
+    return new URL(url).hostname === 'accounts.google.com'
+  } catch {
+    return false
+  }
+}
+
+/** Why a Google export did not yield the document, in words the UI can show. */
+function googleExportFailure(responses: readonly GoogleExportResponse[]): string {
+  for (const res of responses) {
+    if (res.finalUrl && isGoogleSignIn(res.finalUrl)) return 'google-export: not signed in to this account'
+    if (res.status === 401 || res.status === 403)
+      return `google-export: HTTP ${res.status} (export or download disabled for this account)`
+    if (res.status === 404) return 'google-export: HTTP 404 (not found for this account)'
+    if (res.status < 200 || res.status > 299) return `google-export: HTTP ${res.status}`
+    if (res.contentType && /text\/html/i.test(res.contentType))
+      return 'google-export: Google answered with a web page instead of the export'
+  }
+  return 'google-export: the export was empty'
+}
+
 function isPdfResource(url: string, contentType: string | null): boolean {
   if (contentType && /application\/pdf/i.test(contentType)) return true
   try {
@@ -96,8 +124,9 @@ function isPdfResource(url: string, contentType: string | null): boolean {
  * The privacy boundary. Eligibility is decided here, from the tab's committed URL and session, at the
  * moment of the call; a UI request for a blocked page is refused whatever it says. The result is
  * checked again afterwards, so a navigation during extraction cannot smuggle out a blocked page.
- * The only network traffic is the Google export fetch (to docs.google.com) and the PDF re-read,
- * which goes to the page's own URL through the tab's session and cache.
+ * The only network traffic is the Google export fetch (to docs.google.com). The PDF re-read takes
+ * the displayed bytes from the tab session's HTTP cache and never touches the network, so a server
+ * cannot hand over a different document (or redirect to another site) on the second request.
  */
 export async function captureTab(target: CaptureTarget, deps: CaptureDeps): Promise<CaptureResult> {
   const url = target.currentUrl()
@@ -119,7 +148,13 @@ export async function captureTab(target: CaptureTarget, deps: CaptureDeps): Prom
     if (plan?.requests.every((r) => new URL(r.url).hostname === GOOGLE_EXPORT_HOST)) {
       const responses: GoogleExportResponse[] = []
       for (const req of plan.requests) {
-        const res = await deps.fetchWithTabSession(req.url)
+        const res = await deps.fetchWithTabSession(req.url, 'export')
+        // A redirect may have taken the export elsewhere: the place it ended must be capturable too.
+        // Google's sign-in page is never read (fromGoogleExport rejects it) and is reported as such.
+        if (res.finalUrl && res.finalUrl !== req.url && !isGoogleSignIn(res.finalUrl)) {
+          const landed = eligibilityFor(res.finalUrl, target.isPrivate, deps.userBlockedHosts())
+          if (!landed.allowed) return blocked(landed)
+        }
         responses.push({
           status: res.status,
           contentType: res.contentType,
@@ -128,6 +163,13 @@ export async function captureTab(target: CaptureTarget, deps: CaptureDeps): Prom
         })
       }
       extraction = fromGoogleExport(plan, responses, { title: target.title(), lang: null })
+      // The editor is canvas-rendered: its DOM holds menus and toolbars, never the document. A refused
+      // export is reported, not replaced by that chrome text.
+      if (!extraction) {
+        const moved = stillAllowed()
+        if (moved) return moved
+        return failure('failed', googleExportFailure(responses))
+      }
     }
 
     if (!extraction) {
@@ -136,9 +178,15 @@ export async function captureTab(target: CaptureTarget, deps: CaptureDeps): Prom
       if (moved) return moved
       if (reply.kind === 'error') return failure('failed', reply.message)
       if (reply.kind === 'pdf') {
-        const res = await deps.fetchWithTabSession(url)
+        const res = await deps.fetchWithTabSession(url, 'displayed-copy')
+        // The committed URL is already past any redirect; bytes from anywhere else are not this page.
+        if (res.finalUrl && res.finalUrl !== url) {
+          const landed = eligibilityFor(res.finalUrl, target.isPrivate, deps.userBlockedHosts())
+          if (!landed.allowed) return blocked(landed)
+          return failure('failed', 'the PDF re-read was redirected away from the displayed URL')
+        }
         if (res.status < 200 || res.status >= 300) return failure('failed', `HTTP ${res.status}`)
-        if (!isPdfResource(url, res.contentType) && res.contentType !== null) {
+        if (!isPdfResource(res.finalUrl ?? url, res.contentType) && res.contentType !== null) {
           return failure('failed', `not a PDF: ${res.contentType}`)
         }
         const pdf = await deps.extractPdf(res.body)

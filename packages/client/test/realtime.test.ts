@@ -61,6 +61,15 @@ describe('protocol with a scripted endpoint', () => {
       type: 'subscribe',
       spaceIds: [SPACE_1, SPACE_2],
     })
+
+    // A Space dropped while online is unsubscribed at once; nothing is resubscribed.
+    const sent = fake.sockets[0]?.sent.length ?? 0
+    rt.setSpaces([SPACE_2])
+    expect(fake.sockets[0]?.sent.slice(sent)).toEqual([
+      { type: 'unsubscribe', spaceIds: [SPACE_1] },
+    ])
+    rt.setSpaces([SPACE_2])
+    expect(fake.sockets[0]?.sent.length).toBe(sent + 1)
     rt.stop()
     expect(rt.state).toBe('offline')
   })
@@ -203,6 +212,33 @@ describe('against the real server', () => {
     server.dropSockets()
     await waitFor(() => resyncs === 1 && rt.state === 'online', 5000, 'resync')
     expect(subscribed).toEqual([[space.id], [space.id]])
+    rt.stop()
+  })
+
+  it('a Space dropped from the list stops reaching the socket; the others keep arriving', async () => {
+    let token: string | null = null
+    const http = createApiClient({ serverUrl: server.url, getToken: () => token })
+    token = (await http.call(api.authDev, { body: { email: 'unsub@example.com', name: 'U' } }))
+      .token
+    const kept = await http.call(api.createSpace, { body: { name: 'Kept' } })
+    const dropped = await http.call(api.createSpace, { body: { name: 'Dropped' } })
+    const rt = new RealtimeClient({ serverUrl: server.url, getToken: () => token })
+    const updates: string[] = []
+    let pongs = 0
+    rt.on('space.updated', (e) => updates.push(e.name))
+    rt.on('pong', () => pongs++)
+    rt.setSpaces([kept.id, dropped.id])
+    rt.start()
+    await waitFor(() => rt.state === 'online')
+    rt.setSpaces([kept.id])
+    // Frames are handled in order: once a later ping is answered, the unsubscribe is in place.
+    ;(rt as unknown as { send(f: unknown): void }).send({ type: 'ping' })
+    await waitFor(() => pongs >= 1, 3000, 'pong')
+    await http.call(api.updateSpace, { params: { spaceId: dropped.id }, body: { name: 'D2' } })
+    await http.call(api.updateSpace, { params: { spaceId: kept.id }, body: { name: 'K2' } })
+    await waitFor(() => updates.includes('K2'), 3000, 'kept update')
+    await sleep(50)
+    expect(updates).toEqual(['K2'])
     rt.stop()
   })
 

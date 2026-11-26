@@ -8,6 +8,7 @@ import { randomBytes } from 'node:crypto'
 import { type ChatProvider, MockProvider } from '@tiger/llm'
 import type { FastifyInstance } from 'fastify'
 import { buildApp } from './app'
+import { recoverInterruptedWork } from './services/recovery'
 import { createChat, loadChatConfig } from './chat'
 import { loadConfig } from './config'
 import { runMigrations } from './db/migrate'
@@ -88,6 +89,7 @@ export async function startTestServer(opts: TestServerOptions = {}): Promise<Tes
       DATABASE_URL: databaseUrl,
       AUTH_DEV_LOGIN: '1',
       AUTH_RATE_LIMIT_PER_MINUTE: '100000',
+      SHARE_RATE_LIMIT_PER_MINUTE: '100000',
       PUBLIC_URL: 'https://tiger.test',
       ...opts.env,
     })
@@ -119,6 +121,7 @@ export async function startTestServer(opts: TestServerOptions = {}): Promise<Tes
     })
     app = built
     chat.attach(built)
+    await recoverInterruptedWork(built.tiger)
     await built.listen({ host: '127.0.0.1', port: 0 })
     const addr = built.server.address()
     if (!addr || typeof addr === 'string') throw new Error('test server has no TCP address')

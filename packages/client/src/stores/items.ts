@@ -240,7 +240,8 @@ export function createUrlShare(ctx: ClientContext): UrlShareController {
     } else if (ev.kind === 'delete') {
       delete entries[ev.itemId]
     } else {
-      for (const [id, e] of Object.entries(entries)) if (e.spaceId === ev.spaceId) delete entries[id]
+      for (const [id, e] of Object.entries(entries))
+        if (e.spaceId === ev.spaceId) delete entries[id]
     }
   }
 
@@ -277,7 +278,10 @@ export function createUrlShare(ctx: ClientContext): UrlShareController {
           if (at !== epoch) return
           log = null
           const error = toClientError(e)
-          store.setState({ load: failed(error), missing: frozen({ status: 'error', locations: [], error }) })
+          store.setState({
+            load: failed(error),
+            missing: frozen({ status: 'error', locations: [], error }),
+          })
         } finally {
           if (at === epoch) {
             fetching = null

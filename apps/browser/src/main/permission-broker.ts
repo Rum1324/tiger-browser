@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { PermissionRequest, SitePermission } from '@tiger/shared'
-import { rememberedDecision } from './permission-policy'
+import { isOneShotGrant, rememberedDecision } from './permission-policy'
 import type { PermissionDecisions } from './store/permissions'
 
 interface Pending {
@@ -86,8 +86,10 @@ export class PermissionBroker {
     if (p.windowId !== windowId) throw new Error('permission request belongs to another window')
     this.pending.delete(requestId)
     const { tabId, origin, permission } = p.request
-    if (remember) p.decisions.set(origin, permission, allow)
-    this.recent.set(`${tabId} ${origin} ${permission}`, { allow, at: this.now() })
+    const oneShot = isOneShotGrant(permission)
+    // A screen-capture grant is never stored: a stored one would let the site record later unasked.
+    if (remember && !(oneShot && allow)) p.decisions.set(origin, permission, allow)
+    if (!(oneShot && allow)) this.recent.set(`${tabId} ${origin} ${permission}`, { allow, at: this.now() })
     p.resolve(allow)
   }
 

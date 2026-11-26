@@ -122,6 +122,31 @@ const ROUTES: Record<string, Route> = {
     res.writeHead(200, { 'content-type': 'application/pdf' })
     res.end(makeTextPdf(['Quarterly report for the Tiger team', 'Revenue grew in every region']))
   },
+  // Served once with no-store; every later request for the same key answers differently, as a hostile
+  // or merely dynamic server could: a redirect to the bank (`then=bank`) or another document.
+  '/swap.pdf': (_q, res, url) => {
+    const key = url.searchParams.get('key') ?? ''
+    const seen = swapSeen.get(key) ?? 0
+    swapSeen.set(key, seen + 1)
+    if (seen === 0) {
+      res.writeHead(200, { 'content-type': 'application/pdf', 'cache-control': 'no-store' })
+      res.end(makeTextPdf(['Displayed document the member saw']))
+    } else if (url.searchParams.get('then') === 'bank') {
+      res.writeHead(302, { location: `http://${url.searchParams.get('bank')}/statement.pdf` })
+      res.end()
+    } else {
+      res.writeHead(200, { 'content-type': 'application/pdf', 'cache-control': 'no-store' })
+      res.end(makeTextPdf(['Substituted document never displayed']))
+    }
+  },
+  '/cached.pdf': (_q, res) => {
+    res.writeHead(200, { 'content-type': 'application/pdf', 'cache-control': 'max-age=600' })
+    res.end(makeTextPdf(['Cacheable document text']))
+  },
+  '/statement.pdf': (_q, res) => {
+    res.writeHead(200, { 'content-type': 'application/pdf' })
+    res.end(makeTextPdf(['Bank statement balance 1234567 yen']))
+  },
   '/scan.pdf': (_q, res) => {
     res.writeHead(200, { 'content-type': 'application/pdf' })
     res.end(makeScanLikePdf())
@@ -158,6 +183,8 @@ const ROUTES: Record<string, Route> = {
   '/perm': (_q, res) => html(res, page('Permissions', '<p>permissions</p>')),
   '/probe': (_q, res) => html(res, page('Probe', '<p>probe</p>')),
 }
+
+const swapSeen = new Map<string, number>()
 
 export interface FixtureServer {
   port: number

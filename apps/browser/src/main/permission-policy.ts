@@ -42,6 +42,14 @@ export function policyForRequest(
   }
 }
 
+/**
+ * A grant that is never stored or reused: each screen capture is asked for on its own, as in Chrome.
+ * A remembered "block" is still honoured.
+ */
+export function isOneShotGrant(permission: SitePermission): boolean {
+  return permission === 'screen-capture'
+}
+
 /** A remembered decision for this request, if any. Camera plus microphone is covered by either form. */
 export function rememberedDecision(
   decisions: PermissionDecisions,
@@ -49,6 +57,7 @@ export function rememberedDecision(
   permission: SitePermission,
 ): boolean | undefined {
   const direct = decisions.get(origin, permission)
+  if (isOneShotGrant(permission)) return direct === false ? false : undefined
   if (direct !== undefined) return direct
   if (permission === 'camera-and-microphone') {
     const cam = decisions.get(origin, 'camera')

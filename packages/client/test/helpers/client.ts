@@ -20,6 +20,11 @@ export interface TestClient {
   count(method: string, path: RegExp): number
   /** Reconnection gate: while closed, new sockets go to a dead port and fail. */
   gate: { blocked: boolean }
+  /**
+   * Resolves when no request of this client is in flight. Tests call it before closing the server:
+   * the server's close hangs while requests are in flight (reported, apps/server).
+   */
+  idle(timeoutMs?: number): Promise<void>
 }
 
 export interface MakeClientOptions {
@@ -37,6 +42,7 @@ export function makeClient(
 ): TestClient {
   const requests: RecordedRequest[] = []
   const gate = { blocked: false }
+  let inflight = 0
   const Native = globalThis.WebSocket as unknown as new (url: string) => WebSocket
   class GatedWebSocket extends Native {
     constructor(url: string) {
@@ -49,7 +55,10 @@ export function makeClient(
     // biome-ignore lint/suspicious/noExplicitAny: the DOM overloads are not worth restating here
     override addEventListener(type: string, listener: any, options?: any): void {
       const drop = opts.dropFrame
-      if (type !== 'message' || !drop) return super.addEventListener(type, listener, options)
+      if (type !== 'message' || !drop) {
+        super.addEventListener(type, listener, options)
+        return
+      }
       super.addEventListener(
         type,
         (ev: MessageEvent) => {
@@ -76,7 +85,12 @@ export function makeClient(
         body: rawBody ? JSON.parse(rawBody) : undefined,
         rawBody,
       })
-      return fetch(input, init)
+      inflight += 1
+      try {
+        return await fetch(input, init)
+      } finally {
+        inflight -= 1
+      }
     },
   })
   return {
@@ -84,6 +98,8 @@ export function makeClient(
     bridge,
     requests,
     gate,
+    idle: (timeoutMs = 5000) =>
+      waitFor(() => inflight === 0, timeoutMs, 'requests settled').then(() => undefined),
     count: (method, path) =>
       requests.filter((r) => r.method === method && path.test(r.path)).length,
   }

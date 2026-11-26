@@ -17,6 +17,7 @@ const DEFAULT_KEYWORD_WEIGHT = 0.5
 /** Queries up to this many characters (spaces ignored) count as a short term. */
 const SHORT_TERM_CHARS = 3
 
+// NFKC turns full-width quotes ＂ into ", so the ASCII alternative covers them.
 const QUOTED = /"([^"]{1,200})"|“([^”]{1,200})”|「([^」]{1,200})」|『([^』]{1,200})』/g
 // A Latin token that is an identifier rather than a word: has a digit (ERR-4012, v2.3.1, 1on1), an
 // underscore (user_id), an uppercase letter around - . / : (Foo-Bar), is an all-caps acronym (KPI, SAFE),
@@ -38,7 +39,9 @@ function isIdentifier(token: string): boolean {
  * as 稟議 that embeddings may blur). Natural-language questions get no keyword leg: on the benchmark
  * an ungated keyword leg lowered MRR for a strong embedder (docs/research/retrieval-jp.md).
  */
-export function keywordTerms(query: string): string[] {
+export function keywordTerms(input: string): string[] {
+  // Full-width letters and digits typed through a Japanese IME (ＥＲＲ－４０１２) are the same tokens.
+  const query = input.normalize('NFKC')
   const terms: string[] = []
   const stripped = query.replace(QUOTED, (_m, a, b, c, d) => {
     terms.push(String(a ?? b ?? c ?? d).trim())
@@ -101,7 +104,8 @@ export function createRetriever(deps: {
       const pool = Math.max(30, k * 3)
       const terms = keywordWeight > 0 ? keywordTerms(q) : []
       const useKeyword = terms.length > 0 || (always && keywordWeight > 0)
-      const kwTerms = terms.length > 0 ? terms : [q]
+      // Terms and chunk text are both compared NFKC-normalised (see migration 0003 for the index).
+      const kwTerms = terms.length > 0 ? terms : [q.normalize('NFKC')]
 
       const { vectorIds, keywordIds } = await deps.sql.begin(async (tx) => {
         await tx`set local hnsw.iterative_scan = relaxed_order`
@@ -122,10 +126,10 @@ export function createRetriever(deps: {
         const kw = await tx<Ranked[]>`
           select c.id
           from chunks c
-          where c.space_id = ${spaceId} and c.text ilike any (${patterns}::text[])
+          where c.space_id = ${spaceId} and normalize(c.text, NFKC) ilike any (${patterns}::text[])
           order by
-            (select count(*) from unnest(${patterns}::text[]) p where c.text ilike p) desc,
-            (select max(word_similarity(t, c.text)) from unnest(${kwTerms}::text[]) t) desc,
+            (select count(*) from unnest(${patterns}::text[]) p where normalize(c.text, NFKC) ilike p) desc,
+            (select max(word_similarity(t, normalize(c.text, NFKC))) from unnest(${kwTerms}::text[]) t) desc,
             c.id
           limit ${pool}
         `

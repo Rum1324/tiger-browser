@@ -31,7 +31,7 @@ import { GoogleService } from './google/service'
 import { checkEvent, checkResponse, isTrustedSender, parseInvoke } from './ipc-validate'
 import { PermissionBroker } from './permission-broker'
 import { checkPermission, policyForRequest, webOrigin } from './permission-policy'
-import { registerUiProtocol, UI_ORIGIN } from './protocol'
+import { registerUiProtocol, serverConnectSources, UI_ORIGIN } from './protocol'
 import { isWebUrl } from './resolve-input'
 import { BookmarkStore } from './store/bookmarks'
 import { KvStore, openDatabase } from './store/db'
@@ -190,7 +190,7 @@ export class Engine {
   // ── Sessions ─────────────────────────────────────────────────────────────
 
   private hardenUiSession(ses: Session): void {
-    registerUiProtocol(ses, this.paths.rendererDir)
+    registerUiProtocol(ses, this.paths.rendererDir, () => this.settings.get().serverUrl)
     ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
     ses.setPermissionCheckHandler(() => false)
     ses.setDevicePermissionHandler(() => false)
@@ -202,7 +202,7 @@ export class Engine {
         const headers = { ...details.responseHeaders }
         if (details.url.startsWith(dev)) {
           headers['Content-Security-Policy'] = [
-            `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self' ws: ${dev}`,
+            `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self' ws: ${dev} ${serverConnectSources(this.settings.get().serverUrl).join(' ')}`,
           ]
         }
         cb({ responseHeaders: headers })
@@ -414,9 +414,10 @@ export class Engine {
   private async fetchWithSession(
     ses: Session,
     url: string,
-    cache: RequestCache,
+    mode: 'export' | 'displayed-copy',
   ): Promise<FetchedResource> {
-    const res = await ses.fetch(url, { credentials: 'include', redirect: 'follow', cache })
+    if (mode === 'displayed-copy') return this.readDisplayedCopy(ses, url)
+    const res = await ses.fetch(url, { credentials: 'include', redirect: 'follow', cache: 'no-store' })
     const length = Number(res.headers.get('content-length') ?? 0)
     if (length > MAX_FETCH_BYTES) throw new Error('resource too large')
     const body = new Uint8Array(await res.arrayBuffer())
@@ -424,9 +425,63 @@ export class Engine {
     return {
       status: res.status,
       contentType: res.headers.get('content-type'),
-      finalUrl: res.url,
+      finalUrl: res.url || null,
       body,
     }
+  }
+
+  /**
+   * The bytes the tab displayed, from the session's HTTP cache only: no network request (so no second,
+   * different answer from the server) and no redirect (the committed URL is already past any).
+   * `fetch` refuses `only-if-cached` outside same-origin mode, so this uses `net.request`.
+   */
+  private readDisplayedCopy(ses: Session, url: string): Promise<FetchedResource> {
+    const notCached = (why: string) =>
+      new Error(
+        `the displayed copy is not in the cache (sent with no-store, too large, or a POST result), so it cannot be read again safely: ${why}`,
+      )
+    return new Promise((resolve, reject) => {
+      const req = net.request({
+        url,
+        session: ses,
+        useSessionCookies: true,
+        credentials: 'include',
+        redirect: 'error',
+        cache: 'only-if-cached',
+      })
+      req.on('error', (err) => reject(notCached(err.message)))
+      req.on('response', (res) => {
+        const header = (name: string) => {
+          const v = res.headers[name]
+          return Array.isArray(v) ? (v[0] ?? null) : (v ?? null)
+        }
+        if (Number(header('content-length') ?? 0) > MAX_FETCH_BYTES) {
+          req.abort()
+          return reject(new Error('resource too large'))
+        }
+        const chunks: Buffer[] = []
+        let size = 0
+        res.on('data', (chunk: Buffer) => {
+          size += chunk.byteLength
+          if (size > MAX_FETCH_BYTES) {
+            req.abort()
+            reject(new Error('resource too large'))
+            return
+          }
+          chunks.push(chunk)
+        })
+        res.on('end', () =>
+          resolve({
+            status: res.statusCode,
+            contentType: header('content-type'),
+            finalUrl: url,
+            body: new Uint8Array(Buffer.concat(chunks)),
+          }),
+        )
+        res.on('error', (err: Error) => reject(notCached(err.message)))
+      })
+      req.end()
+    })
   }
 
   async capture(tab: TabController) {
@@ -434,13 +489,7 @@ export class Engine {
       userBlockedHosts: () => this.settings.get().userBlockedHosts,
       now: () => new Date(),
       extractDom: () => this.requestDomExtraction(tab),
-      fetchWithTabSession: (url) =>
-        // Google exports must be current; a PDF re-read should come from the cache the tab just filled.
-        this.fetchWithSession(
-          tab.window.tabSession,
-          url,
-          url === tab.committedUrl() ? 'force-cache' : 'no-store',
-        ),
+      fetchWithTabSession: (url, mode) => this.fetchWithSession(tab.window.tabSession, url, mode),
       extractPdf: async (bytes) => {
         const { extractPdf } = await import('@tiger/extract/pdf')
         return extractPdf(bytes)

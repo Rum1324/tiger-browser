@@ -6,13 +6,13 @@ import { type Translator, translator } from './i18n'
 import type { ClientContext } from './load'
 import { type ConnectionState, RealtimeClient, type WebSocketCtor } from './realtime'
 import { type ActivityController, createActivity } from './stores/activity'
+import { createGoogle, type GoogleController } from './stores/google'
 import {
   createItems,
   createUrlShare,
   type ItemsController,
   type UrlShareController,
 } from './stores/items'
-import { createGoogle, type GoogleController } from './stores/google'
 import { createModels, type ModelsController } from './stores/models'
 import { createSession, type SessionController } from './stores/session'
 import { createShareFlow, type ShareFlowController } from './stores/share'
@@ -136,6 +136,8 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
 
   session = createSession(ctx, {
     signedIn: (_user, list) => {
+      // A sign-in that finishes after dispose() (window closed meanwhile) must not open a socket.
+      if (disposed) return
       // The index first, so that setList below sees no new Space and does not fetch it twice.
       void urlShare.start(list.map((s) => s.id))
       spaces.setList(list)
@@ -160,6 +162,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
   })
 
   const offs: (() => void)[] = []
+  let disposed = false
   offs.push(
     realtime.on('state', (connection) => ui.setState({ connection })),
     realtime.on('event', (e) => {
@@ -200,12 +203,14 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
     exports,
     google,
     async start() {
+      if (disposed) return
       try {
         const settings = await bridge.invoke('settings.get')
         ui.setState({ locale: settings.locale })
       } catch {
         // Keep the default locale.
       }
+      if (disposed) return
       offs.push(
         bridge.on('settings.changed', (s) => ui.setState({ locale: s.locale })),
         bridge.on('invite.open', ({ token }) => spaces.offerInvite(token)),
@@ -216,6 +221,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
       await session?.boot()
     },
     dispose() {
+      disposed = true
       for (const off of offs.splice(0)) off()
       realtime.stop()
       realtime.events.clear()

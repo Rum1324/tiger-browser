@@ -4,6 +4,7 @@ import { loadConfig } from './config'
 import { runMigrations } from './db/migrate'
 import { createSql } from './db/sql'
 import { createRetrieval } from './retrieval'
+import { recoverInterruptedWork } from './services/recovery'
 
 const config = loadConfig()
 const sql = createSql(config.databaseUrl)
@@ -23,6 +24,8 @@ const app = await buildApp({
   models: chat.models,
 })
 chat.attach(app)
+// Answers and indexing a previous process left unfinished; before listening, after the seams exist.
+await recoverInterruptedWork(app.tiger)
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down')

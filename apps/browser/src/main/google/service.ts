@@ -1,4 +1,10 @@
-import type { EngineRequest, EngineResponse, GoogleConnection } from '@tiger/shared'
+import type {
+  EngineRequest,
+  EngineResponse,
+  GoogleConnection,
+  GoogleFlowError,
+  GoogleFlowResult,
+} from '@tiger/shared'
 import { z } from 'zod'
 import type { FetchLike, GoogleConfig } from './config'
 import { type MediaType, type UploadOutcome, uploadDocument } from './drive'
@@ -18,6 +24,21 @@ import {
 
 export type ExportDocRequest = EngineRequest<'google.exportDoc'>
 export type ExportDocResult = EngineResponse<'google.exportDoc'>
+export type SignInResult = EngineResponse<'auth.googleSignIn'>
+
+/** The reason the UI is told when a consent flow ends without a result. */
+export function flowErrorOf(err: unknown): GoogleFlowError {
+  if (!(err instanceof GoogleAuthError)) return 'failed'
+  switch (err.code) {
+    case 'denied':
+    case 'timeout':
+    case 'cancelled':
+      return err.code
+    default:
+      // state-mismatch, invalid-grant, failed: nothing the member can act on beyond retrying.
+      return 'failed'
+  }
+}
 
 /** One sealed secret; the engine's TokenStore under its own key fits. */
 export interface SecretStore {
@@ -161,9 +182,15 @@ export class GoogleService {
     if (this.flow === controller) this.flow = null
   }
 
-  async signIn(): Promise<{ idToken: string } | null> {
+  /** The member gave up on the consent page: close the listener; the waiting call ends `cancelled`. */
+  cancel(): void {
+    this.flow?.abort()
+    this.flow = null
+  }
+
+  async signIn(): Promise<SignInResult> {
     const config = this.deps.config
-    if (!config) return null
+    if (!config) return { ok: false, error: 'not-configured' }
     const controller = this.beginFlow()
     try {
       const token = await authorize(this.oauth(config), {
@@ -173,20 +200,20 @@ export class GoogleService {
       })
       if (!token.id_token) {
         this.log('sign-in returned no ID token')
-        return null
+        return { ok: false, error: 'failed' }
       }
-      return { idToken: token.id_token }
+      return { ok: true, idToken: token.id_token }
     } catch (err) {
       this.log(`sign-in failed (${codeOf(err)}): ${(err as Error).message}`)
-      return null
+      return { ok: false, error: flowErrorOf(err) }
     } finally {
       this.endFlow(controller)
     }
   }
 
-  async connect(): Promise<GoogleConnection> {
+  async connect(): Promise<GoogleFlowResult> {
     const config = this.deps.config
-    if (!config) return NOT_CONFIGURED
+    if (!config) return { connection: NOT_CONFIGURED, error: 'not-configured' }
     const controller = this.beginFlow()
     const oauth = this.oauth(config)
     try {
@@ -220,10 +247,10 @@ export class GoogleService {
       }
       const conn = this.connection(account)
       this.deps.onChange(conn)
-      return conn
+      return { connection: conn, error: null }
     } catch (err) {
       this.log(`connect failed (${codeOf(err)}): ${(err as Error).message}`)
-      return this.connection(await this.load())
+      return { connection: this.connection(await this.load()), error: flowErrorOf(err) }
     } finally {
       this.endFlow(controller)
     }

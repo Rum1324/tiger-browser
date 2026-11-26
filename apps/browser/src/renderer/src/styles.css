@@ -74,7 +74,7 @@ html[data-view="overlay"] body {
   min-width: 0;
 }
 .panel {
-  width: 300px;
+  width: 380px;
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -102,4 +102,28 @@ html[data-view="overlay"] body {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+.team {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  color: #1d1d1f;
+  padding: 6px;
+  border-radius: 6px;
+}
+.team input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.team .error {
+  color: #b00020;
+}
+.message {
+  border-top: 1px solid #ddd;
+  padding: 4px 0;
+}
+.message.user {
+  color: #444;
 }

@@ -71,6 +71,7 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     DATABASE_URL: TEST_DATABASE_URL,
     AUTH_DEV_LOGIN: '1',
     AUTH_RATE_LIMIT_PER_MINUTE: '100000',
+    SHARE_RATE_LIMIT_PER_MINUTE: '100000',
     PUBLIC_URL: 'https://tiger.test',
     ...opts.env,
   })

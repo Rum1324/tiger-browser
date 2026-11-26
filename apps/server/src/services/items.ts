@@ -84,42 +84,63 @@ export async function shareItem(
   const { sql } = ctx
   await requireMember(sql, spaceId, user.id)
   assertCaptureAllowed(page.url)
+  if (!ctx.shareLimiter.take(user.id)) {
+    throw new AppError(429, 'rate_limited', 'Too many shares in a short time; try again in a minute')
+  }
 
   const urlKey = canonicalUrl(page.url)
   const hash = sha256Hex(page.markdown)
   const actor = userRef(user.id, user.name, user.avatarUrl)
 
   const result = await sql.begin(async (tx) => {
-    const itemId = newId()
-    const inserted = await tx<{ id: string }[]>`
-      insert into items (id, space_id, url, url_key, title, source_type, shared_by, status)
-      values (${itemId}, ${spaceId}, ${page.url}, ${urlKey}, ${page.title}, ${page.sourceType}, ${user.id}, 'indexing')
-      on conflict (space_id, url_key) do nothing
-      returning id
-    `
-    let outcome: ShareItemResult['outcome']
-    let id: string
-    let number: number
-    if (inserted[0]) {
-      outcome = 'new'
-      id = itemId
-      number = 1
-    } else {
-      // Row lock serialises concurrent shares of the same page so version numbers cannot collide.
-      const existing = await tx<{ id: string; content_hash: string; number: number }[]>`
-        select i.id, v.content_hash, v.number
-        from items i join item_versions v on v.id = i.current_version_id
-        where i.space_id = ${spaceId} and i.url_key = ${urlKey}
-        for update of i
+    let outcome: ShareItemResult['outcome'] | null = null
+    let id = ''
+    let number = 0
+    // Two attempts: if an unshare deletes the row between the conflicting insert and the lock, the
+    // second insert takes the new-item path.
+    for (let attempt = 0; attempt < 2 && outcome === null; attempt++) {
+      const itemId = newId()
+      const inserted = await tx<{ id: string }[]>`
+        insert into items (id, space_id, url, url_key, title, source_type, shared_by, status)
+        values (${itemId}, ${spaceId}, ${page.url}, ${urlKey}, ${page.title}, ${page.sourceType}, ${user.id}, 'indexing')
+        on conflict (space_id, url_key) do nothing
+        returning id
       `
-      const ex = existing[0]
-      if (!ex) throw new Error('item row disappeared during share')
-      if (ex.content_hash === hash)
-        return { outcome: 'unchanged' as const, id: ex.id, versionId: null, event: null }
+      if (inserted[0]) {
+        outcome = 'new'
+        id = itemId
+        number = 1
+        break
+      }
+      // Lock the item row on its own: with a join, a waiter re-checks the join against the old
+      // version after the holder commits and gets no row at all. The lock serialises concurrent
+      // shares of the same page so version numbers cannot collide.
+      const [locked] = await tx<{ id: string; status: string; current_version_id: string | null }[]>`
+        select id, status, current_version_id from items
+        where space_id = ${spaceId} and url_key = ${urlKey}
+        for update
+      `
+      if (!locked) continue
+      const [current] = await tx<{ content_hash: string; number: number }[]>`
+        select content_hash, number from item_versions where id = ${locked.current_version_id}
+      `
+      const [top] = await tx<{ max: number | null }[]>`
+        select max(number)::int as max from item_versions where item_id = ${locked.id}
+      `
+      if (current && current.content_hash === hash) {
+        return {
+          outcome: 'unchanged' as const,
+          id: locked.id,
+          versionId: null,
+          event: null,
+          reindex: locked.status !== 'ready' ? (locked.current_version_id ?? null) : null,
+        }
+      }
       outcome = 'version'
-      id = ex.id
-      number = ex.number + 1
+      id = locked.id
+      number = (top?.max ?? 0) + 1
     }
+    if (outcome === null) throw new Error('item row kept disappearing during share')
     const versionId = newId()
     await tx`
       insert into item_versions (id, item_id, number, markdown, content_hash, char_count, extractor, lang,
@@ -139,7 +160,7 @@ export async function shareItem(
       action: outcome === 'new' ? 'item.shared' : 'item.reshared',
       target: { type: 'item', id, title: page.title, url: page.url },
     })
-    return { outcome, id, versionId, event }
+    return { outcome, id, versionId, event, reindex: null as string | null }
   })
 
   const item = await getItemRow(sql, result.id)
@@ -147,15 +168,47 @@ export async function shareItem(
     ctx.hub.publishToSpace(spaceId, { type: 'item.upserted', item })
     ctx.hub.publishToSpace(spaceId, { type: 'audit.appended', event: result.event })
     startIndexing(ctx, item, result.versionId, page)
+  } else if (result.reindex) {
+    // Same content, but its index was lost (a failure or an interrupted run): build it again.
+    startIndexing(ctx, item, result.reindex, page)
   }
   return { item, outcome: result.outcome }
+}
+
+/**
+ * Re-run the Indexer for the current version of an item, from the stored Markdown. Used on startup
+ * for items whose indexing was interrupted or failed.
+ */
+export async function reindexItem(ctx: AppContext, itemId: string): Promise<boolean> {
+  const [row] = await ctx.sql<
+    { version_id: string; url: string; title: string; markdown: string; lang: string | null }[]
+  >`
+    select v.id as version_id, i.url, i.title, v.markdown, v.lang
+    from items i join item_versions v on v.id = i.current_version_id
+    where i.id = ${itemId}
+  `
+  if (!row) return false
+  const item = await getItemRow(ctx.sql, itemId)
+  startIndexing(ctx, item, row.version_id, {
+    url: row.url,
+    title: row.title,
+    sourceType: item.sourceType,
+    markdown: row.markdown,
+    lang: row.lang,
+  })
+  return true
 }
 
 /**
  * Run the Indexer for one version in the background, then settle the item's status. A result for a
  * version that is no longer current is discarded: a newer share is already being indexed.
  */
-function startIndexing(ctx: AppContext, item: Item, versionId: string, page: ExtractedPage): void {
+function startIndexing(
+  ctx: AppContext,
+  item: Item,
+  versionId: string,
+  page: Pick<ExtractedPage, 'url' | 'title' | 'sourceType' | 'markdown' | 'lang'>,
+): void {
   ctx.background.run(`index ${item.id}`, async () => {
     let ok = true
     try {
@@ -171,6 +224,8 @@ function startIndexing(ctx: AppContext, item: Item, versionId: string, page: Ext
         signal: ctx.shutdown.signal,
       })
     } catch (err) {
+      // Stopped by shutdown: the item stays 'indexing' and the next start re-runs it.
+      if (ctx.shutdown.signal.aborted) return
       ok = false
       ctx.log.warn({ err, itemId: item.id }, 'indexing failed')
     }
@@ -228,6 +283,13 @@ export async function unshareItem(ctx: AppContext, user: User, itemId: string): 
     })
     return { url: gone.url, event }
   })
+  // Answers still streaming serve their sources from memory; drop the quote there too.
+  for (const live of ctx.runningAnswers.values()) {
+    if (live.spaceId !== access.spaceId || !live.citations) continue
+    live.citations = live.citations.map((c) =>
+      c.itemId === itemId ? { ...c, quote: '', available: false } : c,
+    )
+  }
   ctx.hub.publishToSpace(access.spaceId, {
     type: 'item.deleted',
     spaceId: access.spaceId,

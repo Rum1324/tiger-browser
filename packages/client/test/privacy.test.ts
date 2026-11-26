@@ -49,6 +49,7 @@ let bridge: FakeBridge
 const seen: Seen[] = []
 const frames: string[] = []
 const violations: string[] = []
+let inflight = 0
 
 beforeAll(async () => {
   server = await startServer()
@@ -80,16 +81,22 @@ beforeAll(async () => {
       if (carries(line, ATTACHED) && !messagePost)
         violations.push(`${method} ${path} carried ATTACHED`)
       if (violations.length) throw new Error(`privacy violation: ${violations.at(-1)}`)
-      return fetch(input, init)
+      inflight += 1
+      try {
+        return await fetch(input, init)
+      } finally {
+        inflight -= 1
+      }
     },
   })
 })
 
 afterAll(async () => {
+  // Closing the server while requests are in flight hangs its close (see the report), so let the
+  // client's last refetches finish first.
+  await waitFor(() => inflight === 0, 5000, 'requests settled').catch(() => {})
   client?.dispose()
-  const t=Date.now()
-  await server?.app.close(); console.log('app closed', Date.now()-t)
-  await server?.sql.end({timeout:5}); console.log('sql ended', Date.now()-t)
+  await server?.close()
 })
 
 describe('no URL of an open tab leaves the machine unless the member shares or attaches it', () => {
@@ -148,7 +155,9 @@ describe('no URL of an open tab leaves the machine unless the member shares or a
     const priv = await client.threads.ensurePrivateThread()
     await client.threads.beginAttach(priv?.id as string, 'att')
     expect(client.threads.confirmAttach()).toBe(true)
-    expect(await client.threads.post(priv?.id as string, 'まとめて', { askAi: false })).not.toBeNull()
+    expect(
+      await client.threads.post(priv?.id as string, 'まとめて', { askAi: false }),
+    ).not.toBeNull()
 
     // A reconnect refetches the index; still nothing about the tabs is sent.
     client.realtime.reconnectNow()
@@ -156,9 +165,10 @@ describe('no URL of an open tab leaves the machine unless the member shares or a
     await server.settle()
 
     expect(violations).toEqual([])
-    for (const f of frames) for (const url of [SHARED, ATTACHED, ...SECRETS]) {
-      expect(carries(f, url), `socket frame ${f}`).toBe(false)
-    }
+    for (const f of frames)
+      for (const url of [SHARED, ATTACHED, ...SECRETS]) {
+        expect(carries(f, url), `socket frame ${f}`).toBe(false)
+      }
     // The index is fetched with a bare GET: no query, no body.
     const indexCalls = seen.filter((r) => new URL(r.url).pathname === '/v1/items/index')
     expect(indexCalls.length).toBeGreaterThanOrEqual(1)
@@ -175,9 +185,13 @@ describe('no URL of an open tab leaves the machine unless the member shares or a
   it('the spy itself works: a request carrying a tab URL is refused and recorded', async () => {
     const before = violations.length
     await expect(
-      client.threads.post(client.threads.store.getState().threads[0]?.id as string, SECRETS[0] as string, {
-        askAi: false,
-      }),
+      client.threads.post(
+        client.threads.store.getState().threads[0]?.id as string,
+        SECRETS[0] as string,
+        {
+          askAi: false,
+        },
+      ),
     ).resolves.toBeNull()
     expect(violations.length).toBe(before + 1)
     violations.length = before

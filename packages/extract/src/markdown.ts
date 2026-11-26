@@ -19,6 +19,11 @@ export interface MdContext {
    * subtree. Unset when the input is an already-cleaned clone.
    */
   skip: ((el: Element) => boolean) | null
+  /**
+   * Live DOM only: true when the element's own text nodes cannot be seen (zero font size, text in the
+   * background colour) while its child elements are judged on their own.
+   */
+  skipText: ((el: Element) => boolean) | null
   /** Per-extraction cache; a module-level cache would go stale when a live page changes. */
   blockMemo: WeakMap<Element, boolean>
 }
@@ -43,6 +48,7 @@ export function createContext(
     nodes: 0,
     stopped: false,
     skip: null,
+    skipText: null,
     blockMemo: new WeakMap(),
   }
 }
@@ -149,6 +155,21 @@ const SKIP = new Set([
 /** Marker element the cleaner leaves in place of a checkbox, so task lists survive input removal. */
 export const TASK_TAG = 'tiger-task'
 
+/**
+ * Children in the flat tree, as rendered: an element with an open shadow root shows its shadow tree
+ * (its unslotted light children are never on screen), and a <slot> inside a shadow tree shows the nodes
+ * assigned to it, or its fallback content. On a clone there are no shadow roots and this is childNodes.
+ */
+function flatChildren(el: Element): ArrayLike<Node> {
+  const root = (el as Element & { shadowRoot: ShadowRoot | null }).shadowRoot
+  if (root) return root.childNodes
+  if (el.localName === 'slot' && (el.getRootNode() as { host?: Element }).host) {
+    const assigned = (el as HTMLSlotElement).assignedNodes?.() ?? []
+    if (assigned.length > 0) return assigned
+  }
+  return el.childNodes
+}
+
 function tagOf(el: Element): string {
   return el.localName.toLowerCase()
 }
@@ -164,10 +185,13 @@ function containsBlock(el: Element, ctx: MdContext): boolean {
   const cached = ctx.blockMemo.get(el)
   if (cached !== undefined) return cached
   let found = false
-  for (let c = el.firstElementChild; c; c = c.nextElementSibling) {
-    const tag = tagOf(c)
+  const kids = flatChildren(el)
+  for (let i = 0; i < kids.length; i++) {
+    const c = kids[i] as Node
+    if (c.nodeType !== 1) continue
+    const tag = tagOf(c as Element)
     if (SKIP.has(tag)) continue
-    if (isBlockTag(tag) || containsBlock(c, ctx)) {
+    if (isBlockTag(tag) || containsBlock(c as Element, ctx)) {
       found = true
       break
     }
@@ -308,9 +332,14 @@ function escapeLineStart(line: string): string {
 }
 
 function renderInlineChildren(el: Element, line: Inline, ctx: MdContext): void {
-  for (let n = el.firstChild; n; n = n.nextSibling) {
+  const textOff = ctx.skipText?.(el) ?? false
+  const kids = flatChildren(el)
+  for (let i = 0; i < kids.length; i++) {
+    const n = kids[i] as Node
     if (ctx.stopped) return
-    if (n.nodeType === 3) line.text((n as Text).data, ctx)
+    if (n.nodeType === 3) {
+      if (!textOff) line.text((n as Text).data, ctx)
+    }
     else if (n.nodeType === 1 && !ctx.skip?.(n as Element)) renderInline(n as Element, line, ctx)
   }
 }
@@ -498,10 +527,13 @@ export function renderChildren(el: Element, ctx: MdContext): Block[] {
     if (text) out.push({ kind: 'p', text })
     line = new Inline()
   }
-  for (let n = el.firstChild; n; n = n.nextSibling) {
+  const textOff = ctx.skipText?.(el) ?? false
+  const kids = flatChildren(el)
+  for (let i = 0; i < kids.length; i++) {
+    const n = kids[i] as Node
     if (ctx.stopped) break
     if (n.nodeType === 3) {
-      line.text((n as Text).data, ctx)
+      if (!textOff) line.text((n as Text).data, ctx)
       continue
     }
     if (n.nodeType !== 1) continue
@@ -570,7 +602,10 @@ function renderList(el: Element, ordered: boolean, ctx: MdContext, only?: Elemen
   const items: Element[][] = []
   if (only) items.push(only)
   else {
-    for (let c = el.firstElementChild; c; c = c.nextElementSibling) {
+    const kids = flatChildren(el)
+    for (let i = 0; i < kids.length; i++) {
+      if ((kids[i] as Node).nodeType !== 1) continue
+      const c = kids[i] as Element
       const tag = tagOf(c)
       if (SKIP.has(tag) || ctx.skip?.(c)) continue
       // A list nested directly in a list (invalid but common) belongs to the previous item.
@@ -632,9 +667,13 @@ const LINE_BLOCKS = new Set(['div', 'p', 'li', 'tr'])
 /** Text of a <pre>, keeping line structure from <br> and per-line block wrappers used by highlighters. */
 export function preformattedText(el: Element, ctx: MdContext): string {
   let out = ''
-  const walk = (node: Node) => {
-    for (let n = node.firstChild; n; n = n.nextSibling) {
+  const walk = (node: Element) => {
+    const textOff = ctx.skipText?.(node) ?? false
+    const kids = flatChildren(node)
+    for (let i = 0; i < kids.length; i++) {
+      const n = kids[i] as Node
       if (n.nodeType === 3) {
+        if (textOff) continue
         const data = (n as Text).data
         ctx.chars += data.length
         out += data
@@ -645,7 +684,7 @@ export function preformattedText(el: Element, ctx: MdContext): string {
           out += '\n'
           continue
         }
-        walk(n)
+        walk(n as Element)
         if (LINE_BLOCKS.has(tag) && !out.endsWith('\n')) out += '\n'
       }
     }
@@ -704,6 +743,58 @@ function cellText(cell: Element, ctx: MdContext): string {
   return text.replace(/\n+/g, '<br>').replace(/\|/g, '\\|').trim()
 }
 
+const MAX_SPAN = 50
+
+function spanOf(cell: Element, attr: 'colspan' | 'rowspan'): number {
+  const n = Number.parseInt(cell.getAttribute(attr) ?? '1', 10)
+  // rowspan="0" spans to the end of the section; the row count bounds it anyway.
+  if (attr === 'rowspan' && n === 0) return MAX_SPAN
+  return Math.min(Math.max(Number.isFinite(n) ? n : 1, 1), MAX_SPAN)
+}
+
+/**
+ * The table as a grid, each cell at its real column: a cell spanning rows occupies its columns in the
+ * rows below, so later cells there move right instead of sliding under the wrong header. A row-spanning
+ * value is repeated in each row it covers (every row then reads on its own); the extra columns of a
+ * colspan are left empty.
+ */
+function tableGrid(rows: Element[], ctx: MdContext): string[][] {
+  const grid: string[][] = []
+  // Column → value carried down and the number of further rows it covers.
+  const carry = new Map<number, { text: string; rows: number }>()
+  for (const row of rows) {
+    const out: string[] = []
+    const place = () => {
+      for (;;) {
+        const c = carry.get(out.length)
+        if (!c) return
+        out.push(c.text)
+        c.rows -= 1
+        if (c.rows <= 0) carry.delete(out.length - 1)
+      }
+    }
+    for (const cell of ownCells(row)) {
+      place()
+      const text = cellText(cell, ctx)
+      const colspan = spanOf(cell, 'colspan')
+      const rowspan = spanOf(cell, 'rowspan')
+      for (let s = 0; s < colspan; s++) {
+        const value = s === 0 ? text : ''
+        if (rowspan > 1) carry.set(out.length, { text: value, rows: rowspan - 1 })
+        out.push(value)
+      }
+    }
+    // Carried cells beyond this row's own cells still take their columns (and use up a row).
+    const lastCarried = Math.max(-1, ...carry.keys())
+    while (out.length <= lastCarried) {
+      if (carry.has(out.length)) place()
+      else out.push('')
+    }
+    grid.push(out)
+  }
+  return grid
+}
+
 function renderTable(table: Element, ctx: MdContext): Block[] {
   const rows = ownRows(table)
   if (rows.length === 0) return []
@@ -712,16 +803,7 @@ function renderTable(table: Element, ctx: MdContext): Block[] {
     for (const r of rows) for (const c of ownCells(r)) blocks.push(...renderChildren(c, ctx))
     return blocks
   }
-  const grid: string[][] = []
-  for (const row of rows) {
-    const out: string[] = []
-    for (const cell of ownCells(row)) {
-      out.push(cellText(cell, ctx))
-      const span = Math.min(Number.parseInt(cell.getAttribute('colspan') ?? '1', 10) || 1, 50)
-      for (let s = 1; s < span; s++) out.push('')
-    }
-    grid.push(out)
-  }
+  const grid = tableGrid(rows, ctx)
   const cols = Math.max(...grid.map((r) => r.length))
   for (const r of grid) while (r.length < cols) r.push('')
   const lines: string[] = []

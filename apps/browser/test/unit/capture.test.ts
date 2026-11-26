@@ -34,7 +34,7 @@ function setup(
     extractDom: vi.fn(
       async (): Promise<DomReply> => opts.dom ?? { kind: 'dom', url: current, extraction },
     ),
-    fetchWithTabSession: vi.fn(async (u: string): Promise<FetchedResource> => {
+    fetchWithTabSession: vi.fn(async (u: string, _mode: string): Promise<FetchedResource> => {
       fetched.push(u)
       return {
         status: 200,
@@ -146,12 +146,13 @@ describe('captureTab: extraction paths', () => {
     const { target, deps, fetched } = setup('https://docs.google.com/document/d/abc123/edit')
     const r = await captureTab(target, deps)
     expect(fetched).toEqual(['https://docs.google.com/document/d/abc123/export?format=md'])
+    expect(deps.fetchWithTabSession).toHaveBeenCalledWith(fetched[0], 'export')
     expect(deps.extractDom).not.toHaveBeenCalled()
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.page).toMatchObject({ sourceType: 'google-doc', title: 'Tab title' })
   })
 
-  it('falls back to the DOM when the Google export is a sign-in page', async () => {
+  it('never falls back to the canvas editor DOM when the Google export is refused', async () => {
     const s = setup('https://docs.google.com/document/d/abc123/edit')
     s.deps.fetchWithTabSession.mockResolvedValue({
       status: 200,
@@ -159,9 +160,64 @@ describe('captureTab: extraction paths', () => {
       finalUrl: 'https://accounts.google.com/signin',
       body: new TextEncoder().encode('<html>sign in</html>'),
     })
-    const r = await captureTab(s.target, s.deps)
-    expect(s.deps.extractDom).toHaveBeenCalled()
-    expect(r.ok).toBe(true)
+    expect(await captureTab(s.target, s.deps)).toEqual({
+      ok: false,
+      error: 'failed',
+      reason: null,
+      detail: 'google-export: not signed in to this account',
+    })
+    s.deps.fetchWithTabSession.mockResolvedValue({
+      status: 403,
+      contentType: 'text/html',
+      finalUrl: 'https://docs.google.com/document/d/abc123/export?format=md',
+      body: new TextEncoder().encode('<html>no</html>'),
+    })
+    expect(await captureTab(s.target, s.deps)).toMatchObject({
+      ok: false,
+      error: 'failed',
+      detail: expect.stringMatching(/HTTP 403.*disabled/),
+    })
+    expect(s.deps.extractDom).not.toHaveBeenCalled()
+  })
+
+  it('refuses a Google export that was redirected to a blocked host', async () => {
+    const s = setup('https://docs.google.com/document/d/abc123/edit')
+    s.deps.fetchWithTabSession.mockResolvedValue({
+      status: 200,
+      contentType: 'text/markdown',
+      finalUrl: 'https://direct.bk.mufg.jp/statement.md',
+      body: new TextEncoder().encode('# Statement\n\nBalance'),
+    })
+    expect(await captureTab(s.target, s.deps)).toMatchObject({
+      ok: false,
+      error: 'blocked',
+      reason: 'banking',
+    })
+  })
+
+  it('refuses a PDF re-read that ended anywhere but the displayed URL', async () => {
+    const s = setup('https://files.example/q3.pdf', {
+      dom: { kind: 'pdf', url: 'https://files.example/q3.pdf' },
+    })
+    s.deps.fetchWithTabSession.mockResolvedValue({
+      status: 200,
+      contentType: 'application/pdf',
+      finalUrl: 'https://direct.bk.mufg.jp/statements/latest.pdf',
+      body: new Uint8Array([1]),
+    })
+    expect(await captureTab(s.target, s.deps)).toMatchObject({
+      ok: false,
+      error: 'blocked',
+      reason: 'banking',
+    })
+    s.deps.fetchWithTabSession.mockResolvedValue({
+      status: 200,
+      contentType: 'application/pdf',
+      finalUrl: 'https://other.example/x.pdf',
+      body: new Uint8Array([1]),
+    })
+    expect(await captureTab(s.target, s.deps)).toMatchObject({ ok: false, error: 'failed' })
+    expect(s.deps.extractPdf).not.toHaveBeenCalled()
   })
 
   it('reads a PDF through the tab session and pdf.js', async () => {
@@ -176,7 +232,10 @@ describe('captureTab: extraction paths', () => {
     })
     const r = await captureTab(s.target, s.deps)
     expect(s.fetched).toEqual([])
-    expect(s.deps.fetchWithTabSession).toHaveBeenCalledWith('https://example.com/report.pdf')
+    expect(s.deps.fetchWithTabSession).toHaveBeenCalledWith(
+      'https://example.com/report.pdf',
+      'displayed-copy',
+    )
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.page.sourceType).toBe('pdf')
   })

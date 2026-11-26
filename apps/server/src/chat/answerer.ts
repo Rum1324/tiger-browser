@@ -4,7 +4,7 @@ import type { Sql } from '../db/sql'
 import { estimateTokens } from '../retrieval/chunker'
 import type { BuiltContext, ContextBuilder } from '../retrieval/context'
 import { AnswerError, type Answerer, type AnswerInput, type AnswerUsage } from '../seams'
-import { budgetExceeded, getSpaceUsage } from '../services/usage'
+import { budgetExceeded, getSpaceUsage, reserveBudget } from '../services/usage'
 import { finalizeAnswer, previewCitations } from './citations'
 import { assemblePrompt } from './prompt'
 
@@ -62,6 +62,9 @@ function toAnswerUsage(router: Router, model: ModelRef, u: ChatUsage, at: Date):
   }
 }
 
+/** Output tokens held against the budget for an answer whose request sets no maximum. */
+const DEFAULT_OUTPUT_RESERVE = 1024
+
 /** A provider that ended without usage still spent tokens; count an estimate against the budget. */
 function estimatedUsage(request: ChatRequest, output: string): ChatUsage {
   const input =
@@ -111,9 +114,23 @@ export function createAnswerer(deps: AnswererDeps): Answerer {
         model,
         system: prompt.system,
         ...(prompt.context ? { context: prompt.context } : {}),
+        // Whole-space context repeats across questions; retrieved passages almost never do.
+        cacheContext: built.mode === 'whole-space',
         messages: prompt.messages,
         cacheKey: `space:${spaceId}`,
         signal,
+      }
+      // Hold this answer's expected cost before calling the provider, so answers started together
+      // cannot all pass the check above. Released when the answer settles (services/answers.ts).
+      const expected =
+        estimatedUsage(request, '').inputTokens + (request.maxOutputTokens ?? DEFAULT_OUTPUT_RESERVE)
+      const reserved = await reserveBudget(sql, {
+        spaceId,
+        messageId: input.assistantMessageId,
+        tokens: expected,
+      })
+      if (!reserved) {
+        throw new AnswerError('budget_exceeded', "This Space has used this month's AI budget")
       }
       deps.onRequest?.({ input, request, context: built })
 

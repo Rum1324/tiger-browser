@@ -22,7 +22,12 @@ import {
   emailFromIdToken,
 } from '../../src/main/google/oauth'
 import { createPkce, randomState, s256 } from '../../src/main/google/pkce'
-import { classifyUpload, GoogleService, NOT_CONFIGURED } from '../../src/main/google/service'
+import {
+  classifyUpload,
+  flowErrorOf,
+  GoogleService,
+  NOT_CONFIGURED,
+} from '../../src/main/google/service'
 import { KvStore, openDatabase } from '../../src/main/store/db'
 import { type Cipher, TokenStore } from '../../src/main/store/token'
 import { FakeGoogle, parseMultipart } from '../fake-google'
@@ -411,9 +416,9 @@ describe('GoogleService', () => {
     const storeSpy = { get: vi.fn(async () => null), set: vi.fn(async () => {}) }
     const s = service({ config: null, fetch: fetchSpy, openBrowser: opener, store: storeSpy })
     expect(await s.status()).toEqual(NOT_CONFIGURED)
-    expect(await s.connect()).toEqual(NOT_CONFIGURED)
+    expect(await s.connect()).toEqual({ connection: NOT_CONFIGURED, error: 'not-configured' })
     expect(await s.disconnect()).toEqual(NOT_CONFIGURED)
-    expect(await s.signIn()).toBeNull()
+    expect(await s.signIn()).toEqual({ ok: false, error: 'not-configured' })
     expect(await s.exportDoc({ title: 't', markdown: 'm' })).toEqual({
       ok: false,
       error: 'not-configured',
@@ -435,7 +440,8 @@ describe('GoogleService', () => {
       },
     })
     const result = await s.signIn()
-    expect(emailFromIdToken(result?.idToken)).toBe('taro@example.com')
+    expect(result.ok).toBe(true)
+    expect(emailFromIdToken(result.ok ? result.idToken : undefined)).toBe('taro@example.com')
     expect(new URL(consentUrl).searchParams.get('scope')).toBe('openid email profile')
     expect(kv.get('google.account')).toBeNull()
     expect(google.liveRefreshTokens).toEqual([])
@@ -443,9 +449,9 @@ describe('GoogleService', () => {
     expect(await s.status()).toEqual({ configured: true, connected: false, email: null })
   })
 
-  it('returns null when the member refuses sign-in', async () => {
+  it('says denied when the member refuses sign-in', async () => {
     google.denyConsent = true
-    expect(await service().signIn()).toBeNull()
+    expect(await service().signIn()).toEqual({ ok: false, error: 'denied' })
   })
 
   it('connects with drive.file offline, seals the refresh token, reports the email and broadcasts', async () => {
@@ -458,7 +464,7 @@ describe('GoogleService', () => {
     })
     const conn = await s.connect()
     const expected = { configured: true, connected: true, email: 'taro@example.com' }
-    expect(conn).toEqual(expected)
+    expect(conn).toEqual({ connection: expected, error: null })
     expect(changes).toEqual([expected])
     const q = new URL(consentUrl).searchParams
     expect(q.get('scope')).toBe(`openid email ${DRIVE_FILE_SCOPE}`)
@@ -478,7 +484,10 @@ describe('GoogleService', () => {
   it('stays disconnected and revokes the grant when Drive is not granted', async () => {
     google.grant = (r) => r.filter((s) => s !== DRIVE_FILE_SCOPE)
     const conn = await service().connect()
-    expect(conn).toEqual({ configured: true, connected: false, email: null })
+    expect(conn).toEqual({
+      connection: { configured: true, connected: false, email: null },
+      error: 'denied',
+    })
     expect(kv.get('google.account')).toBeNull()
     expect(google.revoked.length).toBe(1)
     expect(google.liveRefreshTokens).toEqual([])
@@ -500,11 +509,65 @@ describe('GoogleService', () => {
     const abandoned = s.connect()
     await new Promise((r) => setTimeout(r, 50))
     const second = await s.connect()
-    expect(second.connected).toBe(true)
+    expect(second.connection.connected).toBe(true)
     // The abandoned flow settled instead of waiting for its timeout, and its listener is gone.
-    await abandoned
+    expect((await abandoned).error).toBe('cancelled')
     expect(await get(`${firstRedirect}/?state=x&code=y`)).toEqual({ error: 'ECONNREFUSED' })
     expect(changes.length).toBe(1)
+  })
+
+  it('cancel() ends a consent flow the member abandoned, and says cancelled', async () => {
+    let redirect = ''
+    const s = service({
+      openBrowser: async (url) => {
+        redirect = new URL(url).searchParams.get('redirect_uri') ?? ''
+      },
+    })
+    const pending = s.connect()
+    await new Promise((r) => setTimeout(r, 50))
+    s.cancel()
+    expect(await pending).toEqual({
+      connection: { configured: true, connected: false, email: null },
+      error: 'cancelled',
+    })
+    expect(await get(`${redirect}/?state=x&code=y`)).toEqual({ error: 'ECONNREFUSED' })
+    // Sign-in is a consent flow too.
+    const signing = s.signIn()
+    await new Promise((r) => setTimeout(r, 50))
+    s.cancel()
+    expect(await signing).toEqual({ ok: false, error: 'cancelled' })
+    // Nothing waiting: a no-op.
+    s.cancel()
+    expect(changes).toEqual([])
+  })
+
+  it('a flow nobody completes ends with timeout; a broken redirect ends with failed', async () => {
+    const quiet = service({
+      config: {
+        clientId: google.clientId,
+        clientSecret: google.clientSecret,
+        endpoints: google.endpoints,
+        authTimeoutMs: 60,
+      },
+      openBrowser: async () => {},
+    })
+    expect(await quiet.signIn()).toEqual({ ok: false, error: 'timeout' })
+    expect((await quiet.connect()).error).toBe('timeout')
+    const broken = service({
+      openBrowser: async () => {
+        throw new Error('no browser')
+      },
+    })
+    expect(await broken.signIn()).toEqual({ ok: false, error: 'failed' })
+  })
+
+  it('maps every OAuth failure onto a reason the UI can show', () => {
+    expect(flowErrorOf(new GoogleAuthError('denied', 'x'))).toBe('denied')
+    expect(flowErrorOf(new GoogleAuthError('timeout', 'x'))).toBe('timeout')
+    expect(flowErrorOf(new GoogleAuthError('cancelled', 'x'))).toBe('cancelled')
+    expect(flowErrorOf(new GoogleAuthError('state-mismatch', 'x'))).toBe('failed')
+    expect(flowErrorOf(new GoogleAuthError('invalid-grant', 'x'))).toBe('failed')
+    expect(flowErrorOf(new Error('boom'))).toBe('failed')
   })
 
   it('disconnect revokes at Google, deletes the token and broadcasts', async () => {

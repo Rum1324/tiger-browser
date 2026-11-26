@@ -1,6 +1,7 @@
 import type { ChatMessage } from '@tiger/llm'
 import type { Message, ThreadVisibility } from '@tiger/shared'
 import { estimateTokens } from '../retrieval/chunker'
+import { stripCitationMarkers } from './citations'
 import { type ContextSource, renderContext } from '../retrieval/context'
 import type { AttachmentContent } from '../seams'
 
@@ -112,7 +113,7 @@ export function renderPrivateSources(sources: PrivateSource[]): string {
 
 /** Citation markers of an earlier answer point at an older numbering; drop them from history. */
 export function stripMarkers(text: string): string {
-  return text.replace(/[ \t]*[[［](?:A?\d{1,3})(?:\s*[,、，]\s*A?\d{1,3})*[\]］]/g, '')
+  return stripCitationMarkers(text)
 }
 
 function userTurn(m: Message, visibility: ThreadVisibility): string {

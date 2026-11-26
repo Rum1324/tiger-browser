@@ -25,6 +25,9 @@ export const DEFAULT_MAX_CHARS = 1_200_000
 /** Readability is not interruptible; beyond this many elements the cheaper landmark path is used. */
 export const READABILITY_MAX_ELEMENTS = 30_000
 
+/** Above this much landmark text, Readability may keep a smaller share (a long page with heavy furniture). */
+const VERY_LONG_PAGE_CHARS = 60_000
+
 const READABILITY_VERSION = 'readability@0.6'
 const DOM_EXTRACTOR = 'tiger-dom@1'
 
@@ -235,7 +238,10 @@ function mainContent(doc: Document): Main {
     const content = article?.content
     if (article && content && content.nodeType === 1) {
       const kept = textLength(content as Element)
-      if (kept > 0 && (kept >= fallbackLength * 0.5 || kept >= 2_000)) {
+      // A share of the landmark text, never an absolute size: Readability drops blocks classed
+      // `comment`, `footer` and the like, which on forums and issue trackers hold the answers.
+      const share = fallbackLength > VERY_LONG_PAGE_CHARS ? 0.25 : 0.5
+      if (kept > 0 && kept >= fallbackLength * share) {
         return {
           element: content as Element,
           title: collapseSpaces(article.title ?? ''),

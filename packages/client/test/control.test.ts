@@ -58,6 +58,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  for (const c of [A, B, C]) await c?.idle().catch(() => {})
   for (const c of [A, B, C]) c?.client.dispose()
   await server?.close()
 })
@@ -121,7 +122,12 @@ describe('repairing a stream that lost deltas', () => {
     expect(B.count('GET', /\/threads\/[^/]+\/messages$/)).toBeGreaterThan(listsBefore)
     const longest = Math.max(...snapshots.map((s) => s.length))
     expect(longest).toBeGreaterThan(3 * 4 + 4)
-    for (const s of snapshots) expect(final.startsWith(s), s).toBe(true)
+    let prev = 0
+    for (const s of snapshots) {
+      expect(final.startsWith(s), s).toBe(true)
+      expect(s.length).toBeGreaterThanOrEqual(prev)
+      prev = s.length
+    }
   })
 
   it('a client that loads the thread mid-stream starts from the text so far', async () => {
@@ -145,7 +151,13 @@ describe('repairing a stream that lost deltas', () => {
     off()
     const final = viewOf(D, thread.id, id)?.text as string
     expect(final).toBe(viewOf(A, thread.id, id)?.text)
-    for (const s of snapshots) expect(final.startsWith(s), s).toBe(true)
+    // Never shorter than what was already shown, never anything but a prefix of the answer.
+    let prev = first?.text.length ?? 0
+    for (const s of snapshots) {
+      expect(final.startsWith(s), s).toBe(true)
+      expect(s.length).toBeGreaterThanOrEqual(prev)
+      prev = s.length
+    }
     D.client.dispose()
   })
 })

@@ -34,6 +34,7 @@ const ConfigSchema = z
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     SPACE_TOKEN_BUDGET: optionalPositiveInt,
     AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(20),
+    SHARE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
@@ -59,6 +60,8 @@ export interface Config {
   /** Budget stored on each new Space; null = unlimited. */
   spaceTokenBudget: number | null
   authRateLimitPerMinute: number
+  /** Shares (new items and new versions) per member per minute; each one queues embedding work. */
+  shareRateLimitPerMinute: number
   logLevel: string
   /** Passed through untouched for the chat agent. Never logged, never returned to clients. */
   providerKeys: { anthropic: string | null; openai: string | null; gemini: string | null }
@@ -89,6 +92,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     sessionTtlDays: c.SESSION_TTL_DAYS,
     spaceTokenBudget: c.SPACE_TOKEN_BUDGET ?? null,
     authRateLimitPerMinute: c.AUTH_RATE_LIMIT_PER_MINUTE,
+    shareRateLimitPerMinute: c.SHARE_RATE_LIMIT_PER_MINUTE,
     logLevel: c.LOG_LEVEL,
     providerKeys: {
       anthropic: c.ANTHROPIC_API_KEY ?? null,

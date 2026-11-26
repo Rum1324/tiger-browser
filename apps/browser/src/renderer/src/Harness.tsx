@@ -9,6 +9,7 @@ import type {
 import { type FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { GooglePanel } from './GooglePanel'
 import { strings } from './i18n'
+import { TeamPanel } from './TeamPanel'
 
 const tiger = window.tiger
 
@@ -201,9 +202,11 @@ export function Harness() {
                 <button type="button" onClick={() => answer(p, false, false)}>
                   {t.deny}
                 </button>
-                <button type="button" onClick={() => answer(p, true, true)}>
-                  {t.allow} + {t.remember}
-                </button>
+                {p.permission === 'screen-capture' ? null : (
+                  <button type="button" onClick={() => answer(p, true, true)}>
+                    {t.allow} + {t.remember}
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -216,6 +219,7 @@ export function Harness() {
               </pre>
             )
           ) : null}
+          {settings ? <TeamPanel t={t} serverUrl={settings.serverUrl} activeTab={active} /> : null}
           <GooglePanel t={t} markdown={capture?.ok ? capture.page.markdown : null} />
           {downloads.length ? (
             <div>

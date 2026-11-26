@@ -2,8 +2,9 @@ import { join } from 'node:path'
 import { ShortcutAction } from '@tiger/shared'
 import { describe, expect, it } from 'vitest'
 import { safeFileName, uniquePath } from '../../src/main/files'
+import { inviteTokenFromUrl } from '../../src/main/invite'
 import { appMenuTemplate, pageMenuTemplate, shortcutItems } from '../../src/main/menus'
-import { resolveUiFile, UI_CSP } from '../../src/main/protocol'
+import { resolveUiFile, UI_CSP, uiCsp } from '../../src/main/protocol'
 import { mergeSuggestions } from '../../src/main/suggest'
 import { chromeLikeUserAgent } from '../../src/main/user-agent'
 import { nextZoom } from '../../src/main/zoom'
@@ -203,6 +204,18 @@ describe('protocol', () => {
     expect(UI_CSP).not.toMatch(/script-src[^;]*unsafe/)
     expect(UI_CSP).toContain("object-src 'none'")
   })
+
+  it('the CSP lets the UI connect to the configured server and nothing else', () => {
+    const csp = uiCsp('https://api.tiger.example/v1')
+    const connect = csp.split('; ').find((d) => d.startsWith('connect-src'))
+    expect(connect).toBe("connect-src 'self' https://api.tiger.example wss://api.tiger.example")
+    expect(uiCsp('http://127.0.0.1:8787')).toContain(
+      "connect-src 'self' http://127.0.0.1:8787 ws://127.0.0.1:8787;",
+    )
+    expect(uiCsp('javascript:alert(1)')).toContain("connect-src 'self';")
+    expect(uiCsp(null)).toBe(UI_CSP)
+    expect(csp).not.toMatch(/script-src[^;]*unsafe/)
+  })
 })
 
 describe('small helpers', () => {
@@ -229,5 +242,33 @@ describe('small helpers', () => {
     expect(nextZoom(5, 'in')).toBe(5)
     expect(nextZoom(0.25, 'out')).toBe(0.25)
     expect(nextZoom(1.05, 'in')).toBe(1.1)
+  })
+})
+
+describe('invite links', () => {
+  const TOKEN = 'AbC_def-1234567890xyz'
+  it('recognises the server-issued link of the configured server only', () => {
+    expect(
+      inviteTokenFromUrl(`http://localhost:8787/invite#${TOKEN}`, 'http://localhost:8787'),
+    ).toBe(TOKEN)
+    expect(inviteTokenFromUrl(`https://t.example/invite/#${TOKEN}`, 'https://t.example/')).toBe(
+      TOKEN,
+    )
+    expect(
+      inviteTokenFromUrl(`https://t.example/api/invite#${TOKEN}`, 'https://t.example/api'),
+    ).toBe(TOKEN)
+    // Another origin, another path, no token, a non-token, or not a web URL: an ordinary navigation.
+    expect(
+      inviteTokenFromUrl(`https://evil.example/invite#${TOKEN}`, 'https://t.example'),
+    ).toBeNull()
+    expect(inviteTokenFromUrl(`http://t.example/invite#${TOKEN}`, 'https://t.example')).toBeNull()
+    expect(inviteTokenFromUrl(`https://t.example/invites#${TOKEN}`, 'https://t.example')).toBeNull()
+    expect(inviteTokenFromUrl('https://t.example/invite', 'https://t.example')).toBeNull()
+    expect(inviteTokenFromUrl('https://t.example/invite#short', 'https://t.example')).toBeNull()
+    expect(
+      inviteTokenFromUrl('https://t.example/invite#a b c d e f g h', 'https://t.example'),
+    ).toBeNull()
+    expect(inviteTokenFromUrl(`tiger://ui/invite#${TOKEN}`, 'tiger://ui')).toBeNull()
+    expect(inviteTokenFromUrl(`https://t.example/invite#${TOKEN}`, 'not a url')).toBeNull()
   })
 })

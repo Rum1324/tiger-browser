@@ -152,6 +152,7 @@ export function createHandlers(engine: Engine): Handlers {
 
     'google.status': () => engine.google.status(),
     'google.connect': () => engine.google.connect(),
+    'google.cancel': () => engine.google.cancel(),
     'google.disconnect': () => engine.google.disconnect(),
     'google.exportDoc': (req) => engine.google.exportDoc(req),
 
