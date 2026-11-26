@@ -1,0 +1,363 @@
+/*
+ * Web content mocks: third-party pages inside the page rectangle. Neutral greys from the --web-*
+ * tokens, their own type sizes (web pages do not follow our scale), none of Tiger's marks.
+ */
+
+.web {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--web-bg);
+  color: var(--web-text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* --- Document editor --- */
+.wd-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+  padding: 0 16px;
+}
+.wd-logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 36px;
+  border-radius: 4px;
+  background: var(--web-ui);
+  color: var(--web-text-2);
+}
+.wd-titles {
+  flex: 1;
+  min-width: 0;
+}
+.wd-title {
+  font-size: 18px;
+  line-height: 26px;
+  white-space: nowrap;
+}
+.wd-saved {
+  margin-left: 16px;
+  font-size: 12px;
+  color: var(--web-text-2);
+}
+.wd-menu {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--web-text-2);
+  white-space: nowrap;
+}
+.wd-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.wd-ghost,
+.wd-solid {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 17px;
+  white-space: nowrap;
+}
+.wd-ghost {
+  border: 1px solid var(--web-rule);
+  color: var(--web-text-2);
+}
+.wd-solid {
+  background: var(--web-ui-strong);
+  color: var(--web-text);
+}
+.wd-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--web-ui-strong);
+}
+.wd-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  margin: 0 12px;
+  padding: 0 16px;
+  border-radius: 19px;
+  background: var(--web-canvas);
+  overflow: hidden;
+}
+.wd-tools i {
+  flex: none;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--web-ui-strong);
+}
+.wd-tools b {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--web-rule);
+}
+.wd-canvas {
+  position: absolute;
+  inset: 106px 0 0;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  padding: 14px 24px 0;
+  background: var(--web-canvas);
+}
+.wd-page {
+  flex: 0 1 780px;
+  min-width: 0;
+  padding: 52px 80px 0;
+  background: var(--web-bg);
+  border: 1px solid var(--web-rule);
+  border-bottom: 0;
+}
+.wd-page h1 {
+  font-size: 26px;
+  line-height: 1.35;
+  font-weight: 600;
+  font-feature-settings: normal;
+}
+.wd-meta {
+  margin: 4px 0 6px;
+  font-size: 13px;
+  color: var(--web-text-2);
+}
+.wd-page h2 {
+  margin: 26px 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  font-feature-settings: normal;
+}
+.wd-page p,
+.wd-page li {
+  font-size: 14.5px;
+  line-height: 1.8;
+}
+.wd-page ul {
+  padding-left: 22px;
+  list-style: disc;
+}
+.wd-page table {
+  width: 64%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.wd-page th,
+.wd-page td {
+  padding: 5px 10px;
+  border: 1px solid var(--web-ui-strong);
+  text-align: left;
+  font-weight: 400;
+}
+.wd-page th {
+  background: var(--web-canvas);
+  font-weight: 600;
+}
+
+/* --- News article --- */
+.wn-head {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  height: 56px;
+  padding: 0 40px;
+  border-bottom: 1px solid var(--web-rule);
+  white-space: nowrap;
+}
+.wn-brand {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.wn-head nav {
+  display: flex;
+  flex: 1;
+  gap: 24px;
+  font-size: 13px;
+  color: var(--web-text-2);
+}
+.wn-login {
+  font-size: 13px;
+  color: var(--web-text-2);
+}
+.wn-article {
+  width: 680px;
+  margin: 0 auto;
+  padding-top: 44px;
+}
+.wn-kicker {
+  font-size: 13px;
+  color: var(--web-text-2);
+}
+.wn-article h1 {
+  margin: 10px 0 18px;
+  font-size: 30px;
+  line-height: 1.4;
+  font-weight: 600;
+  font-feature-settings: normal;
+  word-break: auto-phrase;
+}
+.wn-article h2 {
+  margin: 30px 0 10px;
+  font-size: 19px;
+  font-weight: 600;
+  font-feature-settings: normal;
+}
+.wn-article p {
+  font-size: 16px;
+  line-height: 1.9;
+}
+.wn-article p + p {
+  margin-top: 16px;
+}
+.wn-lead {
+  color: var(--web-text);
+}
+.wn-figure {
+  margin: 24px 0;
+}
+.wn-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  height: 148px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--web-ui-strong);
+}
+.wn-bars i {
+  flex: 1;
+  background: var(--web-ui-strong);
+}
+.wn-figure p {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--web-text-2);
+}
+
+/* --- Internet banking --- */
+.wb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 40px;
+  background: var(--web-canvas);
+  border-bottom: 1px solid var(--web-rule);
+}
+.wb-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.wb-brand .ic {
+  width: 22px;
+  height: 22px;
+}
+.wb-brand small {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--web-text-2);
+}
+.wb-user {
+  font-size: 13px;
+  color: var(--web-text-2);
+}
+.wb-user span {
+  margin-left: 20px;
+  text-decoration: underline;
+}
+.wb-nav {
+  display: flex;
+  gap: 0;
+  padding: 0 40px;
+  border-bottom: 1px solid var(--web-rule);
+  font-size: 14px;
+}
+.wb-nav span {
+  padding: 12px 22px;
+  color: var(--web-text-2);
+}
+.wb-nav .on {
+  color: var(--web-text);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--web-text);
+}
+.wb-main {
+  padding: 28px 40px;
+  max-width: 880px;
+}
+.wb-main h1 {
+  font-size: 22px;
+  font-weight: 600;
+  font-feature-settings: normal;
+}
+.wb-main h2 {
+  margin: 30px 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  font-feature-settings: normal;
+}
+.wb-accts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+.wb-accts > div {
+  padding: 16px 18px;
+  border: 1px solid var(--web-rule);
+  border-radius: 4px;
+}
+.wb-accts p {
+  font-size: 13px;
+  color: var(--web-text-2);
+}
+.wb-accts b {
+  display: block;
+  margin: 6px 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.wb-accts span {
+  font-size: 12px;
+  color: var(--web-text-2);
+  text-decoration: underline;
+}
+.wb-main table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.wb-main th,
+.wb-main td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--web-rule);
+  text-align: left;
+  font-weight: 400;
+}
+.wb-main th {
+  background: var(--web-canvas);
+  font-size: 12px;
+  color: var(--web-text-2);
+}
+.wb-main .num {
+  text-align: right;
+}

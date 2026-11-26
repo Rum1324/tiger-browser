@@ -1,0 +1,491 @@
+/* Paper: the window frame. Sidebar (the margin), toolbar (the running head), gutter, page. */
+
+.window {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  width: 1440px;
+  height: 900px;
+  overflow: hidden;
+  background: var(--paper);
+  border-radius: var(--r-4);
+  color: var(--ink);
+}
+.window::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 var(--hair) var(--window-edge);
+  pointer-events: none;
+}
+
+/* ---------- Sidebar ---------- */
+
+.side {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+.side__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--toolbar-h);
+  padding: 0 var(--s-2) 0 18px;
+  flex: none;
+}
+.lights {
+  display: inline-flex;
+  gap: var(--s-4);
+}
+.light {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 var(--hair) var(--os-light-edge);
+}
+.light--close {
+  background: var(--os-close);
+}
+.light--min {
+  background: var(--os-min);
+}
+.light--zoom {
+  background: var(--os-zoom);
+}
+
+/* The Space is the title of the sheet. */
+.space {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  margin: var(--s-2) var(--s-4) 0;
+  padding: var(--s-3) var(--s-4) var(--s-4);
+  border-radius: var(--r-2);
+}
+button.space:hover {
+  background: var(--paper-sunk);
+}
+.space__name {
+  font-size: var(--fs-15);
+  font-weight: var(--fw-strong);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--track-title);
+  font-feature-settings: 'palt';
+}
+.space__chev {
+  margin-left: var(--s-2);
+  color: var(--ink-2);
+}
+.space__meta {
+  grid-column: 1 / -1;
+  margin-top: var(--s-1);
+  font-size: var(--fs-11);
+  letter-spacing: var(--track-label);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.space--draft .space__name {
+  color: var(--ink-2);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  height: var(--row);
+  margin: var(--s-4) var(--s-4) 0 14px;
+  padding: 0 var(--s-4) 0 var(--s-3);
+  border: var(--hair) solid transparent;
+  border-radius: var(--r-2);
+}
+.nav .ic {
+  color: var(--ink-2);
+}
+.nav__count {
+  margin-left: auto;
+  font-size: var(--fs-11);
+  font-weight: var(--fw-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tab list, ruled in two parts. */
+.tabs {
+  position: relative;
+  margin-top: var(--s-6);
+}
+.tabs__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  height: 24px;
+  padding-left: 20px;
+  font-size: var(--fs-11);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--track-label);
+  color: var(--ink-2);
+}
+.tabs__label b {
+  color: var(--ink);
+}
+.tabs__empty {
+  padding: var(--s-1) var(--s-6) var(--s-4) 20px;
+  font-size: var(--fs-11);
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+/* Above the line: the margin rule runs down the whole shared section and meets the line. */
+.tabs--shared .tabs__label b {
+  color: var(--shu);
+}
+.tabs--shared::before {
+  content: '';
+  position: absolute;
+  left: var(--s-4);
+  top: var(--s-2);
+  bottom: calc(-1 * var(--s-4));
+  width: var(--margin-rule);
+  background: var(--shu);
+}
+.shareline {
+  height: 1px;
+  margin: var(--s-4) var(--s-4) 0 var(--s-4);
+  background: var(--shu);
+  flex: none;
+}
+.is-dragging .shareline {
+  height: 2px;
+}
+.tabs--local {
+  margin-top: var(--s-4);
+}
+
+.tab {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  column-gap: var(--s-4);
+  align-items: center;
+  min-height: var(--row);
+  margin: 0 var(--s-4) 0 14px;
+  padding: 0 var(--s-3);
+  border: var(--hair) solid transparent;
+  border-radius: var(--r-2);
+}
+.tab:hover {
+  background: var(--paper-sunk);
+}
+.tab__glyph {
+  color: var(--ink-2);
+}
+.tab__title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 20px;
+}
+.tab__by {
+  grid-column: 2 / -1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fs-11);
+  line-height: 16px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.tab__by b {
+  color: var(--ink);
+}
+.tab--shared,
+.tab--blocked {
+  min-height: var(--row-2);
+  padding-block: 5px;
+  align-content: center;
+}
+.tab__tail {
+  display: inline-flex;
+  gap: var(--s-1);
+  color: var(--ink-2);
+}
+/* Close: a 28 px target around a 16 px glyph, pulled back so the glyph stays optically aligned. */
+.tab__x {
+  display: grid;
+  place-items: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: -6px -6px -6px 0;
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+}
+/* The selected row is the same white as the page it shows. No extra weight. */
+.tab.is-active,
+.nav.is-active {
+  background: var(--paper-page);
+  border-color: var(--rule-strong);
+}
+/* Protected rows carry a hatched band where a shared row carries the rule. */
+.tab--blocked::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: var(--s-2);
+  bottom: var(--s-2);
+  width: var(--hatch-band);
+  background: repeating-linear-gradient(135deg, var(--hatch) 0 1px, transparent 1px 3px);
+}
+.tab--new {
+  width: calc(100% - 22px);
+  color: var(--ink-2);
+}
+.tab.is-ghost {
+  opacity: 0.32;
+}
+/* Drop slot above the line while a tab is dragged. Dashed = not yet shared. */
+.tab--slot {
+  display: flex;
+  min-height: var(--row-2);
+  border: 1px dashed var(--shu);
+  font-size: var(--fs-11);
+  color: var(--shu);
+}
+.tab--slot:hover {
+  background: none;
+}
+
+.side__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  height: var(--toolbar-h);
+  margin-top: auto;
+  padding: 0 var(--s-2) 0 20px;
+}
+.side__me {
+  flex: 1;
+}
+
+/* The lifted row and the pointer (signature, frame a). */
+.dragrow {
+  position: absolute;
+  z-index: 60;
+  left: 20px;
+  top: 364px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: var(--s-4);
+  align-items: center;
+  width: 228px; /* stays inside the sidebar: the chrome cannot draw over the page */
+  height: var(--row);
+  padding: 0 var(--s-3);
+  background: var(--paper-page);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-lift);
+}
+.cursor {
+  position: absolute;
+  z-index: 61;
+  left: 176px;
+  top: 378px;
+  width: 16px;
+  height: 20px;
+  fill: var(--ink);
+  stroke: var(--paper-page);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+}
+
+/* ---------- Toolbar ---------- */
+
+.main {
+  display: grid;
+  grid-template-rows: var(--toolbar-h) minmax(0, 1fr);
+  min-width: 0;
+  height: 100%;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+  padding: 0 var(--gutter);
+}
+.bar__nav {
+  display: flex;
+}
+/* Address: host / title. A breadcrumb to read; click or ⌘L turns it into the field. */
+.addr {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  min-width: 0;
+  height: var(--hit);
+  padding: 0 var(--s-4);
+  border-radius: var(--r-2);
+  line-height: var(--hit);
+  white-space: nowrap;
+}
+.addr:hover {
+  background: var(--paper-sunk);
+}
+.addr__host {
+  color: var(--ink-2);
+}
+.addr__sep {
+  color: var(--rule-strong);
+}
+.addr__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The tab's state, in words. */
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-4);
+  height: var(--hit);
+  padding: 0 var(--s-4);
+  border-radius: var(--r-2);
+  white-space: nowrap;
+  flex: none;
+}
+button.state:hover,
+.state.is-on {
+  background: var(--paper-sunk);
+}
+.state__main {
+  font-weight: var(--fw-strong);
+}
+.state__sub {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.state__chev {
+  margin-left: calc(-1 * var(--s-1));
+  color: var(--ink-2);
+}
+.state--shared .state__main {
+  color: var(--shu);
+}
+.state--local .state__main {
+  font-weight: var(--fw-regular);
+  color: var(--ink-2);
+}
+
+/* ---------- Stage: gutter, page, panel ---------- */
+
+.stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+  min-height: 0;
+  padding: 0 var(--gutter) var(--gutter) 0;
+}
+.stage.has-panel {
+  grid-template-columns: var(--gutter) minmax(0, 1fr) var(--panel-w);
+  padding-right: 0;
+}
+
+/* The gutter is ours. The page cannot paint here, so the state cannot be faked from inside. */
+.gutter {
+  position: relative;
+}
+.gutter::before {
+  content: '';
+  position: absolute;
+  top: var(--s-4);
+  bottom: var(--s-4);
+}
+/* The rule touches the page edge, so it reads as the page's own margin, not the sidebar's border. */
+.gutter--shared::before {
+  left: calc(var(--gutter) - var(--margin-rule));
+  width: var(--margin-rule);
+  background: var(--shu);
+}
+.gutter--drawing::before {
+  bottom: auto;
+  height: 44%;
+}
+.gutter--protected::before {
+  left: calc(var(--gutter) - var(--hatch-band));
+  width: var(--hatch-band);
+  background: repeating-linear-gradient(135deg, var(--hatch) 0 1px, transparent 1px 3px);
+}
+
+.page {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--paper-page);
+  border-radius: var(--r-3);
+  box-shadow: 0 0 0 var(--hair) var(--rule-strong);
+}
+
+/* Overlay layer: sheets, palette, popovers, a second window. Opaque; no scrim, no blur. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+.overlay > * {
+  pointer-events: auto;
+}
+
+/* ---------- Motion ----------
+   Durations and easings come from tokens. With reduced motion every state simply swaps.
+   render.cjs emulates reduced motion, so shots are always the settled state. */
+@media (prefers-reduced-motion: no-preference) {
+  .btn,
+  .tbtn,
+  .ib,
+  .tab,
+  .nav,
+  .state,
+  .addr,
+  .models button {
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      color var(--dur-1) var(--ease-out);
+  }
+  .shareline {
+    transition: height var(--dur-1) var(--ease-out);
+  }
+  /* Overlay layers fade in and rise 8 px. */
+  .sheet,
+  .pop {
+    animation: rise var(--dur-2) var(--ease-out) both;
+  }
+  /* Signature, after confirm: the rule is drawn down the row, then down the page. */
+  [data-screen='09-signature-c'] .tab.is-active {
+    animation: settle var(--dur-3) var(--ease-ink) both;
+  }
+  [data-screen='09-signature-c'] .gutter--shared::before {
+    animation: ink var(--dur-4) var(--ease-ink) both;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes settle {
+  from {
+    transform: translateY(var(--row-2));
+  }
+}
+@keyframes ink {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}

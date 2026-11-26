@@ -1,0 +1,523 @@
+/* Paper: reset, type defaults, and the small parts every surface shares. Tokens only. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: transparent;
+}
+
+body {
+  margin: 0;
+  width: 1440px;
+  height: 900px;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-ui);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Japanese: kinsoku on, no breaks inside Latin words. */
+  line-break: strict;
+  overflow-wrap: anywhere;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+dd {
+  margin: 0;
+  padding: 0;
+}
+ul,
+ol {
+  list-style: none;
+}
+h1,
+h2,
+h3 {
+  font-size: inherit;
+  font-weight: var(--fw-strong);
+  font-feature-settings: 'palt';
+}
+b {
+  font-weight: var(--fw-strong);
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+small {
+  font-size: var(--fs-11);
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-align: inherit;
+}
+code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+}
+time,
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Prose breaks at phrase boundaries (bunsetsu), not mid-word. Chromium 119+, needs lang="ja". */
+.msg__text,
+.ai p,
+.fr__lead,
+.fr__notes p,
+.pop p,
+.sheet__head p,
+.slip__fine,
+.pntp dd,
+.tabs__empty {
+  word-break: auto-phrase;
+  text-wrap: pretty;
+}
+
+/* Focus: ink ring. `.is-focus` shows the same ring in static shots. */
+:focus-visible,
+.is-focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.grow {
+  flex: 1;
+}
+.nb {
+  white-space: nowrap;
+}
+.placeholder {
+  color: var(--ink-3);
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* Icons: 16 px grid, 1.5 px stroke, round. */
+.ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Key hints */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-11);
+  line-height: 1;
+  color: var(--ink-2);
+  border: var(--hair) solid var(--rule-strong);
+  border-radius: var(--r-1);
+}
+
+/* Icon button: 28 px target */
+.ib {
+  display: inline-grid;
+  place-items: center;
+  width: var(--hit);
+  height: var(--hit);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  flex: none;
+}
+.ib:hover {
+  background: var(--paper-sunk);
+  color: var(--ink);
+}
+.ib.is-off {
+  color: var(--rule-strong);
+}
+
+/* Button: label always, icon optional. Hairline edge, 6 px radius. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: var(--hit);
+  padding: 0 10px;
+  border: var(--hair) solid var(--rule-strong);
+  border-radius: var(--r-2);
+  white-space: nowrap;
+  flex: none;
+}
+.btn > .ic {
+  margin-left: -2px;
+}
+.btn > kbd {
+  margin-right: -4px;
+  margin-left: 2px;
+}
+.btn:hover,
+.btn.is-on {
+  background: var(--paper-sunk);
+}
+.btn--ink {
+  background: var(--ink);
+  color: var(--ink-on-ink);
+  border-color: transparent;
+  font-weight: var(--fw-strong);
+}
+.btn--ink:hover {
+  background: var(--ink);
+}
+/* The only shu-filled control in the product: applying the ink. */
+.btn--shu {
+  background: var(--shu);
+  color: var(--on-shu);
+  border-color: transparent;
+  font-weight: var(--fw-strong);
+}
+.btn--shu:hover {
+  background: var(--shu);
+}
+.btn--ink > kbd,
+.btn--shu > kbd {
+  color: inherit;
+  border-color: currentColor;
+  opacity: 0.72;
+}
+.btn--lg {
+  height: 36px;
+  padding: 0 14px;
+}
+
+/* Text button */
+.tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: var(--hit);
+  padding: 0 var(--s-3);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.tbtn:hover {
+  background: var(--paper-sunk);
+  color: var(--ink);
+}
+.tbtn--bare {
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+}
+
+/*
+ * The mark. A short piece of the margin rule, used inline wherever a state is named.
+ * shu rule = the Space can read this. hatch = protected, cannot leave. none = this Mac only.
+ */
+.mark {
+  display: inline-block;
+  width: var(--margin-rule);
+  height: 14px;
+  background: var(--shu);
+  flex: none;
+}
+.mark--hatch {
+  width: var(--hatch-band);
+  background: repeating-linear-gradient(135deg, var(--hatch) 0 1px, transparent 1px 3px);
+}
+.mark--none {
+  background: none;
+}
+
+/* A disc is presence, never decoration: filled = here now, ring = member who is away.
+   Authorship is always written out as a name. */
+.who {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: var(--hair) solid var(--rule-strong);
+  font-size: var(--fs-11);
+  line-height: 1;
+  color: var(--ink-2);
+  flex: none;
+}
+.who--here {
+  background: var(--ink);
+  border-color: transparent;
+  color: var(--ink-on-ink);
+}
+
+/* Checkbox */
+.check {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--ink-2);
+  border-radius: var(--r-1);
+  background: var(--paper-page);
+  flex: none;
+}
+.check[aria-checked='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ink-on-ink);
+}
+.check .ic {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
+}
+
+/* Text field */
+.input {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  background: var(--paper-page);
+  border: var(--hair) solid var(--rule-strong);
+  border-radius: var(--r-2);
+}
+.caret {
+  width: 1.5px;
+  height: 18px;
+  margin-left: 1px;
+  background: var(--ink);
+}
+
+/* Composer field: input plus a foot row */
+.field {
+  background: var(--paper-page);
+  border: var(--hair) solid var(--rule-strong);
+  border-radius: var(--r-3);
+}
+.field__input {
+  min-height: 52px;
+  padding: 10px var(--s-5) 0;
+}
+.field__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: 0 var(--s-3) var(--s-3);
+}
+.field__note {
+  padding-left: var(--s-3);
+  font-size: var(--fs-11);
+  color: var(--ink-2);
+}
+
+/* Model choice: three words, one is ink. */
+.models {
+  display: inline-flex;
+  gap: var(--s-1);
+}
+.models button {
+  height: var(--hit);
+  padding: 0 var(--s-4);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+}
+.models button.is-on {
+  background: var(--paper-sunk);
+  color: var(--ink);
+  font-weight: var(--fw-strong);
+}
+
+/* Messages: a byline, then text. People in gothic, models in mincho. */
+.msg__by {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  height: 20px;
+}
+.msg__by time,
+.msg__meta {
+  font-size: var(--fs-11);
+  color: var(--ink-2);
+}
+.msg__meta::before {
+  content: '·';
+  margin-right: var(--s-4);
+}
+.msg__text {
+  margin-top: var(--s-3);
+  line-height: var(--lh-read);
+}
+.msg__saw {
+  margin-top: var(--s-2);
+  font-size: var(--fs-11);
+  color: var(--ink-2);
+}
+.ai {
+  margin-top: var(--s-3);
+  font-family: var(--font-ai);
+  font-size: var(--fs-15);
+  line-height: var(--lh-ai);
+}
+.ai p + p {
+  margin-top: 0.5em;
+}
+.at {
+  font-weight: var(--fw-strong);
+}
+/* A model's name is set in its own face, like its text. */
+.msg--ai .msg__by b {
+  font-family: var(--font-ai);
+  font-size: var(--fs-15);
+  line-height: 20px;
+}
+
+/* Citation: a shu numeral. It points at something the Space holds, so it carries the ink. */
+.cite {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin: 0 2px;
+  padding: 0 4px;
+  vertical-align: 2px;
+  border: var(--hair) solid var(--shu-rule);
+  border-radius: var(--r-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--shu);
+}
+.cite::after {
+  /* 28 px pointer target around a 16 px chip */
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.cite.is-hot {
+  background: var(--shu-wash);
+  border-color: var(--shu);
+}
+
+/* References: the bibliography under an answer. Always open; nothing hides behind hover. */
+.refs {
+  display: grid;
+  gap: var(--s-1);
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: var(--hair) solid var(--rule);
+  counter-reset: none;
+}
+.ref {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: var(--s-4);
+  margin: 0 calc(-1 * var(--s-3));
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-2);
+}
+.ref.is-hot {
+  background: var(--shu-wash);
+}
+.ref__n {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+  text-align: center;
+  color: var(--shu);
+}
+.ref__body {
+  display: grid;
+  min-width: 0;
+}
+.ref__title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  line-height: 20px;
+}
+.ref__title .ic {
+  color: var(--ink-2);
+}
+.ref__by {
+  font-size: var(--fs-11);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.ref__quote {
+  margin: var(--s-3) 0 var(--s-1);
+  padding-left: var(--s-4);
+  border-left: var(--margin-rule) solid var(--shu);
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  line-height: 1.6;
+  color: var(--ink-2);
+  quotes: none;
+}
+
+/* One-line references, for the thread where vertical space is scarce. */
+.refs--tight .ref__body {
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--s-5);
+  align-items: center;
+}
+.refs--tight .ref__by {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* While a model writes: tokens stream in, the step is named, and the send button becomes Stop.
+   No skeletons. */
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  margin-top: var(--s-3);
+  font-size: var(--fs-11);
+  color: var(--ink-2);
+}
+.step .mark {
+  height: 12px;
+}
+.step small {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.ai .caret {
+  display: inline-block;
+  height: 16px;
+  margin-left: 2px;
+  vertical-align: -2px;
+}

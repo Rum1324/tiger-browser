@@ -1,0 +1,204 @@
+/*
+ * Tiger / Paper direction: design tokens.
+ * Component CSS reads these custom properties only. No colour literal lives outside this file.
+ *
+ * Colour rule: the chrome is ink on paper. Exactly one hue exists, --shu (vermilion), and it means
+ * "the Space can read this". It is never used for errors, focus, selection, links or decoration.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Paper: surfaces. Chrome and page differ by one luminance step and a hairline. */
+  --paper: #f6f5f1; /* chrome: sidebar, toolbar, side panel */
+  --paper-page: #ffffff; /* page rectangle, selected rows, text fields */
+  --paper-sunk: #edece7; /* hover and pressed fills, source wells */
+  --paper-float: #ffffff; /* sheets, palette, popovers (overlay layer) */
+
+  /* Ink: text. All three pass 4.5:1 on --paper and --paper-page. */
+  --ink: #1b1a17;
+  --ink-2: #54534e;
+  --ink-3: #6b6a64;
+  --ink-on-ink: #ffffff; /* text on an ink-filled control */
+
+  /* Rules: hairlines. Not text; used at 0.5 px (one device pixel at 2x). */
+  --rule: rgba(27, 26, 23, 0.16);
+  --rule-strong: rgba(27, 26, 23, 0.34);
+  --hatch: rgba(27, 26, 23, 0.5); /* protected: blocklist, private window */
+
+  /* Shu: the one ink colour. State "shared with the Space". */
+  --shu: #bb3617;
+  --shu-wash: rgba(187, 54, 23, 0.07); /* hover of a citation or its source row */
+  --shu-rule: rgba(187, 54, 23, 0.45); /* edge of a citation chip */
+  --on-shu: #ffffff; /* text on the single shu-filled control: confirm share */
+
+  /* Focus ring is ink, 2 px, offset 2 px. */
+  --focus: #1b1a17;
+
+  /* Window and OS furniture */
+  --window-edge: rgba(27, 26, 23, 0.28);
+  --os-close: #ff5f57;
+  --os-min: #febc2e;
+  --os-zoom: #28c840;
+  --os-light-edge: rgba(0, 0, 0, 0.14);
+
+  /* Elevation: floating layers only. Everything in flow is flat. */
+  --shadow-float: 0 0 0 0.5px rgba(27, 26, 23, 0.34), 0 2px 6px rgba(27, 26, 23, 0.06),
+    0 12px 32px rgba(27, 26, 23, 0.14);
+  --shadow-window: 0 0 0 0.5px rgba(27, 26, 23, 0.4), 0 4px 10px rgba(27, 26, 23, 0.1),
+    0 24px 56px rgba(27, 26, 23, 0.24);
+  --shadow-lift: 0 0 0 0.5px rgba(27, 26, 23, 0.34), 0 6px 16px rgba(27, 26, 23, 0.16);
+
+  /* Web content in mocks: neutral greys so third-party pages read as "not ours". */
+  --web-bg: #ffffff;
+  --web-canvas: #f3f3f2;
+  --web-ui: #e7e7e5;
+  --web-ui-strong: #c9c9c6;
+  --web-text: #202020;
+  --web-text-2: #5c5c5c;
+  --web-rule: #dcdcda;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: #111110;
+  --paper-page: #191917;
+  --paper-sunk: #222220;
+  --paper-float: #1d1d1b;
+
+  --ink: #eceae4;
+  --ink-2: #b2b0a8;
+  --ink-3: #94928a;
+  --ink-on-ink: #111110;
+
+  --rule: rgba(236, 234, 228, 0.16);
+  --rule-strong: rgba(236, 234, 228, 0.34);
+  --hatch: rgba(236, 234, 228, 0.5);
+
+  --shu: #f0764f; /* lighter and less saturated: no neon on near-black */
+  --shu-wash: rgba(240, 118, 79, 0.12);
+  --shu-rule: rgba(240, 118, 79, 0.5);
+  --on-shu: #1a0d08;
+
+  --focus: #eceae4;
+
+  --window-edge: rgba(236, 234, 228, 0.22);
+  --os-light-edge: rgba(0, 0, 0, 0.3);
+
+  --shadow-float: 0 0 0 0.5px rgba(236, 234, 228, 0.3), 0 2px 6px rgba(0, 0, 0, 0.3),
+    0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-window: 0 0 0 0.5px rgba(236, 234, 228, 0.3), 0 4px 10px rgba(0, 0, 0, 0.4),
+    0 24px 56px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 0 0 0.5px rgba(236, 234, 228, 0.3), 0 6px 16px rgba(0, 0, 0, 0.5);
+
+  --web-bg: #1c1c1b;
+  --web-canvas: #151514;
+  --web-ui: #2a2a28;
+  --web-ui-strong: #44443f;
+  --web-text: #e6e6e3;
+  --web-text-2: #a4a49f;
+  --web-rule: #343431;
+}
+
+/*
+ * A private window is carbon paper: ink-coloured in the light theme, and one step darker than the
+ * dark theme. It has no Space, so --shu is never rendered inside it.
+ */
+[data-window='private'] {
+  color-scheme: dark;
+
+  --paper: #262522;
+  --paper-page: #1b1a17;
+  --paper-sunk: #33322e;
+  --paper-float: #2c2b28;
+
+  --ink: #f1efe9;
+  --ink-2: #bdbbb3;
+  --ink-3: #a09e96;
+  --ink-on-ink: #1b1a17;
+
+  --rule: rgba(241, 239, 233, 0.18);
+  --rule-strong: rgba(241, 239, 233, 0.36);
+  --hatch: rgba(241, 239, 233, 0.55);
+  --focus: #f1efe9;
+  --window-edge: rgba(241, 239, 233, 0.24);
+}
+
+[data-theme='dark'] [data-window='private'] {
+  --paper: #050505;
+  --paper-page: #0b0b0a;
+  --paper-sunk: #1a1a18;
+  --paper-float: #141413;
+}
+
+:root {
+  /* Type families. On macOS the first names resolve (SF Pro + Hiragino). The mock, rendered on
+     Linux, falls through to the bundled Inter / Noto Sans JP / Noto Serif JP / JetBrains Mono. */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Hiragino Sans', 'Inter', 'Noto Sans JP',
+    sans-serif;
+  --font-ai: 'Hiragino Mincho ProN', 'Noto Serif JP', serif; /* generated text only */
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Hiragino Sans', 'Noto Sans JP', monospace;
+
+  /* Type scale: five sizes, two weights. 28 is reserved for generated documents. */
+  --fs-11: 11px;
+  --fs-13: 13px;
+  --fs-15: 15px;
+  --fs-20: 20px;
+  --fs-28: 28px;
+  --fw-regular: 400; /* Hiragino W3 */
+  --fw-strong: 600; /* Hiragino W6 */
+
+  /* Line height: Japanese needs more air than Latin. */
+  --lh-tight: 1.3; /* single-line labels, titles */
+  --lh-ui: 1.5; /* UI text */
+  --lh-read: 1.75; /* messages, statements */
+  --lh-ai: 1.9; /* mincho passages */
+
+  --track-label: 0.02em; /* 11 px labels */
+  --track-title: 0.01em;
+
+  /* Space: 4 px base. Lists are tight, reading is airy. */
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 6px;
+  --s-4: 8px;
+  --s-5: 12px;
+  --s-6: 16px;
+  --s-7: 20px;
+  --s-8: 24px;
+  --s-9: 32px;
+  --s-10: 40px;
+  --s-11: 56px;
+
+  /* Density */
+  --row: 32px; /* list row, one line */
+  --row-2: 46px; /* list row with byline */
+  --hit: 28px; /* minimum pointer target */
+
+  /* Radii: in-flow controls 4-8, floating layers 12. Inner = outer - padding. */
+  --r-1: 4px; /* chips, checkboxes */
+  --r-2: 6px; /* buttons, rows, fields */
+  --r-3: 8px; /* page rectangle, composer */
+  --r-4: 12px; /* sheets, palette, popovers, window */
+
+  /* Lines */
+  --hair: 0.5px; /* one device pixel at 2x */
+  --margin-rule: 2px; /* the shu rule */
+  --hatch-band: 4px;
+
+  /* Frame geometry */
+  --sidebar-w: 256px;
+  --toolbar-h: 44px;
+  --gutter: 8px;
+  --panel-w: 408px;
+
+  /* Motion */
+  --dur-1: 120ms; /* hover, label swap */
+  --dur-2: 180ms; /* popover, sheet in */
+  --dur-3: 280ms; /* row move, rule drawn on a row */
+  --dur-4: 420ms; /* rule drawn down the page */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-ink: cubic-bezier(0.3, 0, 0.1, 1); /* a pen stroke: quick start, long settle */
+}
