@@ -114,11 +114,12 @@ export function createHandlers(engine: Engine): Handlers {
       })
     },
 
-    'downloads.list': () => engine.downloads.list(),
-    'downloads.cancel': (req) => engine.downloads.cancel(req.id),
-    'downloads.open': (req) => engine.downloads.open(req.id),
-    'downloads.showInFolder': (req) => engine.downloads.showInFolder(req.id),
-    'downloads.clear': () => engine.downloads.clear(),
+    'downloads.list': (_req, win) => engine.downloads.list(engine.downloadScopeOf(win)),
+    'downloads.cancel': (req, win) => engine.downloads.cancel(req.id, engine.downloadScopeOf(win)),
+    'downloads.open': (req, win) => engine.downloads.open(req.id, engine.downloadScopeOf(win)),
+    'downloads.showInFolder': (req, win) =>
+      engine.downloads.showInFolder(req.id, engine.downloadScopeOf(win)),
+    'downloads.clear': (_req, win) => engine.downloads.clear(engine.downloadScopeOf(win)),
 
     'bookmarks.list': () => engine.bookmarks.list(),
     'bookmarks.add': (req) => {
@@ -189,7 +190,7 @@ export function createHandlers(engine: Engine): Handlers {
           b.close()
           break
         case 'toggle-fullscreen':
-          b.setFullScreen(!b.isFullScreen())
+          win.toggleFullscreen()
           break
       }
     },

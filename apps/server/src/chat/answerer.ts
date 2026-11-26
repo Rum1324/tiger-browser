@@ -123,7 +123,8 @@ export function createAnswerer(deps: AnswererDeps): Answerer {
       // Hold this answer's expected cost before calling the provider, so answers started together
       // cannot all pass the check above. Released when the answer settles (services/answers.ts).
       const expected =
-        estimatedUsage(request, '').inputTokens + (request.maxOutputTokens ?? DEFAULT_OUTPUT_RESERVE)
+        estimatedUsage(request, '').inputTokens +
+        (request.maxOutputTokens ?? DEFAULT_OUTPUT_RESERVE)
       const reserved = await reserveBudget(sql, {
         spaceId,
         messageId: input.assistantMessageId,

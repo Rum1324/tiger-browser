@@ -15,17 +15,30 @@ export function defaultSettings(systemLocale: string, serverUrl: string): Settin
   }
 }
 
-/** Host suffixes are compared lower-case without a leading dot or scheme; blanks are dropped. */
+/**
+ * The member's blocked hosts in the form capture eligibility compares against `URL.hostname`:
+ * lower-case, punycode for internationalised names (社内.example.jp → xn--…), no scheme, port, user
+ * info, path or surrounding dots. A leading `*.` means the domain and its subdomains, which is how
+ * every entry already matches. Entries that are not host names are dropped, so the list shown back
+ * to the member is exactly what is enforced.
+ */
 export function normalizeBlockedHosts(hosts: readonly string[]): string[] {
   const out = new Set<string>()
   for (const raw of hosts) {
-    const h = raw
+    const text = raw
       .trim()
-      .toLowerCase()
-      .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
-      .replace(/[/?#].*$/, '')
-      .replace(/^\.+|\.+$/g, '')
-    if (h) out.add(h)
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+      .replace(/^\*\./, '')
+    if (!text) continue
+    let host: string
+    try {
+      // The URL parser applies IDNA (punycode, full-width to ASCII) and drops port and user info.
+      host = new URL(`http://${text}`).hostname
+    } catch {
+      continue
+    }
+    host = host.replace(/^\.+|\.+$/g, '')
+    if (/^\[[0-9a-f:.]+\]$/.test(host) || /^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(host)) out.add(host)
   }
   return [...out]
 }
@@ -42,7 +55,9 @@ export class SettingsStore {
     private readonly kv: KvStore,
     private readonly defaults: Settings,
   ) {
-    this.current = this.load()
+    const loaded = this.load()
+    // Entries saved by a build that stored them as typed are enforced in the normalised form too.
+    this.current = { ...loaded, userBlockedHosts: normalizeBlockedHosts(loaded.userBlockedHosts) }
   }
 
   get(): Settings {

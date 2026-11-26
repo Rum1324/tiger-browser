@@ -108,7 +108,9 @@ function extractLive(
   maxChars: number,
 ): Extraction | null {
   const ctx = createContext(baseUrl(doc, url), { deadline, maxChars })
-  ctx.skip = liveSkipFilter(doc, deadline)
+  const filter = liveSkipFilter(doc, deadline)
+  ctx.skip = filter.skip
+  ctx.skipText = filter.skipText
   const meta = readMeta(doc)
   const markdown = elementToMarkdown(landmarkOf(doc), ctx)
   return finish(ctx, {

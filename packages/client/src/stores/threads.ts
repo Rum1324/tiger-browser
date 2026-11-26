@@ -255,6 +255,8 @@ export function createThreads(
   /** Failures reported before their placeholder message reached this client: id → partial text. */
   const pendingFailures = new Map<string, string>()
   let attachRun = 0
+  /** Threads with a post in flight: a second send (double Enter) would post the message twice. */
+  const posting = new Set<string>()
 
   function dropStream(messageId: string): StreamBuffer | undefined {
     const buf = streams.get(messageId)
@@ -576,21 +578,32 @@ export function createThreads(
         })
         return null
       }
+      if (posting.has(threadId)) return null
       const model = opts.askAi ? (opts.model ?? deps.modelForMessage()) : null
-      const r = await mutate(() =>
-        ctx.api.call(api.postMessage, {
-          params: { threadId },
-          body: {
-            content,
-            askAi: opts.askAi,
-            ...(model ? { model } : {}),
-            ...(attachments.length ? { attachments } : {}),
-          },
-        }),
-      )
+      posting.add(threadId)
+      let r: Awaited<ReturnType<ThreadsController['post']>>
+      try {
+        r = await mutate(() =>
+          ctx.api.call(api.postMessage, {
+            params: { threadId },
+            body: {
+              content,
+              askAi: opts.askAi,
+              ...(model ? { model } : {}),
+              ...(attachments.length ? { attachments } : {}),
+            },
+          }),
+        )
+      } finally {
+        posting.delete(threadId)
+      }
       if (!r) return null
-      const { [threadId]: _sent, ...drafts } = store.getState().drafts
-      store.setState({ drafts })
+      // Only the pages that went out leave the draft; one attached while sending stays for the next.
+      const sent = new Set(attachments)
+      const all = store.getState().drafts
+      const left = (all[threadId] ?? []).filter((p) => !sent.has(p))
+      const { [threadId]: _sent, ...rest } = all
+      store.setState({ drafts: left.length ? { ...rest, [threadId]: left } : rest })
       if (!store.getState().messages[threadId]) {
         setMessages(threadId, { list: [], load: IDLE, hasMore: false })
       }
@@ -761,6 +774,7 @@ export function createThreads(
 
     reset() {
       for (const id of [...streams.keys()]) dropStream(id)
+      posting.clear()
       failures.clear()
       settled.clear()
       pendingFailures.clear()

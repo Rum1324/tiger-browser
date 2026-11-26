@@ -101,7 +101,11 @@ export class E5Embedder implements Embedder {
   }
 
   /** Runs `work` when the model is free and no batch of a higher-priority lane is waiting. */
-  private schedule<T>(lane: Lane, signal: AbortSignal | undefined, work: () => Promise<T>): Promise<T> {
+  private schedule<T>(
+    lane: Lane,
+    signal: AbortSignal | undefined,
+    work: () => Promise<T>,
+  ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (signal?.aborted) {
         reject(signal.reason)

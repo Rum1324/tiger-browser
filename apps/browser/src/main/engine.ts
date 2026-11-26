@@ -24,7 +24,7 @@ import {
 import { type CaptureDeps, captureTab, DomReply, type FetchedResource } from './capture'
 import { TAB_CAPTURE_REQUEST, TAB_CAPTURE_RESULT, TAB_NOTIFICATION_STATE } from './channels'
 import { createHandlers, type Handlers } from './commands'
-import { DownloadManager } from './downloads'
+import { DownloadManager, type DownloadScope } from './downloads'
 import { devServerUrl, env } from './env'
 import { fetchingOpener, googleConfigFromEnv, wantsFetchOpener } from './google/config'
 import { GoogleService } from './google/service'
@@ -35,13 +35,13 @@ import { registerUiProtocol, serverConnectSources, UI_ORIGIN } from './protocol'
 import { isWebUrl } from './resolve-input'
 import { BookmarkStore } from './store/bookmarks'
 import { KvStore, openDatabase } from './store/db'
-import { HistoryStore } from './store/history'
+import { HistoryStore, isNewVisit } from './store/history'
 import {
   MemoryPermissionStore,
   type PermissionDecisions,
   PermissionStore,
 } from './store/permissions'
-import { SessionRestoreStore } from './store/session-restore'
+import { type RestoredWindow, SessionRestoreStore } from './store/session-restore'
 import { defaultSettings, SettingsStore } from './store/settings'
 import { type Cipher, TokenStore } from './store/token'
 import type { TabController } from './tab'
@@ -88,6 +88,7 @@ export class Engine {
   readonly tabSession: Session
   private readonly persistentDecisions: PermissionStore
   private readonly sessionDecisions = new WeakMap<Session, PermissionDecisions>()
+  private readonly privateScopes = new Map<EngineWindow, string>()
   readonly userAgent: string
   readonly devToolsAllowed = !app.isPackaged
   private readonly handlers: Handlers
@@ -112,7 +113,13 @@ export class Engine {
     })
     this.downloads = new DownloadManager(
       () => env.downloadsDir ?? app.getPath('downloads'),
-      (list) => this.broadcast('downloads.changed', list),
+      (scope, list) => {
+        // A private window's downloads go to that window only; the shared list to normal windows.
+        for (const win of this.windows.values()) {
+          if (!win.closed && this.downloadScopeOf(win) === scope)
+            win.emit('downloads.changed', list)
+        }
+      },
     )
     this.userAgent = chromeLikeUserAgent(app.userAgentFallback)
     app.userAgentFallback = this.userAgent
@@ -120,7 +127,7 @@ export class Engine {
     this.uiSession = session.fromPartition(UI_PARTITION)
     this.hardenUiSession(this.uiSession)
     this.tabSession = session.fromPartition(TAB_PARTITION)
-    this.hardenTabSession(this.tabSession, this.persistentDecisions)
+    this.hardenTabSession(this.tabSession, this.persistentDecisions, null)
 
     this.handlers = createHandlers(this)
     this.wireIpc()
@@ -210,7 +217,11 @@ export class Engine {
     }
   }
 
-  hardenTabSession(ses: Session, decisions: PermissionDecisions): void {
+  hardenTabSession(
+    ses: Session,
+    decisions: PermissionDecisions,
+    downloadScope: DownloadScope,
+  ): void {
     this.sessionDecisions.set(ses, decisions)
     ses.setUserAgent(this.userAgent)
     ses.setPermissionRequestHandler((wc, permission, callback, details) => {
@@ -257,28 +268,44 @@ export class Engine {
         .catch(() => callback(null))
     })
     ses.webRequest.onBeforeRequest({ urls: ['file://*/*'] }, (_d, cb) => cb({ cancel: true }))
-    this.downloads.attach(ses)
+    this.downloads.attach(ses, downloadScope)
+  }
+
+  /** Which downloads a window lists: its own private ones, or the shared normal-window ones. */
+  downloadScopeOf(win: EngineWindow): DownloadScope {
+    return this.privateScopes.get(win) ?? null
   }
 
   // ── Windows ──────────────────────────────────────────────────────────────
 
   createWindow(opts: { private?: boolean; restore?: boolean } = {}): EngineWindow {
+    const saved = opts.restore && !opts.private ? this.sessionRestore.load() : []
+    const win = this.openWindow(opts.private ?? false, saved[0] ?? null)
+    // Every other window of the last session reopens too, in the order they were opened.
+    for (const extra of saved.slice(1)) this.openWindow(false, extra)
+    if (saved.length > 1) win.base.focus()
+    return win
+  }
+
+  private openWindow(isPrivate: boolean, restore: RestoredWindow | null): EngineWindow {
     let ses = this.tabSession
     let decisions: PermissionDecisions = this.persistentDecisions
-    if (opts.private) {
+    let scope: string | null = null
+    if (isPrivate) {
       // No "persist:" prefix: an in-memory partition that dies with the window.
-      ses = session.fromPartition(`private-${randomUUID()}`)
+      scope = `private-${randomUUID()}`
+      ses = session.fromPartition(scope)
       decisions = new MemoryPermissionStore()
-      this.hardenTabSession(ses, decisions)
+      this.hardenTabSession(ses, decisions, scope)
     }
-    const win = new EngineWindow(this, opts.private ?? false, ses, decisions)
+    const win = new EngineWindow(this, isPrivate, ses, decisions)
+    if (scope) this.privateScopes.set(win, scope)
     this.windows.set(win.id, win)
     this.uiOwners.set(win.uiWc.id, win)
     this.uiOwners.set(win.overlayWc.id, win)
     if (!win.isPrivate) this.lastNormalWindow = win
 
-    const saved = opts.restore && !win.isPrivate ? this.sessionRestore.load() : null
-    if (saved?.tabs.length) win.restore(saved.tabs, saved.activeIndex)
+    if (restore?.tabs.length) win.restore(restore.tabs, restore.activeIndex)
     else win.createTab({})
     return win
   }
@@ -287,25 +314,35 @@ export class Engine {
     if (!win.isPrivate) this.lastNormalWindow = win
   }
 
-  /** Session restore follows the most recently focused normal window. */
+  /** Session restore covers every open normal window; changes are saved after a short pause. */
   windowTabsChanged(win: EngineWindow): void {
-    if (win.isPrivate || win !== this.lastNormalWindow) return
+    if (win.isPrivate) return
     if (this.restoreTimer) clearTimeout(this.restoreTimer)
-    this.restoreTimer = setTimeout(() => this.saveSession(win), 300)
+    this.restoreTimer = setTimeout(() => this.saveSession(), 300)
   }
 
-  saveSession(win: EngineWindow | null = this.lastNormalWindow): void {
+  /** Save the open normal windows (or exactly `only`, for the last window as it closes). */
+  saveSession(only?: EngineWindow, except?: EngineWindow): void {
     if (this.restoreTimer) clearTimeout(this.restoreTimer)
     this.restoreTimer = null
-    if (!win || win.isPrivate || win.closed || this.quitting) return
-    const tabs = win.tabs.map((t) => ({
-      url: t.displayUrl(),
-      title: t.title,
-      pinned: t.pinned,
-      spaceId: t.spaceId,
-    }))
-    const active = win.tabs.findIndex((t) => t.id === win.activeTabId)
-    this.sessionRestore.save(tabs, active === -1 ? null : active)
+    if (this.quitting) return
+    const wins = only
+      ? [only]
+      : [...this.windows.values()].filter((w) => !w.isPrivate && !w.closed && w !== except)
+    this.sessionRestore.save(
+      wins.map((win) => {
+        const active = win.tabs.findIndex((t) => t.id === win.activeTabId)
+        return {
+          tabs: win.tabs.map((t) => ({
+            url: t.displayUrl(),
+            title: t.title,
+            pinned: t.pinned,
+            spaceId: t.spaceId,
+          })),
+          activeIndex: active === -1 ? null : active,
+        }
+      }),
+    )
   }
 
   /** Save the session once; windows closing during shutdown must not overwrite it. */
@@ -318,16 +355,25 @@ export class Engine {
   windowClosing(win: EngineWindow): void {
     if (win.isPrivate || this.quitting) return
     const others = [...this.windows.values()].filter((w) => w !== win && !w.isPrivate && !w.closed)
-    // The last normal window to close is the one restored next time.
+    // The last normal window to close is the one restored next time; a window closed while others
+    // stay open is not.
     if (others.length === 0) this.saveSession(win)
-    else if (this.lastNormalWindow === win)
-      this.lastNormalWindow = others[others.length - 1] ?? null
+    else {
+      this.saveSession(undefined, win)
+      if (this.lastNormalWindow === win) this.lastNormalWindow = others[others.length - 1] ?? null
+    }
   }
 
   windowClosed(win: EngineWindow): void {
     this.windows.delete(win.id)
     for (const [id, owner] of this.uiOwners) if (owner === win) this.uiOwners.delete(id)
     if (this.lastNormalWindow === win) this.lastNormalWindow = null
+    const scope = this.privateScopes.get(win)
+    if (scope) {
+      // Listed nowhere once the window is gone; the files stay on disk.
+      this.downloads.dropScope(scope)
+      this.privateScopes.delete(win)
+    }
     if (win.isPrivate) {
       // In-memory already; clearing makes sure nothing outlives the window even within this run.
       win.tabSession.clearStorageData().catch(() => {})
@@ -358,8 +404,18 @@ export class Engine {
 
   // ── History ──────────────────────────────────────────────────────────────
 
-  recordVisit(tab: TabController, url: string): void {
+  /**
+   * A main-frame navigation commit. A same-document change (pushState, #fragment) is a visit only
+   * when the path or query changed; otherwise it at most renames the page.
+   */
+  recordVisit(
+    tab: TabController,
+    url: string,
+    previousUrl: string | null,
+    sameDocument: boolean,
+  ): void {
     if (tab.window.isPrivate || !isWebUrl(url)) return
+    if (sameDocument && !isNewVisit(previousUrl, url)) return
     this.history.recordVisit(url, tab.title)
   }
 
@@ -417,7 +473,11 @@ export class Engine {
     mode: 'export' | 'displayed-copy',
   ): Promise<FetchedResource> {
     if (mode === 'displayed-copy') return this.readDisplayedCopy(ses, url)
-    const res = await ses.fetch(url, { credentials: 'include', redirect: 'follow', cache: 'no-store' })
+    const res = await ses.fetch(url, {
+      credentials: 'include',
+      redirect: 'follow',
+      cache: 'no-store',
+    })
     const length = Number(res.headers.get('content-length') ?? 0)
     if (length > MAX_FETCH_BYTES) throw new Error('resource too large')
     const body = new Uint8Array(await res.arrayBuffer())

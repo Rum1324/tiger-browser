@@ -123,3 +123,53 @@ describe('persistence across restart', () => {
     }
   })
 })
+
+describe('session restore with several windows', () => {
+  it('reopens every normal window with its tabs, not only the one focused last', async () => {
+    const profile = tempDir('persist-multi')
+    try {
+      const a = await launch({ userDataDir: profile })
+      const first = (await a.tabsState()).tabs[0]?.id as string
+      await a.invoke('tabs.navigate', { tabId: first, input: url('/one') })
+      await waitForTab(a, first, (x) => x.title === 'Page One' && !x.isLoading, 'one')
+      const two = await a.invoke('tabs.create', { input: url('/two') })
+      await waitForTab(a, two.id, (x) => x.title === 'Page Two' && !x.isLoading, 'two')
+      // A second, smaller window opened last (so it is the focused one at quit).
+      await a.invoke('window.create', {})
+      const second = await waitFor(() => a.uiPages()[1], 15_000, 'second window')
+      await second.waitForFunction(() => typeof window.tiger?.invoke === 'function')
+      const lone = (await a.tabsState(second)).tabs[0]?.id as string
+      await a.invokeFrom(second, 'tabs.navigate', { tabId: lone, input: url('/probe') })
+      await waitForTab(a, lone, (x) => x.title === 'Probe' && !x.isLoading, 'probe', second)
+      await a.close()
+
+      const b = await launch({ userDataDir: profile })
+      try {
+        const windows = await waitFor(
+          async () => {
+            const pages = b.uiPages()
+            if (pages.length !== 2) return null
+            const states = await Promise.all(
+              pages.map((p) =>
+                p
+                  .waitForFunction(() => typeof window.tiger?.invoke === 'function')
+                  .then(() => b.tabsState(p)),
+              ),
+            )
+            return states.every((st) => st.tabs.every((x) => x.url)) ? states : null
+          },
+          20_000,
+          'two restored windows',
+        )
+        const urls = windows
+          .map((w) => w.tabs.map((x) => x.url))
+          .sort((x, y) => y.length - x.length)
+        expect(urls).toEqual([[url('/one'), url('/two')], [url('/probe')]])
+      } finally {
+        await b.close()
+      }
+    } finally {
+      removeDir(profile)
+    }
+  })
+})

@@ -173,24 +173,47 @@ function hostMatches(host: string, suffix: string): boolean {
   return host === suffix || host.endsWith(`.${suffix}`)
 }
 
-function isLocalNetworkHost(host: string): boolean {
-  if (host === 'localhost' || host.endsWith('.localhost')) return true
-  if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')) return true
-  if (host.startsWith('[')) {
-    const v6 = host.slice(1, -1).toLowerCase()
-    return v6 === '::1' || v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('fe80')
-  }
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
-  if (!m) return false
-  const a = Number(m[1])
-  const b = Number(m[2])
+function isPrivateIpv4(a: number, b: number): boolean {
   return (
+    a === 0 ||
     a === 10 ||
     a === 127 ||
+    // Carrier-grade NAT, which is also where Tailscale puts its nodes.
+    (a === 100 && b >= 64 && b <= 127) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
     (a === 169 && b === 254)
   )
+}
+
+const LOCAL_SUFFIXES = [
+  '.local',
+  '.internal',
+  '.lan',
+  '.home.arpa',
+  '.ts.net',
+  '.intranet',
+  '.corp',
+]
+
+function isLocalNetworkHost(host: string): boolean {
+  if (host === 'localhost' || host.endsWith('.localhost')) return true
+  if (LOCAL_SUFFIXES.some((suffix) => host.endsWith(suffix))) return true
+  if (host.startsWith('[')) {
+    const v6 = host.slice(1, -1).toLowerCase()
+    if (v6 === '::' || v6 === '::1') return true
+    // IPv4-mapped addresses: the URL parser turns ::ffff:192.168.1.1 into ::ffff:c0a8:101.
+    const mapped = /^::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(v6)
+    if (mapped) {
+      const high = Number.parseInt(mapped[1] ?? '0', 16)
+      return isPrivateIpv4(high >> 8, high & 0xff)
+    }
+    return v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('fe80')
+  }
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+  if (m) return isPrivateIpv4(Number(m[1]), Number(m[2]))
+  // A host with no dot resolves only on a local network (an intranet wiki at http://wiki/).
+  return !host.includes('.')
 }
 
 const blocked = (reason: CaptureBlockReason, rule: string): CaptureEligibility => ({

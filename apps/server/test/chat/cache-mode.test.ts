@@ -24,7 +24,14 @@ afterAll(async () => {
 async function lastRequest(c: ChatHarness) {
   const { h } = c
   const { owner, space } = await spaceWithMembers(h, 'Cache')
-  await shareSettled(h, owner.token, space.id, 'https://example.com/c', 'C', '# C\n\nThe launch is in May.')
+  await shareSettled(
+    h,
+    owner.token,
+    space.id,
+    'https://example.com/c',
+    'C',
+    '# C\n\nThe launch is in May.',
+  )
   const thread = await h.ok(
     'createThread',
     { params: { spaceId: space.id }, body: { visibility: 'space' } },

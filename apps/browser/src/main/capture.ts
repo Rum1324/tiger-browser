@@ -100,7 +100,8 @@ function isGoogleSignIn(url: string): boolean {
 /** Why a Google export did not yield the document, in words the UI can show. */
 function googleExportFailure(responses: readonly GoogleExportResponse[]): string {
   for (const res of responses) {
-    if (res.finalUrl && isGoogleSignIn(res.finalUrl)) return 'google-export: not signed in to this account'
+    if (res.finalUrl && isGoogleSignIn(res.finalUrl))
+      return 'google-export: not signed in to this account'
     if (res.status === 401 || res.status === 403)
       return `google-export: HTTP ${res.status} (export or download disabled for this account)`
     if (res.status === 404) return 'google-export: HTTP 404 (not found for this account)'

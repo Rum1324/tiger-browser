@@ -231,15 +231,29 @@ function estimateContext(sources: ContextSource[]): number {
   return sources.reduce((sum, s) => sum + SOURCE_OVERHEAD_TOKENS + estimateTokens(s.text), 0)
 }
 
+/** A source's own block tags cannot be written by its text; deterministic, so caching holds. */
+function defuseSourceTags(text: string): string {
+  return text.replace(/<(\/?)(source)/gi, '<$1\u200b$2')
+}
+
+/** One line: a newline in a title or name could otherwise start a forged header line. */
+function oneLine(text: string): string {
+  return defuseSourceTags(text.replace(/\s+/g, ' ').trim())
+}
+
 /**
  * Deterministic prompt text for the sources: the same sources always give the same bytes. Nothing in
  * it depends on the question or the time of the request.
+ *
+ * Each source is a `<source n="k">` block whose header (title, URL, type, sharer) is the first lines
+ * after the opening tag. Page text can neither open nor close a block, and header fields are single
+ * lines, so a page cannot pass off text of its own as another numbered source.
  */
 export function renderContext(context: Pick<BuiltContext, 'sources'>): string {
   return context.sources
     .map((s) => {
-      const header = `[${s.n}] ${s.title}\nURL: ${s.url}\nType: ${s.sourceType}; shared by ${s.sharedBy.name} on ${s.sharedAt.slice(0, 10)}`
-      return `${header}\n\n${s.text}`
+      const header = `[${s.n}] ${oneLine(s.title)}\nURL: ${oneLine(s.url)}\nType: ${s.sourceType}; shared by ${oneLine(s.sharedBy.name)} on ${s.sharedAt.slice(0, 10)}`
+      return `<source n="${s.n}">\n${header}\n\n${defuseSourceTags(s.text)}\n</source>`
     })
-    .join('\n\n---\n\n')
+    .join('\n\n')
 }

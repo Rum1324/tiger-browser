@@ -2,7 +2,10 @@ import { z } from 'zod'
 import { isWebUrl } from '../resolve-input'
 import type { KvStore } from './db'
 
-const KEY = 'session.lastWindow'
+/** Every normal window, in the order they were opened. */
+const KEY = 'session.windows'
+/** The single-window document written by earlier builds; read when the new one is absent. */
+const LEGACY_KEY = 'session.lastWindow'
 
 export const RestoredTab = z.object({
   url: z.string(),
@@ -19,37 +22,52 @@ export const RestoredWindow = z.object({
 })
 export type RestoredWindow = z.infer<typeof RestoredWindow>
 
+const RestoredSession = z.object({ windows: z.array(RestoredWindow), savedAt: z.string() })
+
+export interface WindowSnapshot {
+  tabs: readonly RestoredTab[]
+  activeIndex: number | null
+}
+
 /**
- * The last normal window's tabs, restored at the next launch. Private windows are never written
- * here; tabs that never left the new-tab page (or hold a non-web URL) are dropped.
+ * The normal windows' tabs, restored at the next launch. Private windows are never written here;
+ * tabs that never left the new-tab page (or hold a non-web URL) are dropped, and so is a window left
+ * with no tab.
  */
 export class SessionRestoreStore {
   constructor(private readonly kv: KvStore) {}
 
-  save(tabs: readonly RestoredTab[], activeIndex: number | null): void {
-    const kept: RestoredTab[] = []
-    let active: number | null = null
-    tabs.forEach((tab, i) => {
-      if (!isWebUrl(tab.url)) return
-      if (i === activeIndex) active = kept.length
-      kept.push(tab)
-    })
-    const doc: RestoredWindow = {
-      tabs: kept,
-      activeIndex: active ?? (kept.length ? kept.length - 1 : null),
-      savedAt: new Date().toISOString(),
+  save(windows: readonly WindowSnapshot[]): void {
+    const savedAt = new Date().toISOString()
+    const out: RestoredWindow[] = []
+    for (const w of windows) {
+      const kept: RestoredTab[] = []
+      let active: number | null = null
+      w.tabs.forEach((tab, i) => {
+        if (!isWebUrl(tab.url)) return
+        if (i === w.activeIndex) active = kept.length
+        kept.push(tab)
+      })
+      if (kept.length === 0) continue
+      out.push({ tabs: kept, activeIndex: active ?? kept.length - 1, savedAt })
     }
-    this.kv.set(KEY, JSON.stringify(doc))
+    this.kv.set(KEY, JSON.stringify({ windows: out, savedAt }))
   }
 
-  load(): RestoredWindow | null {
+  load(): RestoredWindow[] {
     const raw = this.kv.get(KEY)
-    if (!raw) return null
-    try {
-      const parsed = RestoredWindow.safeParse(JSON.parse(raw))
-      return parsed.success ? parsed.data : null
-    } catch {
-      return null
-    }
+    if (raw) return parse(raw, RestoredSession)?.windows ?? []
+    const legacy = this.kv.get(LEGACY_KEY)
+    const one = legacy ? parse(legacy, RestoredWindow) : null
+    return one?.tabs.length ? [one] : []
+  }
+}
+
+function parse<T>(raw: string, schema: z.ZodType<T>): T | null {
+  try {
+    const parsed = schema.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
   }
 }

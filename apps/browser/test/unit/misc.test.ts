@@ -77,6 +77,7 @@ describe('menus', () => {
       forward: noop,
       zoom: noop,
       toggleDevTools: noop,
+      toggleFullscreen: noop,
     })
     const all = template.flatMap((m) => (Array.isArray(m.submenu) ? m.submenu : []))
     const ids = all.map((i) => i.id).filter((id): id is string => !!id?.startsWith('shortcut:'))

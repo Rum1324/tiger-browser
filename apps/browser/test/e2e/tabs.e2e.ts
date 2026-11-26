@@ -260,3 +260,86 @@ describe('tab lifecycle and navigation state', () => {
     await t.invoke('window.action', { action: 'toggle-fullscreen' })
   })
 })
+
+describe('HTML fullscreen', () => {
+  const winState = () =>
+    t.app.evaluate(({ BaseWindow }) => {
+      const win = BaseWindow.getAllWindows()[0]
+      const views = win?.contentView.children ?? []
+      const tab = views.slice(1, -1).find((v) => v.getVisible())
+      const c = win?.getContentBounds()
+      return {
+        fullscreen: win?.isFullScreen() ?? false,
+        tab: tab?.getBounds() ?? null,
+        content: c ? { width: c.width, height: c.height } : null,
+      }
+    })
+  const coversWindow = (s: Awaited<ReturnType<typeof winState>>) =>
+    s.tab !== null &&
+    s.tab.x === 0 &&
+    s.tab.y === 0 &&
+    s.tab.width === s.content?.width &&
+    s.tab.height === s.content?.height
+  const enterHtmlFullscreen = async (path: string) => {
+    await t.app.evaluate(async ({ webContents }, u) => {
+      const wc = webContents.getAllWebContents().find((w) => w.getURL() === u)
+      await wc?.executeJavaScript('document.documentElement.requestFullscreen()', true)
+    }, url(path))
+    return waitFor(
+      async () => {
+        const s = await winState()
+        return s.fullscreen && coversWindow(s) ? s : null
+      },
+      10_000,
+      'html fullscreen',
+    )
+  }
+  const openTab = async (path: string, title: string) => {
+    const tab = await t.invoke('tabs.create', { input: url(path) })
+    await waitForTab(t, tab.id, (x) => x.title === title && !x.isLoading, title)
+    return tab
+  }
+
+  it('switching tabs leaves HTML fullscreen instead of stretching the other page over the UI', async () => {
+    const a = await openTab('/one', 'Page One')
+    const b = await openTab('/two', 'Page Two')
+    await t.invoke('tabs.activate', { tabId: a.id })
+    await enterHtmlFullscreen('/one')
+    await t.invoke('tabs.activate', { tabId: b.id })
+    const after = await waitFor(
+      async () => {
+        const s = await winState()
+        return !s.fullscreen ? s : null
+      },
+      10_000,
+      'fullscreen left on tab switch',
+    )
+    expect(coversWindow(after)).toBe(false)
+    await t.invoke('tabs.close', { tabId: a.id })
+    await t.invoke('tabs.close', { tabId: b.id })
+  })
+
+  it('closing the fullscreen tab leaves window fullscreen too', async () => {
+    const a = await openTab('/one', 'Page One')
+    await enterHtmlFullscreen('/one')
+    await t.invoke('tabs.close', { tabId: a.id })
+    await waitFor(async () => !(await winState()).fullscreen, 10_000, 'window fullscreen left')
+  })
+
+  it('leaving HTML fullscreen keeps a window fullscreen the member chose before', async () => {
+    const a = await openTab('/one', 'Page One')
+    await t.invoke('window.action', { action: 'toggle-fullscreen' })
+    await waitFor(async () => (await winState()).fullscreen, 10_000, 'window fullscreen')
+    await enterHtmlFullscreen('/one')
+    await t.app.evaluate(async ({ webContents }, u) => {
+      const wc = webContents.getAllWebContents().find((w) => w.getURL() === u)
+      await wc?.executeJavaScript('document.exitFullscreen()', true)
+    }, url('/one'))
+    await waitFor(async () => !coversWindow(await winState()), 10_000, 'page back in its slot')
+    await new Promise((r) => setTimeout(r, 500))
+    expect((await winState()).fullscreen).toBe(true)
+    await t.invoke('window.action', { action: 'toggle-fullscreen' })
+    await waitFor(async () => !(await winState()).fullscreen, 10_000, 'window fullscreen off')
+    await t.invoke('tabs.close', { tabId: a.id })
+  })
+})

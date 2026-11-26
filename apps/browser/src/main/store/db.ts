@@ -37,6 +37,10 @@ const MIGRATIONS: readonly string[] = [
     value TEXT NOT NULL
   );
   `,
+  // Suggestions read the most visited pages through this index instead of scanning the table.
+  `
+  CREATE INDEX history_visits ON history (visit_count DESC, last_visited_at DESC);
+  `,
 ]
 
 export function openDatabase(path: string): DatabaseSync {

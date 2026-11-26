@@ -46,6 +46,7 @@ function installMenu(e: Engine): void {
           if (!e.devToolsAllowed) return
           activeTab()?.wc.toggleDevTools()
         },
+        toggleFullscreen: () => e.focusedWindow()?.toggleFullscreen(),
       }),
     ),
   )

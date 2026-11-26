@@ -190,6 +190,31 @@ describe('downloads', () => {
     await t.invoke('downloads.clear')
     expect(await t.invoke('downloads.list')).toEqual([])
   })
+
+  it("lists a private window's download only in that window, and forgets it when it closes", async () => {
+    const before = t.uiPages().length
+    await t.invoke('window.create', { private: true })
+    const priv = await waitFor(() => t.uiPages()[before], 15_000, 'private window UI')
+    await priv.waitForFunction(() => typeof window.tiger?.invoke === 'function')
+    await t.invokeFrom(priv, 'tabs.create', { input: url('/file.txt') })
+    const done = await waitFor(
+      async () => {
+        const list = await t.invokeFrom(priv, 'downloads.list')
+        return list.find((d) => d.state === 'completed') ?? null
+      },
+      15_000,
+      'private download completed',
+    )
+    expect(existsSync(done.savePath as string)).toBe(true)
+    expect((await t.invoke('downloads.list')).some((d) => d.id === done.id)).toBe(false)
+    const seen = await events<Download[]>('downloads.changed')
+    expect(seen.flat().some((d) => d.id === done.id)).toBe(false)
+    await t.invokeFrom(priv, 'window.action', { action: 'close' }).catch(() => {})
+    await waitFor(() => t.uiPages().length === before, 10_000, 'private window closed')
+    expect((await t.invoke('downloads.list')).some((d) => d.id === done.id)).toBe(false)
+    // The file itself stays where it was saved.
+    expect(existsSync(done.savePath as string)).toBe(true)
+  })
 })
 
 describe('permissions', () => {

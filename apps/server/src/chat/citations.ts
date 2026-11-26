@@ -53,7 +53,13 @@ function splitCode(text: string): { text: string; code: boolean }[] {
 }
 
 /** True when an ASCII-bracket match at `offset` directly follows a Latin word character. */
-function isIndex(match: string, lead: string, offset: number, all: string, before: string): boolean {
+function isIndex(
+  match: string,
+  lead: string,
+  offset: number,
+  all: string,
+  before: string,
+): boolean {
   if (lead || !match.startsWith('[')) return false
   const prev = offset > 0 ? [...all.slice(0, offset)].at(-1) : [...before].at(-1)
   return prev !== undefined && INDEX_BEFORE.test(prev) && !CJK.test(prev)

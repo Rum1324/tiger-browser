@@ -154,7 +154,8 @@ export async function createInvite(
       spaceId,
       actor: userRef(user.id, user.name, user.avatarUrl),
       action: 'member.invited',
-      target: { type: 'member', id, title: email, url: null },
+      // Every member reads the audit log; invitee emails are for owners (see getSpaceDetail).
+      target: { type: 'member', id, title: null, url: null },
     })
   })
   ctx.hub.publishToSpace(spaceId, { type: 'audit.appended', event })
@@ -198,6 +199,12 @@ export async function acceptInvite(ctx: AppContext, user: User, token: string): 
     const inv = rows[0]
     if (!inv) throw notFound('invite_not_found', 'Invite')
     if (inv.revoked_at) throw new AppError(410, 'invite_revoked', 'This invite was revoked')
+    const already = await tx`
+      select 1 from space_members where space_id = ${inv.space_id} and user_id = ${user.id}
+    `
+    // A member opening a link to their own Space must not burn the invite meant for someone else,
+    // and the second request of a double-click finds the first one's membership: both get the Space.
+    if (already.length > 0) return { spaceId: inv.space_id, event: null }
     if (inv.accepted_at) throw new AppError(410, 'invite_used', 'This invite was already used')
     if (inv.expired) throw new AppError(410, 'invite_expired', 'This invite has expired')
     if (inv.email && inv.email.toLowerCase() !== user.email.toLowerCase()) {
@@ -207,14 +214,14 @@ export async function acceptInvite(ctx: AppContext, user: User, token: string): 
         'This invite is for a different email address',
       )
     }
-    const already = await tx`
-      select 1 from space_members where space_id = ${inv.space_id} and user_id = ${user.id}
-    `
-    // A member opening a link to their own Space must not burn the invite meant for someone else.
-    if (already.length > 0) return { spaceId: inv.space_id, event: null }
-    await tx`
+    // Two different invites to this Space accepted at once: the second insert finds the first
+    // one's row (after it commits) and inserts nothing; that invite is left unused.
+    const joined = await tx`
       insert into space_members (space_id, user_id, role) values (${inv.space_id}, ${user.id}, 'member')
+      on conflict do nothing
+      returning user_id
     `
+    if (joined.length === 0) return { spaceId: inv.space_id, event: null }
     await tx`update invites set accepted_at = now(), accepted_by = ${user.id} where id = ${inv.id}`
     const event = await appendAudit(tx, {
       spaceId: inv.space_id,

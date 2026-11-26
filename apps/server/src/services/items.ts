@@ -85,7 +85,11 @@ export async function shareItem(
   await requireMember(sql, spaceId, user.id)
   assertCaptureAllowed(page.url)
   if (!ctx.shareLimiter.take(user.id)) {
-    throw new AppError(429, 'rate_limited', 'Too many shares in a short time; try again in a minute')
+    throw new AppError(
+      429,
+      'rate_limited',
+      'Too many shares in a short time; try again in a minute',
+    )
   }
 
   const urlKey = canonicalUrl(page.url)
@@ -115,7 +119,9 @@ export async function shareItem(
       // Lock the item row on its own: with a join, a waiter re-checks the join against the old
       // version after the holder commits and gets no row at all. The lock serialises concurrent
       // shares of the same page so version numbers cannot collide.
-      const [locked] = await tx<{ id: string; status: string; current_version_id: string | null }[]>`
+      const [locked] = await tx<
+        { id: string; status: string; current_version_id: string | null }[]
+      >`
         select id, status, current_version_id from items
         where space_id = ${spaceId} and url_key = ${urlKey}
         for update
@@ -128,12 +134,17 @@ export async function shareItem(
         select max(number)::int as max from item_versions where item_id = ${locked.id}
       `
       if (current && current.content_hash === hash) {
+        const reindex =
+          locked.status !== 'ready' &&
+          locked.current_version_id !== null &&
+          !isIndexing(ctx, locked.id, locked.current_version_id)
+        if (reindex) await tx`update items set status = 'indexing' where id = ${locked.id}`
         return {
           outcome: 'unchanged' as const,
           id: locked.id,
           versionId: null,
           event: null,
-          reindex: locked.status !== 'ready' ? (locked.current_version_id ?? null) : null,
+          reindex: reindex ? locked.current_version_id : null,
         }
       }
       outcome = 'version'
@@ -199,6 +210,13 @@ export async function reindexItem(ctx: AppContext, itemId: string): Promise<bool
   return true
 }
 
+/** Index runs in flight in this process, as `itemId:versionId`, per app instance. */
+const inFlight = new WeakMap<AppContext, Set<string>>()
+
+function isIndexing(ctx: AppContext, itemId: string, versionId: string): boolean {
+  return inFlight.get(ctx)?.has(`${itemId}:${versionId}`) ?? false
+}
+
 /**
  * Run the Indexer for one version in the background, then settle the item's status. A result for a
  * version that is no longer current is discarded: a newer share is already being indexed.
@@ -209,41 +227,62 @@ function startIndexing(
   versionId: string,
   page: Pick<ExtractedPage, 'url' | 'title' | 'sourceType' | 'markdown' | 'lang'>,
 ): void {
+  const key = `${item.id}:${versionId}`
+  let running = inFlight.get(ctx)
+  if (!running) {
+    running = new Set()
+    inFlight.set(ctx, running)
+  }
+  if (running.has(key)) return
+  running.add(key)
   ctx.background.run(`index ${item.id}`, async () => {
-    let ok = true
     try {
-      await ctx.indexer.index({
-        spaceId: item.spaceId,
-        itemId: item.id,
-        itemVersionId: versionId,
-        url: page.url,
-        title: page.title,
-        sourceType: page.sourceType,
-        markdown: page.markdown,
-        lang: page.lang,
-        signal: ctx.shutdown.signal,
-      })
-    } catch (err) {
-      // Stopped by shutdown: the item stays 'indexing' and the next start re-runs it.
-      if (ctx.shutdown.signal.aborted) return
-      ok = false
-      ctx.log.warn({ err, itemId: item.id }, 'indexing failed')
+      await indexAndSettle(ctx, item, versionId, page)
+    } finally {
+      running.delete(key)
     }
-    const updated = await ctx.sql.begin(async (tx) => {
-      const rows = await tx`
+  })
+}
+
+async function indexAndSettle(
+  ctx: AppContext,
+  item: Item,
+  versionId: string,
+  page: Pick<ExtractedPage, 'url' | 'title' | 'sourceType' | 'markdown' | 'lang'>,
+): Promise<void> {
+  let ok = true
+  try {
+    await ctx.indexer.index({
+      spaceId: item.spaceId,
+      itemId: item.id,
+      itemVersionId: versionId,
+      url: page.url,
+      title: page.title,
+      sourceType: page.sourceType,
+      markdown: page.markdown,
+      lang: page.lang,
+      signal: ctx.shutdown.signal,
+    })
+  } catch (err) {
+    // Stopped by shutdown: the item stays 'indexing' and the next start re-runs it.
+    if (ctx.shutdown.signal.aborted) return
+    ok = false
+    ctx.log.warn({ err, itemId: item.id }, 'indexing failed')
+  }
+  const updated = await ctx.sql.begin(async (tx) => {
+    const rows = await tx`
         update items set status = ${ok ? 'ready' : 'failed'}
         where id = ${item.id} and current_version_id = ${versionId}
         returning id
       `
-      if (rows.length === 0) return false
-      // Only the current version is chunked (see the schema); drop anything left from older ones.
-      await tx`delete from chunks where item_id = ${item.id} and item_version_id <> ${versionId}`
-      return true
-    })
-    if (!updated) return
-    const fresh = (await selectItems(ctx.sql, ctx.sql`i.id = ${item.id}`))[0]
-    if (fresh) ctx.hub.publishToSpace(item.spaceId, { type: 'item.upserted', item: toItem(fresh) })
+    if (rows.length === 0) return false
+    // Only the current version is chunked (see the schema); drop anything left from older ones.
+    await tx`delete from chunks where item_id = ${item.id} and item_version_id <> ${versionId}`
+    return true
   })
+  if (!updated) return
+  const fresh = (await selectItems(ctx.sql, ctx.sql`i.id = ${item.id}`))[0]
+  if (fresh) ctx.hub.publishToSpace(item.spaceId, { type: 'item.upserted', item: toItem(fresh) })
 }
 
 /**

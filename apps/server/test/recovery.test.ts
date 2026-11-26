@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app'
 import { newId } from '../src/ids'
-import { recoverInterruptedWork } from '../src/services/recovery'
 import type { Indexer, IndexInput } from '../src/seams'
+import { recoverInterruptedWork } from '../src/services/recovery'
 import { spaceWithMembers } from './helpers/fixtures'
 import { type Harness, page, startHarness } from './helpers/harness'
 
@@ -33,7 +33,10 @@ describe('work interrupted by a shutdown or crash', () => {
     const { owner, space } = await spaceWithMembers(h, 'Deploy')
     const shared = await h.ok(
       'shareItem',
-      { params: { spaceId: space.id }, body: { page: page('https://example.com/deploy', '# Deploy\n\nBody text.') } },
+      {
+        params: { spaceId: space.id },
+        body: { page: page('https://example.com/deploy', '# Deploy\n\nBody text.') },
+      },
       owner.token,
     )
     // A crashed answer: the row says streaming but no process holds its stream.
@@ -48,16 +51,25 @@ describe('work interrupted by a shutdown or crash', () => {
       values (${crashedId}, ${thread.id}, 'assistant', ${owner.user.id}, '', 'streaming')
     `
     await h.app.close()
-    const [afterClose] = await h.sql<{ status: string }[]>`select status from items where id = ${shared.item.id}`
+    const [afterClose] = await h.sql<
+      { status: string }[]
+    >`select status from items where id = ${shared.item.id}`
     expect(afterClose?.status).toBe('indexing')
 
     // Second instance on the same database.
-    const next = await buildApp({ sql: h.sql, config: h.config, logger: false, indexer: recordingIndexer })
+    const next = await buildApp({
+      sql: h.sql,
+      config: h.config,
+      logger: false,
+      indexer: recordingIndexer,
+    })
     try {
       await recoverInterruptedWork(next.tiger)
       await next.tiger.background.drain()
       expect(indexed.map((i) => i.itemId)).toContain(shared.item.id)
-      const [item] = await h.sql<{ status: string }[]>`select status from items where id = ${shared.item.id}`
+      const [item] = await h.sql<
+        { status: string }[]
+      >`select status from items where id = ${shared.item.id}`
       expect(item?.status).toBe('ready')
       const [msg] = await h.sql<{ status: string; error_code: string | null }[]>`
         select status, error_code from messages where id = ${crashedId}
@@ -77,7 +89,9 @@ describe('work interrupted by a shutdown or crash', () => {
       expect(res.json().outcome).toBe('unchanged')
       await next.tiger.background.drain()
       expect(indexed.map((i) => i.itemId)).toEqual([shared.item.id])
-      const [again] = await h.sql<{ status: string }[]>`select status from items where id = ${shared.item.id}`
+      const [again] = await h.sql<
+        { status: string }[]
+      >`select status from items where id = ${shared.item.id}`
       expect(again?.status).toBe('ready')
     } finally {
       await next.close()

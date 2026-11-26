@@ -262,3 +262,154 @@ describe('stream assembly', () => {
     expect(threads.store.getState().messages[THREAD]).toBeUndefined()
   })
 })
+
+describe('message lists fetched while an answer streams', () => {
+  /** A threads store whose listMessages answers are released by the test. */
+  function withServer() {
+    const replies: { resolve: (list: Message[]) => void }[] = []
+    const api: ApiClient = {
+      serverUrl: 'http://x.test',
+      call: (() =>
+        new Promise<Message[]>((resolve) => {
+          replies.push({ resolve })
+        })) as unknown as ApiClient['call'],
+    }
+    const ctx: ClientContext = { api, bridge: new FakeBridge(), userId: () => USER.id }
+    const t = createThreads(ctx, {
+      modelForMessage: () => null,
+      messagePosted: () => {},
+      answerFinished: () => {},
+    })
+    t.store.setState({ spaceId: SPACE, threads: [thread], messages: {} })
+    const v = (id: string) => t.store.getState().messages[THREAD]?.list.find((m) => m.id === id)
+    const d = (id: string, seq: number, text: string) => t.handleEvent(delta(id, seq, text))
+    return { t, replies, v, d }
+  }
+
+  it('opening a thread after some deltas arrived shows each delta once', async () => {
+    const s = withServer()
+    const m = placeholder()
+    s.d(m.id, 0, 'Hello ')
+    s.d(m.id, 1, 'world')
+    const loading = s.t.loadMessages(THREAD)
+    s.replies[0]?.resolve([{ ...m, content: 'Hello world' }])
+    await loading
+    expect(s.v(m.id)?.text).toBe('Hello world')
+    s.d(m.id, 2, '!')
+    expect(s.v(m.id)?.text).toBe('Hello world!')
+  })
+
+  it('deltas after a mid-stream load continue the text instead of waiting for completion', async () => {
+    const s = withServer()
+    const m = placeholder()
+    const loading = s.t.loadMessages(THREAD)
+    s.replies[0]?.resolve([{ ...m, content: 'Hello ' }])
+    await loading
+    expect(s.v(m.id)?.text).toBe('Hello ')
+    s.d(m.id, 1, 'world')
+    s.d(m.id, 2, '!')
+    expect(s.v(m.id)?.text).toBe('Hello world!')
+  })
+
+  // Known defect, deferred: a snapshot does not say which delta seq its text covers, so a delta it
+  // already contains that arrives after it is appended again. Needs `streamSeq` on the REST message
+  // (contract request). `it.fails` turns red once the contract lands and this passes.
+  it.fails('a delta the snapshot already covered, arriving after it over the socket, is not shown twice', async () => {
+    const s = withServer()
+    const m = placeholder()
+    const loading = s.t.loadMessages(THREAD)
+    s.replies[0]?.resolve([{ ...m, content: 'Hello world' }]) // covers seq 0 and 1
+    await loading
+    s.d(m.id, 1, 'world') // published before the snapshot was read, delivered after it
+    s.d(m.id, 2, '!')
+    expect(s.v(m.id)?.text).toBe('Hello world!')
+  })
+
+  it('a list fetched before the answer completed does not roll the completed answer back', async () => {
+    const s = withServer()
+    const m = placeholder()
+    s.t.store.setState({
+      messages: { [THREAD]: { list: [], load: { status: 'ready', error: null }, hasMore: false } },
+    })
+    s.t.handleEvent({ type: 'message.created', spaceId: SPACE, message: m })
+    s.d(m.id, 0, 'Full ans')
+    const loading = s.t.loadMessages(THREAD) // e.g. a resync after reconnect
+    s.t.handleEvent({
+      type: 'message.completed',
+      spaceId: SPACE,
+      message: { ...m, status: 'complete', content: 'Full answer.' },
+      usage: null,
+    })
+    s.replies[0]?.resolve([{ ...m, content: 'Full ans' }]) // the server's snapshot was taken earlier
+    await loading
+    expect(s.v(m.id)).toMatchObject({ phase: 'complete', text: 'Full answer.' })
+  })
+})
+
+describe('posting with attachments', () => {
+  const page = (n: number) => ({
+    url: `https://example.com/p${n}`,
+    title: `Page ${n}`,
+    sourceType: 'web' as const,
+    markdown: `Body ${n}`,
+    lang: 'en',
+    byline: null,
+    siteName: null,
+    extractor: 'readability@0.6',
+    capturedAt: now(),
+    charCount: 6,
+    truncated: false,
+  })
+  const priv: Thread = { ...thread, visibility: 'private' }
+
+  function withServer() {
+    const posts: { body: unknown; resolve: (r: unknown) => void }[] = []
+    const api: ApiClient = {
+      serverUrl: 'http://x.test',
+      call: ((_ep: unknown, req: { body: unknown }) =>
+        new Promise((resolve) => {
+          posts.push({ body: req.body, resolve })
+        })) as unknown as ApiClient['call'],
+    }
+    const ctx: ClientContext = { api, bridge: new FakeBridge(), userId: () => USER.id }
+    const t = createThreads(ctx, {
+      modelForMessage: () => null,
+      messagePosted: () => {},
+      answerFinished: () => {},
+    })
+    t.store.setState({
+      spaceId: SPACE,
+      threads: [priv],
+      messages: { [THREAD]: { list: [], load: { status: 'ready', error: null }, hasMore: false } },
+    })
+    const reply = () => ({
+      message: { ...placeholder(), role: 'user', status: 'complete', content: 'q' },
+      assistantMessage: null,
+    })
+    return { t, posts, reply }
+  }
+
+  it('keeps an attachment confirmed while the message was being sent', async () => {
+    const s = withServer()
+    s.t.store.setState({ drafts: { [THREAD]: [page(1)] } })
+    const sending = s.t.post(THREAD, 'q', { askAi: false })
+    // The member attaches page 2 while the POST is in flight.
+    s.t.store.setState({
+      drafts: { [THREAD]: [...(s.t.store.getState().drafts[THREAD] ?? []), page(2)] },
+    })
+    s.posts[0]?.resolve(s.reply())
+    await sending
+    expect(s.t.store.getState().drafts[THREAD]?.map((p) => p.title)).toEqual(['Page 2'])
+  })
+
+  it('a second post to the same thread while one is in flight sends nothing', async () => {
+    const s = withServer()
+    s.t.store.setState({ drafts: { [THREAD]: [page(1)] } })
+    const first = s.t.post(THREAD, 'q', { askAi: false })
+    const second = await s.t.post(THREAD, 'q', { askAi: false })
+    expect(second).toBeNull()
+    expect(s.posts).toHaveLength(1)
+    s.posts[0]?.resolve(s.reply())
+    expect(await first).not.toBeNull()
+  })
+})

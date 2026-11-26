@@ -28,6 +28,9 @@ let nextWindowId = 1
  * One browser window: the chrome UI view at the bottom, one view per tab above it, and the overlay
  * view on top. Tab state lives here; every command from this window's UI acts on this window.
  */
+/** An isolated world of our own for telling a page to leave fullscreen. */
+const EXIT_FULLSCREEN_WORLD = 1_004
+
 export class EngineWindow {
   readonly id = `w${nextWindowId++}`
   readonly base: BaseWindow
@@ -43,6 +46,11 @@ export class EngineWindow {
   private overlayBounds: Rect | null = null
   private readonly closedTabs: ClosedTab[] = []
   private htmlFullscreenTab: TabController | null = null
+  /**
+   * The window fullscreen the member chose (F11, the menu, the UI). HTML fullscreen is laid over it
+   * and, when it ends, the window returns to exactly this.
+   */
+  private memberFullscreen = false
   private emitScheduled = false
   closed = false
 
@@ -92,7 +100,11 @@ export class EngineWindow {
     b.on('maximize', () => this.emitWindowState())
     b.on('unmaximize', () => this.emitWindowState())
     b.on('enter-full-screen', () => this.emitWindowState())
-    b.on('leave-full-screen', () => this.emitWindowState())
+    b.on('leave-full-screen', () => {
+      // Left by the system (e.g. the macOS window button) while no page held fullscreen.
+      if (!this.htmlFullscreenTab) this.memberFullscreen = false
+      this.emitWindowState()
+    })
     b.on('closed', () => this.dispose())
 
     // The UI views hold the bridge: they must never show anything but our own UI. Links and
@@ -245,7 +257,7 @@ export class EngineWindow {
     }
     this.tabs.splice(index, 1)
     this.engine.unregisterTab(tab)
-    if (this.htmlFullscreenTab === tab) this.htmlFullscreenTab = null
+    if (this.htmlFullscreenTab === tab) this.releaseHtmlFullscreen(false)
     if (!this.closed) {
       try {
         this.base.contentView.removeChildView(tab.view)
@@ -265,6 +277,9 @@ export class EngineWindow {
 
   activate(tabId: string): void {
     this.getTab(tabId)
+    // HTML fullscreen belongs to the page that asked for it; another tab never inherits it.
+    if (this.htmlFullscreenTab && this.htmlFullscreenTab.id !== tabId)
+      this.releaseHtmlFullscreen(true)
     this.activeTabId = tabId
     this.layout()
     this.focusActive()
@@ -344,20 +359,57 @@ export class EngineWindow {
     else this.focusActive()
   }
 
+  /** The member's own fullscreen toggle. During HTML fullscreen it leaves fullscreen altogether. */
+  toggleFullscreen(): void {
+    if (this.htmlFullscreenTab) {
+      this.memberFullscreen = false
+      this.releaseHtmlFullscreen(true)
+      this.layout()
+      return
+    }
+    this.memberFullscreen = !this.base.isFullScreen()
+    this.base.setFullScreen(this.memberFullscreen)
+  }
+
   setHtmlFullscreen(tab: TabController, on: boolean): void {
-    this.htmlFullscreenTab = on
-      ? tab
-      : this.htmlFullscreenTab === tab
-        ? null
-        : this.htmlFullscreenTab
-    this.base.setFullScreen(on)
+    if (on) {
+      this.htmlFullscreenTab = tab
+      this.base.setFullScreen(true)
+      this.layout()
+      return
+    }
+    // A late "left" from a page whose fullscreen was already released changes nothing.
+    if (this.htmlFullscreenTab !== tab) return
+    this.releaseHtmlFullscreen(false)
     this.layout()
+  }
+
+  /**
+   * End HTML fullscreen on the engine side: the window returns to the fullscreen state the member had
+   * chosen before. `tellPage` also makes the page leave it (when another tab is activated); this runs
+   * in an isolated world, so the page cannot intercept the call.
+   */
+  private releaseHtmlFullscreen(tellPage: boolean): void {
+    const tab = this.htmlFullscreenTab
+    if (!tab) return
+    this.htmlFullscreenTab = null
+    if (!this.closed) this.base.setFullScreen(this.memberFullscreen)
+    if (tellPage && !tab.destroyed && !tab.wc.isDestroyed()) {
+      tab.wc
+        .executeJavaScriptInIsolatedWorld(
+          EXIT_FULLSCREEN_WORLD,
+          [{ code: 'document.fullscreenElement ? document.exitFullscreen() : undefined' }],
+          true,
+        )
+        .catch(() => {})
+    }
   }
 
   /** Where the active page view currently sits, in window content coordinates (null = hidden). */
   pageViewBounds() {
     const content = this.base.getContentBounds()
-    if (this.htmlFullscreenTab) return fullBounds(content)
+    if (this.htmlFullscreenTab && this.htmlFullscreenTab === this.activeTab())
+      return fullBounds(content)
     if (!this.pageBounds) return null
     return toViewBounds(this.pageBounds, this.uiZoom(), content)
   }

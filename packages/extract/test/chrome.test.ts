@@ -1,7 +1,9 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { build } from 'esbuild'
+import { JSDOM } from 'jsdom'
 import { type Browser, chromium, type Page } from 'playwright-core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { extractFromDocument } from '../src/index'
 
 /**
  * The extractor in a real Chromium with layout, which jsdom does not have: visibility that depends on
@@ -43,7 +45,9 @@ async function extract(html: string, opts: { live?: boolean } = {}): Promise<Res
   let body = html
   // Over 30,000 elements the extractor converts the live DOM instead of a clone.
   if (opts.live) body += `<div>${'<b></b>'.repeat(31_000)}</div>`
-  await page.setContent(`<!doctype html><html lang="en"><head><title>T</title></head><body>${body}</body></html>`)
+  await page.setContent(
+    `<!doctype html><html lang="en"><head><title>T</title></head><body>${body}</body></html>`,
+  )
   await page.evaluate(SHADOW_SETUP)
   await page.addScriptTag({ content: bundle })
   const r = await page.evaluate(() => {
@@ -161,4 +165,30 @@ describe.skipIf(!existsSync(CHROME))('extraction in Chromium (layout-dependent v
     expect(after.openShadow).toBeGreaterThan(0)
     expect(after.lightChildren).toBe(2)
   })
+
+  for (const name of [
+    'english-article.html',
+    'japanese-news.html',
+    'tables-code.html',
+    'hidden.html',
+  ]) {
+    it(`extracts ${name} in Chromium as it does without layout (no visible content lost)`, async () => {
+      const html = readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
+      const url = 'https://example.com/fixture'
+      const expected = extractFromDocument(
+        new JSDOM(html, { url, pretendToBeVisual: true }).window.document,
+        url,
+      )
+      await page.setContent(html)
+      await page.addScriptTag({ content: bundle })
+      const r = await page.evaluate((u) => {
+        const w = window as unknown as {
+          TigerExtract: { extractFromDocument(d: Document, u: string): Result | null }
+        }
+        return w.TigerExtract.extractFromDocument(document, u)
+      }, url)
+      // The one intended difference: a 1x1 tracking pixel has no visible size in a real layout.
+      expect(r?.markdown).toBe(expected?.markdown.replace('![tracking pixel] ', ''))
+    })
+  }
 })

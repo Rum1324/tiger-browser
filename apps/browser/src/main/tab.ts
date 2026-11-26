@@ -47,6 +47,8 @@ export class TabController {
   readonly openerId: string | null
   /** The URL being loaded before it commits, so the UI can show what was typed. */
   private pendingUrl: string | null = null
+  /** The last main-frame URL committed, to tell a same-document visit from a #fragment change. */
+  private lastCommittedUrl: string | null = null
 
   constructor(
     readonly window: EngineWindow,
@@ -207,12 +209,14 @@ export class TabController {
     wc.on('did-navigate', (_e, url) => {
       this.pendingUrl = null
       this.faviconUrl = null
-      engine.recordVisit(this, url)
+      engine.recordVisit(this, url, this.lastCommittedUrl, false)
+      this.lastCommittedUrl = url
       this.changed()
     })
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
       if (!isMainFrame) return
-      engine.recordVisit(this, url)
+      engine.recordVisit(this, url, this.lastCommittedUrl, true)
+      this.lastCommittedUrl = url
       this.changed()
     })
     wc.on('page-title-updated', (_e, title) => {

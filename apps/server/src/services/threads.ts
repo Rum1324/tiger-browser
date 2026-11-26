@@ -186,6 +186,13 @@ export async function abortMessage(ctx: AppContext, user: User, messageId: strin
   )
 }
 
+/** A message just written whose thread may have been deleted since: the thread is gone, 404. */
+async function messageOr404(sql: Sql, messageId: string): Promise<Message> {
+  const [message] = await toMessages(sql, await selectMessages(sql, sql`m.id = ${messageId}`))
+  if (!message) throw notFound('thread_not_found', 'Thread')
+  return message
+}
+
 export async function postMessage(
   ctx: AppContext,
   user: User,
@@ -223,6 +230,10 @@ export async function postMessage(
   const assistantId = body.askAi ? newId() : null
   const titleFromContent = body.content.replace(/\s+/g, ' ').trim().slice(0, 80)
   const titled = await sql.begin(async (tx) => {
+    // The access check ran outside this transaction; hold the thread so a concurrent delete either
+    // finished first (404 here) or waits until these rows are in and then removes them with it.
+    const [held] = await tx`select id from threads where id = ${threadId} for share`
+    if (!held) throw notFound('thread_not_found', 'Thread')
     await tx`
       insert into messages (id, thread_id, role, author_id, content, status)
       values (${messageId}, ${threadId}, 'user', ${user.id}, ${body.content}, 'complete')
@@ -251,7 +262,7 @@ export async function postMessage(
   })
 
   const route = routing(access)
-  const message = await getMessage(sql, messageId)
+  const message = await messageOr404(sql, messageId)
   ctx.hub.publishForThread(route, { type: 'message.created', spaceId: access.spaceId, message })
   if (titled) {
     const thread = await getThread(sql, threadId)
@@ -259,7 +270,7 @@ export async function postMessage(
   }
   if (!assistantId) return { message, assistantMessage: null }
 
-  let assistantMessage = await getMessage(sql, assistantId)
+  let assistantMessage = await messageOr404(sql, assistantId)
   ctx.hub.publishForThread(route, {
     type: 'message.created',
     spaceId: access.spaceId,

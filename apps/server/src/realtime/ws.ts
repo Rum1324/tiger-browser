@@ -2,13 +2,31 @@ import { ClientEvent, type ServerEvent } from '@tiger/shared'
 import type { FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
 import { resolveSession } from '../auth/sessions'
-import type { HubClient } from './hub'
+import type { HubClient, RealtimeHub } from './hub'
 
 /** A socket that has not authenticated by then is closed. */
 export const AUTH_TIMEOUT_MS = 10_000
-/** Protocol-level ping cadence; a socket that misses one pong is considered dead. */
-export const HEARTBEAT_MS = 30_000
 const MAX_FRAME_BYTES = 64 * 1024
+
+/**
+ * Subscribe `client` to those of `ids` the user is a member of, as `lookup` reports. Returns the ids
+ * subscribed to.
+ */
+export async function subscribeMember(
+  hub: RealtimeHub,
+  client: HubClient,
+  ids: string[],
+  lookup: (ids: string[]) => Promise<string[]>,
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set()
+  // Read before the lookup: a removal that commits while it runs bumps the epoch, so a membership
+  // row the lookup saw just before the removal cannot subscribe a socket the removal already dropped.
+  const epochs = new Map(ids.map((id) => [id, hub.membershipEpoch(id, client.userId)]))
+  const found = await lookup(ids)
+  const allowed = new Set<string>()
+  for (const id of found) if (hub.subscribe(client, id, epochs.get(id) ?? 0)) allowed.add(id)
+  return allowed
+}
 
 /**
  * `/v1/ws`: the first frame must be `auth`. After `ready`, `subscribe` adds the Spaces the user is a
@@ -16,7 +34,15 @@ const MAX_FRAME_BYTES = 64 * 1024
  * `unsubscribe` removes Spaces silently; a following `ping` confirms it took effect.
  */
 export function websocketRoute(app: FastifyInstance): void {
-  const { sql, hub, log } = app.tiger
+  const { sql, hub, log, config } = app.tiger
+
+  const sessionValid = async (hashHex: string) =>
+    (
+      await sql`
+        select 1 from sessions
+        where token_hash = ${Buffer.from(hashHex, 'hex')}::bytea and expires_at > now()
+      `
+    ).length > 0
 
   app.get('/v1/ws', { websocket: true }, (socket: WebSocket) => {
     let client: HubClient | null = null
@@ -30,6 +56,9 @@ export function websocketRoute(app: FastifyInstance): void {
     const authTimer = setTimeout(() => {
       if (!client) socket.close(4401, 'authentication timeout')
     }, AUTH_TIMEOUT_MS)
+    // Protocol-level ping every config.wsHeartbeatMs; a socket that misses one pong is dead. Each beat
+    // also checks that the socket's session still exists and has not expired.
+    let checking = false
     const heartbeat = setInterval(() => {
       if (!alive) {
         socket.terminate()
@@ -37,7 +66,18 @@ export function websocketRoute(app: FastifyInstance): void {
       }
       alive = false
       socket.ping()
-    }, HEARTBEAT_MS)
+      const current = client
+      if (!current || checking) return
+      checking = true
+      void sessionValid(current.sessionHash)
+        .then((valid) => {
+          if (!valid) hub.closeClient(current, 4401, 'session ended')
+        })
+        .catch((err) => log.warn({ err }, 'websocket session check failed'))
+        .finally(() => {
+          checking = false
+        })
+    }, config.wsHeartbeatMs)
     socket.on('pong', () => {
       alive = true
     })
@@ -103,15 +143,14 @@ export function websocketRoute(app: FastifyInstance): void {
             case 'subscribe': {
               const current = client
               const ids = [...new Set(frame.spaceIds)]
-              const rows =
-                ids.length === 0
-                  ? []
-                  : await sql<{ space_id: string }[]>`
+              const allowed = await subscribeMember(hub, current, ids, async (spaceIds) =>
+                (
+                  await sql<{ space_id: string }[]>`
                     select space_id from space_members
-                    where user_id = ${current.userId} and space_id = any(${ids}::uuid[])
+                    where user_id = ${current.userId} and space_id = any(${spaceIds}::uuid[])
                   `
-              const allowed = new Set(rows.map((r) => r.space_id))
-              for (const id of allowed) hub.subscribe(current, id)
+                ).map((r) => r.space_id),
+              )
               hub.send(current, {
                 type: 'subscribed',
                 spaceIds: ids.filter((id) => allowed.has(id)),

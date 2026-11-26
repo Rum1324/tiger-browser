@@ -33,6 +33,11 @@ export interface HubClient {
 export class RealtimeHub {
   private readonly clients = new Set<HubClient>()
   private readonly bySpace = new Map<string, Set<HubClient>>()
+  /**
+   * Bumped by dropMembership per (Space, user). A subscribe that checked membership before a removal
+   * and lands after it sees a different value and does not subscribe.
+   */
+  private readonly removals = new Map<string, number>()
 
   constructor(private readonly log: FastifyBaseLogger) {}
 
@@ -48,9 +53,18 @@ export class RealtimeHub {
     client.spaces.clear()
   }
 
-  /** Membership must be checked by the caller. */
-  subscribe(client: HubClient, spaceId: string): void {
-    if (!this.clients.has(client)) return
+  /** Read before checking membership; pass to subscribe so a removal in between wins. */
+  membershipEpoch(spaceId: string, userId: string): number {
+    return this.removals.get(`${spaceId}:${userId}`) ?? 0
+  }
+
+  /**
+   * Membership must be checked by the caller. With `epoch` (from membershipEpoch, read before the
+   * check), nothing happens when the member was removed since. Returns whether it subscribed.
+   */
+  subscribe(client: HubClient, spaceId: string, epoch?: number): boolean {
+    if (!this.clients.has(client)) return false
+    if (epoch !== undefined && this.membershipEpoch(spaceId, client.userId) !== epoch) return false
     client.spaces.add(spaceId)
     let set = this.bySpace.get(spaceId)
     if (!set) {
@@ -58,6 +72,7 @@ export class RealtimeHub {
       this.bySpace.set(spaceId, set)
     }
     set.add(client)
+    return true
   }
 
   /** The client no longer wants this Space's events (it switched Space, or the UI closed it). */
@@ -71,6 +86,8 @@ export class RealtimeHub {
 
   /** A member left or was removed: their sockets stop receiving the Space at once. */
   dropMembership(spaceId: string, userId: string): void {
+    const key = `${spaceId}:${userId}`
+    this.removals.set(key, (this.removals.get(key) ?? 0) + 1)
     const set = this.bySpace.get(spaceId)
     if (!set) return
     for (const client of [...set]) {
@@ -79,6 +96,13 @@ export class RealtimeHub {
         client.spaces.delete(spaceId)
       }
     }
+  }
+
+  /** Close one client's socket, e.g. because its session expired. */
+  closeClient(client: HubClient, code: number, reason: string): void {
+    if (!this.clients.has(client)) return
+    this.remove(client)
+    client.socket.close(code, reason)
   }
 
   /** Logout: close every socket opened with that session. */

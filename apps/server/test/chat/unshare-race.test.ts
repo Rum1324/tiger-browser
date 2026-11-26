@@ -67,7 +67,14 @@ describe('token budget under concurrent questions', () => {
       const { h } = b
       const { owner, space } = await spaceWithMembers(h, 'Budget')
       await h.sql`update spaces set token_budget = 100 where id = ${space.id}`
-      await shareSettled(h, owner.token, space.id, 'https://example.com/b', 'B', '# B\n\nSome facts.')
+      await shareSettled(
+        h,
+        owner.token,
+        space.id,
+        'https://example.com/b',
+        'B',
+        '# B\n\nSome facts.',
+      )
       const thread = await h.ok(
         'createThread',
         { params: { spaceId: space.id }, body: { visibility: 'space' } },

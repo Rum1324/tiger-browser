@@ -101,3 +101,34 @@ describe('sourceTypeForUrl', () => {
     expect(sourceTypeForUrl('about:blank')).toBe('other')
   })
 })
+
+describe('local network detection', () => {
+  const blocked = (url: string) => captureEligibility(url, { incognito: false }).reason
+
+  it('treats mapped, unspecified, CGNAT and single-label hosts as local', () => {
+    for (const url of [
+      'http://[::ffff:192.168.1.1]/',
+      'http://[::ffff:10.0.0.8]/',
+      'http://0.0.0.0:8080/',
+      'http://100.101.1.2/',
+      'http://intranet/',
+      'http://wiki/page',
+      'https://box.tailnet-1234.ts.net/',
+      'http://printer.home.arpa/',
+      'http://[::]/',
+    ]) {
+      expect(blocked(url), url).toBe('local-network')
+    }
+  })
+
+  it('leaves public addresses alone, including mapped ones', () => {
+    for (const url of [
+      'http://[::ffff:8.8.8.8]/',
+      'http://100.128.0.1/',
+      'http://8.8.8.8/',
+      'https://example.com/',
+    ]) {
+      expect(captureEligibility(url, { incognito: false }).allowed, url).toBe(true)
+    }
+  })
+})

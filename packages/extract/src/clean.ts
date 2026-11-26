@@ -12,51 +12,291 @@ const COMPUTED_STYLE_BUDGET_SHARE = 0.25
 
 function isHiddenByStyle(style: CSSStyleDeclaration): boolean {
   return (
-    style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
+    style.display === 'none' ||
+    style.visibility === 'hidden' ||
+    style.visibility === 'collapse' ||
+    Number.parseFloat(style.opacity) === 0
   )
 }
 
+/** `rgb(r, g, b)` / `rgba(r, g, b, a)` as computed styles report colours; null for anything else. */
+function parseRgb(value: string): [number, number, number, number] | null {
+  const m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/.exec(
+    value,
+  )
+  if (!m) return null
+  let a = 1
+  if (m[4] !== undefined) a = m[4].endsWith('%') ? Number.parseFloat(m[4]) / 100 : Number(m[4])
+  return [Number(m[1]), Number(m[2]), Number(m[3]), a]
+}
+
+/** A `clip-path: inset(...)` or `clip: rect(...)` that leaves nothing of the box to see. */
+function clippedAway(style: CSSStyleDeclaration): boolean {
+  const inset = /^inset\(\s*([\d.]+)%(?:\s+([\d.]+)%)?/.exec(style.clipPath ?? '')
+  if (inset) {
+    const v = Number(inset[1])
+    const h = inset[2] !== undefined ? Number(inset[2]) : v
+    if (v >= 50 || h >= 50) return true
+  }
+  if (style.position === 'absolute' || style.position === 'fixed') {
+    const rect =
+      /^rect\(\s*(-?[\d.]+)px,?\s+(-?[\d.]+)px,?\s+(-?[\d.]+)px,?\s+(-?[\d.]+)px\s*\)$/.exec(
+        style.clip ?? '',
+      )
+    if (rect) {
+      const [top, right, bottom, left] = rect.slice(1).map(Number) as [
+        number,
+        number,
+        number,
+        number,
+      ]
+      if (bottom <= top || right <= left) return true
+    }
+  }
+  return false
+}
+
+const clips = (style: CSSStyleDeclaration) =>
+  (style.overflowX !== 'visible' && style.overflowX !== '') ||
+  (style.overflowY !== 'visible' && style.overflowY !== '')
+
 /**
- * Clone the document with elements the member cannot see removed. Hidden-ness is read from the live
- * page's computed style (catches stylesheet rules), then applied to the clone by document order, which
- * a deep clone preserves exactly.
+ * What the member can see, judged on the live page. Layout checks (boxes, size, position, colour) run
+ * only where layout exists: jsdom has none, and there only computed style and attributes apply.
+ */
+export interface Visibility {
+  /** The element and everything under it are not seen. */
+  hidden(el: Element): boolean
+  /** The element's own text nodes are not seen; its child elements are judged on their own. */
+  textHidden(el: Element): boolean
+}
+
+export function visibilityOf(doc: Document): Visibility | null {
+  const view = doc.defaultView
+  if (!view || typeof view.getComputedStyle !== 'function') return null
+  const style = (el: Element): CSSStyleDeclaration | null => {
+    try {
+      return view.getComputedStyle(el)
+    } catch {
+      return null
+    }
+  }
+  const body = doc.body
+  // jsdom reports no boxes at all; a real page's body has one.
+  const layout =
+    body !== null && typeof body.getClientRects === 'function' && body.getClientRects().length > 0
+  const rootStyle = doc.documentElement ? style(doc.documentElement) : null
+  // The canvas behind a page that paints no background: white, unless the page asks for dark only.
+  const canvasKnown = !/^\s*dark\s*$/.test(rootStyle?.colorScheme ?? '')
+  const backgrounds = new Map<Element, [number, number, number] | null>()
+
+  const parentOf = (el: Element): Element | null =>
+    el.parentElement ?? (el.parentNode as { host?: Element } | null)?.host ?? null
+
+  /** The opaque colour painted behind `el`, or null when it cannot be told (images, translucency). */
+  const background = (el: Element | null): [number, number, number] | null => {
+    if (!el) return canvasKnown ? [255, 255, 255] : null
+    const cached = backgrounds.get(el)
+    if (cached !== undefined) return cached
+    const s = style(el)
+    let out: [number, number, number] | null
+    if (!s || (s.backgroundImage && s.backgroundImage !== 'none')) out = null
+    else {
+      const c = parseRgb(s.backgroundColor)
+      if (c && c[3] >= 0.99) out = [c[0], c[1], c[2]]
+      else if (c && c[3] > 0) out = null
+      else out = background(parentOf(el))
+    }
+    backgrounds.set(el, out)
+    return out
+  }
+
+  const inClosedDetails = (el: Element): boolean => el.closest('details:not([open])') !== null
+
+  const hidden = (el: Element): boolean => {
+    const s = style(el)
+    if (!s) return false
+    if (isHiddenByStyle(s)) return true
+    // A light child of an open shadow host that no slot takes is never rendered.
+    const parent = el.parentElement as (Element & { shadowRoot: ShadowRoot | null }) | null
+    if (parent?.shadowRoot && !(el as Element & { assignedSlot: unknown }).assignedSlot) return true
+    if (clippedAway(s)) return true
+    if (!layout) return false
+    // The content of a closed <details> is kept: the member can open it.
+    if (s.display !== 'contents' && el.getClientRects().length === 0) return !inClosedDetails(el)
+    if (s.display === 'contents') return false
+    const r = el.getBoundingClientRect()
+    if ((r.width === 0 || r.height === 0) && clips(s)) return true
+    if (r.width <= 1 && r.height <= 1 && clips(s)) return true
+    // Wholly left of or above the document, where no scrolling reaches.
+    if (
+      (r.width > 0 || r.height > 0) &&
+      (r.right + view.scrollX <= 0 || r.bottom + view.scrollY <= 0)
+    )
+      return true
+    return false
+  }
+
+  const textHidden = (el: Element): boolean => {
+    let hasText = false
+    let firstText: Text | null = null
+    for (let n = el.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType === 3 && (n as Text).data.trim()) {
+        hasText = true
+        firstText = n as Text
+        break
+      }
+    }
+    if (!hasText || !firstText) return false
+    const s = style(el)
+    if (!s) return false
+    if (Number.parseFloat(s.fontSize) < 1) return true
+    const color = parseRgb(s.color)
+    if (color && color[3] === 0) return true
+    if (!layout) return false
+    // Text a closed shadow root never slots has no boxes (the root itself is unreadable from here).
+    if (!inClosedDetails(el)) {
+      const range = doc.createRange()
+      range.selectNodeContents(firstText)
+      if (range.getClientRects().length === 0) return true
+    }
+    if (color) {
+      const bg = background(el)
+      if (bg) {
+        const diff =
+          Math.abs(bg[0] - color[0]) + Math.abs(bg[1] - color[1]) + Math.abs(bg[2] - color[2])
+        if (diff <= 6) return true
+      }
+    }
+    return false
+  }
+
+  return { hidden, textHidden }
+}
+
+/**
+ * Clone the document with what the member cannot see removed, and open shadow roots flattened into the
+ * clone as they render (a deep clone never copies shadow trees). Visibility is read from the live page
+ * (computed style and layout), then applied to the clone by document order, which a deep clone
+ * preserves exactly.
  */
 export function cloneVisible(doc: Document, deadline: number): Document {
   // Indexes are positions among the body's descendants, the same in the live page and its deep clone.
   const liveElements = doc.body ? Array.from(doc.body.getElementsByTagName('*')) : []
   const hiddenIndexes: number[] = []
-  const view = doc.defaultView
-  if (
-    view &&
-    typeof view.getComputedStyle === 'function' &&
-    liveElements.length <= COMPUTED_STYLE_MAX_ELEMENTS
-  ) {
-    const start = performance.now()
-    const stopAt = Math.min(deadline, start + (deadline - start) * COMPUTED_STYLE_BUDGET_SHARE)
+  const textHiddenIndexes: number[] = []
+  const hostIndexes: number[] = []
+  const vis = liveElements.length <= COMPUTED_STYLE_MAX_ELEMENTS ? visibilityOf(doc) : null
+  const start = performance.now()
+  const stopAt = Math.min(deadline, start + (deadline - start) * COMPUTED_STYLE_BUDGET_SHARE)
+  if (vis) {
     let hiddenRoot: Element | null = null
     for (let i = 0; i < liveElements.length; i++) {
       const el = liveElements[i] as Element
       if ((i & 127) === 0 && performance.now() > stopAt) break
       // Descendants of a hidden element go with it; no need to ask for their style.
       if (hiddenRoot?.contains(el)) continue
-      let style: CSSStyleDeclaration
-      try {
-        style = view.getComputedStyle(el)
-      } catch {
-        continue
-      }
-      if (isHiddenByStyle(style)) {
+      if (vis.hidden(el)) {
         hiddenIndexes.push(i)
         hiddenRoot = el
+        continue
       }
+      if (vis.textHidden(el)) textHiddenIndexes.push(i)
+      if ((el as Element & { shadowRoot: ShadowRoot | null }).shadowRoot) hostIndexes.push(i)
+    }
+  } else {
+    // Without computed style, shadow hosts are still flattened.
+    for (let i = 0; i < liveElements.length; i++) {
+      if ((liveElements[i] as Element & { shadowRoot: ShadowRoot | null }).shadowRoot)
+        hostIndexes.push(i)
     }
   }
   const clone = doc.cloneNode(true) as Document
-  if (hiddenIndexes.length > 0 && clone.body) {
-    const cloneElements = Array.from(clone.body.getElementsByTagName('*'))
-    for (const i of hiddenIndexes) cloneElements[i]?.remove()
+  if (!clone.body) return clone
+  const cloneElements = Array.from(clone.body.getElementsByTagName('*'))
+  // Each host's light children as cloned, before anything is removed: slots pick from these.
+  const hostChildren = hostIndexes.map((i) => {
+    const live = liveElements[i] as Element
+    const copy = cloneElements[i] as Element
+    const map = new Map<Node, Node>()
+    for (let k = 0; k < live.childNodes.length; k++) {
+      const c = copy.childNodes[k]
+      if (c) map.set(live.childNodes[k] as Node, c)
+    }
+    return map
+  })
+  for (const i of textHiddenIndexes) {
+    const el = cloneElements[i] as Element
+    for (const n of Array.from(el.childNodes)) if (n.nodeType === 3) n.remove()
   }
+  for (const i of hiddenIndexes) cloneElements[i]?.remove()
+  hostIndexes.forEach((i, h) => {
+    const live = liveElements[i] as Element & { shadowRoot: ShadowRoot }
+    const copy = cloneElements[i] as Element
+    const lightMap = hostChildren[h] as Map<Node, Node>
+    copy.replaceChildren(flattenShadow(live.shadowRoot, lightMap, clone, vis, deadline))
+  })
   return clone
+}
+
+/**
+ * A shadow tree as it renders, cloned into `target`: slots replaced by the nodes assigned to them
+ * (taken from `lightMap`, the host's light children already in the clone) or their fallback content,
+ * nested open roots flattened the same way, and hidden parts left out.
+ */
+function flattenShadow(
+  root: ShadowRoot,
+  lightMap: Map<Node, Node>,
+  target: Document,
+  vis: Visibility | null,
+  deadline: number,
+): DocumentFragment {
+  const frag = target.createDocumentFragment()
+  const copy = (node: Node, into: Node, map: Map<Node, Node>): void => {
+    if (performance.now() > deadline) return
+    if (node.nodeType === 3) {
+      into.appendChild(target.importNode(node, false))
+      return
+    }
+    if (node.nodeType !== 1) return
+    const el = node as Element & { shadowRoot: ShadowRoot | null }
+    if (vis?.hidden(el)) return
+    if (el.localName === 'slot') {
+      const assigned = (el as unknown as HTMLSlotElement).assignedNodes()
+      if (assigned.length > 0) {
+        for (const a of assigned) {
+          const mapped = map.get(a)
+          // A light child removed as hidden has no parent left in the clone.
+          if (mapped?.parentNode) into.appendChild(mapped)
+        }
+      } else {
+        for (const c of Array.from(el.childNodes)) copy(c, into, map)
+      }
+      return
+    }
+    const out = target.importNode(el, false)
+    const textOff = vis?.textHidden(el) ?? false
+    if (el.shadowRoot) {
+      // A nested host: its light children are cloned here, then placed by its own slots.
+      const nestedMap = new Map<Node, Node>()
+      const holder = target.createDocumentFragment()
+      for (const c of Array.from(el.childNodes)) {
+        const before = holder.childNodes.length
+        copy(c, holder, map)
+        const made = holder.childNodes[before]
+        if (made && holder.childNodes.length === before + 1) nestedMap.set(c, made)
+      }
+      out.appendChild(flattenShadow(el.shadowRoot, nestedMap, target, vis, deadline))
+    } else {
+      for (const c of Array.from(el.childNodes)) {
+        if (c.nodeType === 3 && textOff) continue
+        copy(c, out, map)
+      }
+    }
+    into.appendChild(out)
+  }
+  for (const c of Array.from(root.childNodes)) copy(c, frag, lightMap)
+  return frag
 }
 
 /** Elements that are never content. Checked by tag name in one walk; selector passes are far slower. */
@@ -274,29 +514,30 @@ export function stripBoilerplate(doc: Document): void {
  * for converting a live DOM that is too large to clone within the time budget. Checkboxes are not
  * skipped: the converter renders their checked state and never reads a value.
  */
-export function liveSkipFilter(doc: Document, deadline: number): (el: Element) => boolean {
+export function liveSkipFilter(
+  doc: Document,
+  deadline: number,
+): { skip: (el: Element) => boolean; skipText: (el: Element) => boolean } {
   const body = doc.body ?? doc.documentElement
   const holdsMostText = textShare(body)
-  const view = doc.defaultView
+  const vis = visibilityOf(doc)
   const start = performance.now()
   const styleUntil = Math.min(deadline, start + (deadline - start) * COMPUTED_STYLE_BUDGET_SHARE)
-  let styleOpen = view !== null && typeof view.getComputedStyle === 'function'
+  let styleOpen = vis !== null
   let checks = 0
-  return (el) => {
+  // Visibility is the costly check; it stops when its share of the budget is spent.
+  const styleBudget = () => {
+    if (styleOpen && (checks++ & 63) === 0 && performance.now() >= styleUntil) styleOpen = false
+    return styleOpen
+  }
+  const skip = (el: Element) => {
     const verdict = unsafeVerdict(el)
     if (verdict === 'remove') return true
     if (verdict === 'task') return false
     if (isBoilerplate(el, holdsMostText)) return true
-    if (!styleOpen || !view) return false
-    // Computed style is the costly check; it stops when its share of the budget is spent.
-    if ((checks++ & 63) === 0 && performance.now() >= styleUntil) {
-      styleOpen = false
-      return false
-    }
-    try {
-      return isHiddenByStyle(view.getComputedStyle(el))
-    } catch {
-      return false
-    }
+    if (!vis || !styleBudget()) return false
+    return vis.hidden(el)
   }
+  const skipText = (el: Element) => (vis && styleBudget() ? vis.textHidden(el) : false)
+  return { skip, skipText }
 }

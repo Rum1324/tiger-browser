@@ -153,7 +153,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
       threads.reset()
       activity.reset()
       models.reset()
-      share.cancel()
+      share.reset()
       // Tab URLs stay known; their share state is cleared because it was the old member's view.
       const tabs = urlShare.store.getState().tabs
       urlShare.reset()

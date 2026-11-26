@@ -259,6 +259,11 @@ export const Message = z.object({
   status: MessageStatus,
   errorCode: z.string().nullable(),
   usage: TokenUsage.nullable(),
+  /**
+   * For a message read over REST while it is still streaming: how many deltas `content` already
+   * covers, so a client can continue from the next `message.delta` without repeating text.
+   */
+  streamSeq: z.number().int().nonnegative().nullable().optional(),
   createdAt: IsoDate,
 })
 export type Message = z.infer<typeof Message>

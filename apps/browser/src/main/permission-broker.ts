@@ -89,7 +89,8 @@ export class PermissionBroker {
     const oneShot = isOneShotGrant(permission)
     // A screen-capture grant is never stored: a stored one would let the site record later unasked.
     if (remember && !(oneShot && allow)) p.decisions.set(origin, permission, allow)
-    if (!(oneShot && allow)) this.recent.set(`${tabId} ${origin} ${permission}`, { allow, at: this.now() })
+    if (!(oneShot && allow))
+      this.recent.set(`${tabId} ${origin} ${permission}`, { allow, at: this.now() })
     p.resolve(allow)
   }
 

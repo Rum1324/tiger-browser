@@ -8,6 +8,7 @@ export interface AppMenuActions {
   forward(): void
   zoom(direction: 'in' | 'out' | 'reset'): void
   toggleDevTools(): void
+  toggleFullscreen(): void
 }
 
 interface ShortcutItem {
@@ -129,7 +130,12 @@ export function appMenuTemplate(
           accelerator: mac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
           click: () => actions.toggleDevTools(),
         },
-        { role: 'togglefullscreen' },
+        {
+          id: 'fullscreen',
+          label: 'Toggle Full Screen',
+          accelerator: mac ? 'Ctrl+Cmd+F' : 'F11',
+          click: () => actions.toggleFullscreen(),
+        },
       ],
     },
     {

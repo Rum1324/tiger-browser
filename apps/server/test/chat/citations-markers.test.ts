@@ -31,7 +31,11 @@ describe('citation markers are not confused with URLs, indexes and prose', () =>
     ]) {
       expect(cleanMarkers(text, one, none)).toBe(text)
     }
-    const final = finalizeAnswer('Read https://example.com/wiki/a[1] for more.', [source(1, 'Body.')], [])
+    const final = finalizeAnswer(
+      'Read https://example.com/wiki/a[1] for more.',
+      [source(1, 'Body.')],
+      [],
+    )
     expect(final.citations).toEqual([])
   })
 

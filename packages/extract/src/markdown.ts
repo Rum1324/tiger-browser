@@ -339,8 +339,7 @@ function renderInlineChildren(el: Element, line: Inline, ctx: MdContext): void {
     if (ctx.stopped) return
     if (n.nodeType === 3) {
       if (!textOff) line.text((n as Text).data, ctx)
-    }
-    else if (n.nodeType === 1 && !ctx.skip?.(n as Element)) renderInline(n as Element, line, ctx)
+    } else if (n.nodeType === 1 && !ctx.skip?.(n as Element)) renderInline(n as Element, line, ctx)
   }
 }
 

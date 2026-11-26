@@ -35,6 +35,7 @@ const ConfigSchema = z
     SPACE_TOKEN_BUDGET: optionalPositiveInt,
     AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(20),
     SHARE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
+    WS_HEARTBEAT_MS: z.coerce.number().int().min(50).default(30_000),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
@@ -62,6 +63,8 @@ export interface Config {
   authRateLimitPerMinute: number
   /** Shares (new items and new versions) per member per minute; each one queues embedding work. */
   shareRateLimitPerMinute: number
+  /** WebSocket ping cadence; each beat also re-checks the socket's session. */
+  wsHeartbeatMs: number
   logLevel: string
   /** Passed through untouched for the chat agent. Never logged, never returned to clients. */
   providerKeys: { anthropic: string | null; openai: string | null; gemini: string | null }
@@ -93,6 +96,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     spaceTokenBudget: c.SPACE_TOKEN_BUDGET ?? null,
     authRateLimitPerMinute: c.AUTH_RATE_LIMIT_PER_MINUTE,
     shareRateLimitPerMinute: c.SHARE_RATE_LIMIT_PER_MINUTE,
+    wsHeartbeatMs: c.WS_HEARTBEAT_MS,
     logLevel: c.LOG_LEVEL,
     providerKeys: {
       anthropic: c.ANTHROPIC_API_KEY ?? null,

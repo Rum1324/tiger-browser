@@ -282,9 +282,34 @@ describe('exports', () => {
       { params: { spaceId: space.id }, query: { limit: 1 } },
       owner.token,
     )
+    // A private thread's export is recorded without its title or Doc URL (every member reads the log).
     expect(event).toMatchObject({
       action: 'export.google_doc',
-      target: { type: 'export', id: message.id, title: 'Plan', url: body.url },
+      target: { type: 'export', id: message.id, title: null, url: null },
+    })
+    const shared = await h.ok(
+      'createThread',
+      { params: { spaceId: space.id }, body: { visibility: 'space' } },
+      owner.token,
+    )
+    const { message: spaceMessage } = await h.ok(
+      'postMessage',
+      { params: { threadId: shared.id }, body: { content: 'y', askAi: false } },
+      owner.token,
+    )
+    await h.ok(
+      'recordExport',
+      { params: { spaceId: space.id }, body: { ...body, messageId: spaceMessage.id } },
+      owner.token,
+    )
+    const [spaceEvent] = await h.ok(
+      'listAudit',
+      { params: { spaceId: space.id }, query: { limit: 1 } },
+      member.token,
+    )
+    expect(spaceEvent).toMatchObject({
+      action: 'export.google_doc',
+      target: { type: 'export', id: spaceMessage.id, title: 'Plan', url: body.url },
     })
   })
 })

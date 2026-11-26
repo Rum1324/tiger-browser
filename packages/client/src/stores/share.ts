@@ -13,6 +13,8 @@ import type { ShareLocation } from './items'
  *                    │            │                  └────→ error
  *                    └→ error     └─cancel→ idle (the extraction is discarded)
  *
+ * `cancel()` has no effect in `sending`; only `reset()` (sign-out) leaves it.
+ *
  * Nothing is sent before `confirm()` is called on a `preview`. The preview holds the exact
  * ExtractedPage that `confirm()` sends; no other object is sent.
  */
@@ -60,8 +62,14 @@ export interface ShareFlowController {
   begin(tabId: string, spaceId?: string | null): Promise<void>
   /** Send the previewed page. Returns false (and sends nothing) unless the flow is in `preview`. */
   confirm(): Promise<boolean>
-  /** Discard the extraction; a running extraction's result is dropped when it arrives. */
+  /**
+   * Discard the extraction; a running extraction's result is dropped when it arrives. Does nothing
+   * while `sending`: the request cannot be called back, so hiding it would let the member believe
+   * the page was not shared. The flow goes on to `done` or `error`.
+   */
   cancel(): void
+  /** Sign-out: clear the flow whatever its phase; a late answer is not shown to anyone. */
+  reset(): void
   /**
    * Is the shared version of this tab's page out of date? Compares a fresh local extraction's
    * content hash with the shared version's hash. Sends nothing.
@@ -136,6 +144,12 @@ export function createShareFlow(ctx: ClientContext, deps: ShareDeps): ShareFlowC
     },
 
     cancel() {
+      if (store.getState().phase === 'sending') return
+      run++
+      store.setState({ phase: 'idle' }, true)
+    },
+
+    reset() {
       run++
       store.setState({ phase: 'idle' }, true)
     },
