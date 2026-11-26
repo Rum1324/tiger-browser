@@ -1,163 +1,122 @@
 [
- {
-  "id": "q01",
-  "kind": "mixed-alnum",
-  "query": "シリーズA",
-  "relevant": [
-   "p01"
-  ]
- },
- {
-  "id": "q02",
-  "kind": "keyword-jp",
-  "query": "資金調達 リード投資家",
-  "relevant": [
-   "p01"
-  ]
- },
- {
-  "id": "q03",
-  "kind": "mixed-alnum",
-  "query": "KPI",
-  "relevant": [
-   "p03",
-   "p30"
-  ]
- },
- {
-  "id": "q04",
-  "kind": "kanji-2char",
-  "query": "稟議",
-  "relevant": [
-   "p32"
-  ]
- },
- {
-  "id": "q05",
-  "kind": "kanji-2char",
-  "query": "内定",
-  "relevant": [
-   "p14"
-  ]
- },
- {
-  "id": "q06",
-  "kind": "kanji-2char",
-  "query": "退職",
-  "relevant": [
-   "p16"
-  ]
- },
- {
-  "id": "q07",
-  "kind": "kanji-2char",
-  "query": "障害",
-  "relevant": [
-   "p33"
-  ]
- },
- {
-  "id": "q08",
-  "kind": "katakana",
-  "query": "ストックオプション",
-  "relevant": [
-   "p07"
-  ]
- },
- {
-  "id": "q09",
-  "kind": "katakana",
-  "query": "オンボーディング",
-  "relevant": [
-   "p15"
-  ]
- },
- {
-  "id": "q10",
-  "kind": "katakana",
-  "query": "ランウェイ",
-  "relevant": [
-   "p04"
-  ]
- },
- {
-  "id": "q11",
-  "kind": "paraphrase",
-  "query": "会社のお金があと何か月もつか",
-  "relevant": [
-   "p04"
-  ]
- },
- {
-  "id": "q12",
-  "kind": "paraphrase",
-  "query": "従業員が自社株を買える権利はいつから使えるのか",
-  "relevant": [
-   "p07"
-  ]
- },
- {
-  "id": "q13",
-  "kind": "paraphrase",
-  "query": "ユーザーが辞めたら共有したデータはどうなる",
-  "relevant": [
-   "p26"
-  ]
- },
- {
-  "id": "q14",
-  "kind": "paraphrase",
-  "query": "お客さんが契約をやめた理由の傾向",
-  "relevant": [
-   "p40"
-  ]
- },
- {
-  "id": "q15",
-  "kind": "mixed-alnum",
-  "query": "OKR 1on1 の運用",
-  "relevant": [
-   "p18"
-  ]
- },
- {
-  "id": "q16",
-  "kind": "mixed-alnum",
-  "query": "OAuth とレート制限",
-  "relevant": [
-   "p25"
-  ]
- },
- {
-  "id": "q17",
-  "kind": "english",
-  "query": "What is the post-money valuation of our Series A round?",
-  "relevant": [
-   "p01"
-  ]
- },
- {
-  "id": "q18",
-  "kind": "english",
-  "query": "How long is the vesting schedule for employee stock options?",
-  "relevant": [
-   "p07"
-  ]
- },
- {
-  "id": "q19",
-  "kind": "english",
-  "query": "Which postmortem covers the database latency incident?",
-  "relevant": [
-   "p33"
-  ]
- },
- {
-  "id": "q20",
-  "kind": "english",
-  "query": "visa requirements for hiring a foreign engineer",
-  "relevant": [
-   "p20"
-  ]
- }
+  {
+    "id": "q01",
+    "kind": "mixed-alnum",
+    "query": "シリーズA",
+    "relevant": ["p01"]
+  },
+  {
+    "id": "q02",
+    "kind": "keyword-jp",
+    "query": "資金調達 リード投資家",
+    "relevant": ["p01"]
+  },
+  {
+    "id": "q03",
+    "kind": "mixed-alnum",
+    "query": "KPI",
+    "relevant": ["p03", "p30"]
+  },
+  {
+    "id": "q04",
+    "kind": "kanji-2char",
+    "query": "稟議",
+    "relevant": ["p32"]
+  },
+  {
+    "id": "q05",
+    "kind": "kanji-2char",
+    "query": "内定",
+    "relevant": ["p14"]
+  },
+  {
+    "id": "q06",
+    "kind": "kanji-2char",
+    "query": "退職",
+    "relevant": ["p16"]
+  },
+  {
+    "id": "q07",
+    "kind": "kanji-2char",
+    "query": "障害",
+    "relevant": ["p33"]
+  },
+  {
+    "id": "q08",
+    "kind": "katakana",
+    "query": "ストックオプション",
+    "relevant": ["p07"]
+  },
+  {
+    "id": "q09",
+    "kind": "katakana",
+    "query": "オンボーディング",
+    "relevant": ["p15"]
+  },
+  {
+    "id": "q10",
+    "kind": "katakana",
+    "query": "ランウェイ",
+    "relevant": ["p04"]
+  },
+  {
+    "id": "q11",
+    "kind": "paraphrase",
+    "query": "会社のお金があと何か月もつか",
+    "relevant": ["p04"]
+  },
+  {
+    "id": "q12",
+    "kind": "paraphrase",
+    "query": "従業員が自社株を買える権利はいつから使えるのか",
+    "relevant": ["p07"]
+  },
+  {
+    "id": "q13",
+    "kind": "paraphrase",
+    "query": "ユーザーが辞めたら共有したデータはどうなる",
+    "relevant": ["p26"]
+  },
+  {
+    "id": "q14",
+    "kind": "paraphrase",
+    "query": "お客さんが契約をやめた理由の傾向",
+    "relevant": ["p40"]
+  },
+  {
+    "id": "q15",
+    "kind": "mixed-alnum",
+    "query": "OKR 1on1 の運用",
+    "relevant": ["p18"]
+  },
+  {
+    "id": "q16",
+    "kind": "mixed-alnum",
+    "query": "OAuth とレート制限",
+    "relevant": ["p25"]
+  },
+  {
+    "id": "q17",
+    "kind": "english",
+    "query": "What is the post-money valuation of our Series A round?",
+    "relevant": ["p01"]
+  },
+  {
+    "id": "q18",
+    "kind": "english",
+    "query": "How long is the vesting schedule for employee stock options?",
+    "relevant": ["p07"]
+  },
+  {
+    "id": "q19",
+    "kind": "english",
+    "query": "Which postmortem covers the database latency incident?",
+    "relevant": ["p33"]
+  },
+  {
+    "id": "q20",
+    "kind": "english",
+    "query": "visa requirements for hiring a foreign engineer",
+    "relevant": ["p20"]
+  }
 ]

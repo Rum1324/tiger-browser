@@ -49,7 +49,6 @@ let bridge: FakeBridge
 const seen: Seen[] = []
 const frames: string[] = []
 const violations: string[] = []
-let inflight = 0
 
 beforeAll(async () => {
   server = await startServer()
@@ -81,20 +80,12 @@ beforeAll(async () => {
       if (carries(line, ATTACHED) && !messagePost)
         violations.push(`${method} ${path} carried ATTACHED`)
       if (violations.length) throw new Error(`privacy violation: ${violations.at(-1)}`)
-      inflight += 1
-      try {
-        return await fetch(input, init)
-      } finally {
-        inflight -= 1
-      }
+      return fetch(input, init)
     },
   })
 })
 
 afterAll(async () => {
-  // Closing the server while requests are in flight hangs its close (see the report), so let the
-  // client's last refetches finish first.
-  await waitFor(() => inflight === 0, 5000, 'requests settled').catch(() => {})
   client?.dispose()
   await server?.close()
 })

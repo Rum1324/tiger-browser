@@ -2,7 +2,9 @@ import {
   api,
   type Citation,
   type ExtractedPage,
+  MESSAGE_ERROR_CODES,
   type Message,
+  type MessageErrorCode,
   type ModelRef,
   type ServerEvent,
   type Thread,
@@ -104,8 +106,14 @@ export interface ThreadsController {
   confirmAttach(): boolean
   cancelAttach(): void
   removeAttachment(threadId: string, index: number): void
-  /** Promote a private thread to the Space. */
+  /**
+   * Promote a private thread to the Space. A thread with page attachments is refused with
+   * `thread_has_private_attachments`: here, without a request, when one of its loaded messages has
+   * one, and by the server otherwise.
+   */
   promote(threadId: string): Promise<Thread | null>
+  /** Whether a loaded message of the thread has a page attachment (so `promote` would be refused). */
+  hasAttachments(threadId: string): boolean
   remove(threadId: string): Promise<boolean>
   thread(threadId: string): Thread | null
   /**
@@ -137,8 +145,8 @@ export interface ThreadsOptions {
 
 /**
  * The assembled stream of one assistant message. Text = `base` (what the server reported in a
- * listMessages snapshot, covering deltas `0 .. baseSeq-1`) + `text` (the contiguous deltas from
- * `baseSeq` on). `baseSeq` is null when the snapshot covers more deltas than this client has seen;
+ * listMessages snapshot, covering deltas `0 .. baseSeq-1`, its `streamSeq`) + `text` (the contiguous
+ * deltas from `baseSeq` on). `baseSeq` is null only after a streaming snapshot without `streamSeq`;
  * the next delta that arrives then starts the run.
  */
 interface StreamBuffer {
@@ -176,51 +184,33 @@ function advance(b: StreamBuffer): void {
   }
 }
 
-function concat(b: StreamBuffer, from: number, to: number): string {
-  let out = ''
-  for (let i = from; i < to; i++) out += b.received.get(i) ?? ''
-  return out
-}
-
 /**
- * Line a server snapshot `snapshot` (the text of deltas `0 .. k-1`, for an unknown k) up with the
- * deltas this client holds, so that nothing is shown twice and nothing is dropped. Picks the largest
- * k whose received deltas just below it match the end of the snapshot (and, when they reach seq 0,
- * the whole snapshot).
+ * Line a server snapshot up with the deltas this client holds, so that nothing is shown twice and
+ * nothing is dropped. The snapshot's text covers deltas `0 .. streamSeq-1`: deltas from `streamSeq`
+ * on continue it, earlier ones are already in it. A streaming snapshot always states `streamSeq`;
+ * should one not, the next delta this client has not seen yet continues it. A snapshot never moves
+ * the text backwards.
  */
-function alignStream(b: StreamBuffer, snapshot: string): void {
-  let chosen: number | null = null
-  if (snapshot === '') {
-    chosen = 0
-  } else {
-    let prefixEnd = 0
-    while (b.received.has(prefixEnd)) prefixEnd++
-    const prefix = concat(b, 0, prefixEnd)
-    for (let k = b.maxSeq + 1; k >= 0 && chosen === null; k--) {
-      let r = k
-      while (r > 0 && b.received.has(r - 1)) r--
-      const run = concat(b, r, k)
-      const fits =
-        r === 0
-          ? snapshot === run
-          : snapshot.startsWith(prefix) &&
-            snapshot.endsWith(run) &&
-            snapshot.length >= prefix.length + run.length
-      if (fits) chosen = k
-    }
-  }
+function alignStream(b: StreamBuffer, snapshot: string, streamSeq: number | null): void {
+  // The text only grows: a snapshot that covers no more than the contiguous text already assembled
+  // (one read earlier, delivered late) has nothing to add, and the deltas it predates may be gone.
+  if (streamSeq !== null && b.baseSeq !== null && streamSeq <= b.nextSeq) return
   b.base = snapshot
   b.text = ''
-  if (chosen === null) {
-    // The snapshot covers deltas this client never saw; the next new delta starts the run.
+  if (streamSeq === null) {
     b.baseSeq = null
     b.nextSeq = b.maxSeq + 1
     return
   }
-  b.baseSeq = chosen
-  b.nextSeq = chosen
+  b.baseSeq = streamSeq
+  b.nextSeq = streamSeq
   advance(b)
 }
+
+const MESSAGE_CODES = new Set<string>(MESSAGE_ERROR_CODES)
+/** `message.failed.code` is a plain string on the wire; a code this client does not know reads as ai_failed. */
+const messageErrorCode = (code: string | undefined): MessageErrorCode =>
+  code !== undefined && MESSAGE_CODES.has(code) ? (code as MessageErrorCode) : 'ai_failed'
 
 const activity = (t: Thread) => t.lastMessageAt ?? t.createdAt
 const byActivity = (a: Thread, b: Thread) => (activity(a) < activity(b) ? 1 : -1)
@@ -255,6 +245,9 @@ export function createThreads(
   /** Failures reported before their placeholder message reached this client: id → partial text. */
   const pendingFailures = new Map<string, string>()
   let attachRun = 0
+  /** listMessages requests by start order, and per thread the latest one whose answer was applied. */
+  let listRequests = 0
+  const listApplied = new Map<string, number>()
   /** Threads with a post in flight: a second send (double Enter) would post the message twice. */
   const posting = new Set<string>()
 
@@ -277,7 +270,7 @@ export function createThreads(
   /** A streaming copy from the server carries the text so far: line the local stream up with it. */
   function absorbSnapshot(message: Message): void {
     if (message.status !== 'streaming') return
-    alignStream(bufferFor(message.id, message.threadId), message.content)
+    alignStream(bufferFor(message.id, message.threadId), message.content, message.streamSeq)
   }
 
   function scheduleRepair(messageId: string, buf: StreamBuffer): void {
@@ -329,8 +322,12 @@ export function createThreads(
     store.setState({ messages: { ...s.messages, [threadId]: { ...cur, ...patch } } })
   }
 
-  /** Insert or replace one message in a loaded thread, keeping server order (oldest first). */
-  function upsertMessage(incoming: Message): void {
+  /**
+   * The freshest known state of a message the server sent: a streaming copy yields to a settled
+   * version this client already has, or to a failure reported before the copy arrived. A message
+   * settled here is remembered so a later streaming copy cannot roll it back.
+   */
+  function current(incoming: Message): Message {
     let message =
       incoming.status === 'streaming' ? (settled.get(incoming.id) ?? incoming) : incoming
     const failedText = pendingFailures.get(message.id)
@@ -339,12 +336,22 @@ export function createThreads(
       message = {
         ...message,
         status: 'error',
-        errorCode: f?.code ?? 'ai_failed',
-        content: failedText,
+        errorCode: messageErrorCode(f?.code),
+        content: failedText || message.content,
+        streamSeq: null,
       }
     }
     pendingFailures.delete(message.id)
-    if (message.status !== 'streaming') settled.set(message.id, message)
+    if (message.status !== 'streaming') {
+      settled.set(message.id, message)
+      dropStream(message.id)
+    }
+    return message
+  }
+
+  /** Insert or replace one message in a loaded thread, keeping server order (oldest first). */
+  function upsertMessage(incoming: Message): void {
+    const message = current(incoming)
     const cur = store.getState().messages[message.threadId]
     if (!cur) return
     const view = project(message)
@@ -417,6 +424,12 @@ export function createThreads(
     store.setState({ messages })
   }
 
+  /** Some loaded message of the thread carries a page attachment. */
+  function hasAttachments(threadId: string): boolean {
+    const list = store.getState().messages[threadId]?.list ?? []
+    return list.some((v) => v.message.attachments.length > 0)
+  }
+
   function pickPrivate(threads: Thread[]): string | null {
     const me = ctx.userId()
     return threads.find((t) => t.visibility === 'private' && t.owner.id === me)?.id ?? null
@@ -485,24 +498,28 @@ export function createThreads(
     },
 
     async loadMessages(threadId) {
+      const request = ++listRequests
+      // Overlapping loads can be answered out of order; one read before a list already shown is stale.
+      const stale = () => (listApplied.get(threadId) ?? 0) > request
       setMessages(threadId, { load: LOADING })
       try {
-        const list = await ctx.api.call(api.listMessages, {
+        const fetched = await ctx.api.call(api.listMessages, {
           params: { threadId },
           query: { limit: PAGE },
         })
-        // A message the server reports as settled has no use for a stream buffer any more; a
-        // streaming one carries the text so far, which repairs any deltas this client lost.
-        for (const m of list) {
-          if (m.status !== 'streaming') dropStream(m.id)
-          else if (!settled.has(m.id)) absorbSnapshot(m)
-        }
+        if (stale()) return
+        listApplied.set(threadId, request)
+        // A message settled here or by the server has no use for a stream buffer any more (current()
+        // drops it); a streaming one carries the text so far, which repairs any deltas this client lost.
+        const list = fetched.map(current)
+        for (const m of list) absorbSnapshot(m)
         setMessages(threadId, {
-          list: list.map((m) => project(m.status === 'streaming' ? (settled.get(m.id) ?? m) : m)),
+          list: list.map(project),
           load: READY,
           hasMore: list.length === PAGE,
         })
       } catch (e) {
+        if (stale()) return
         setMessages(threadId, { load: failed(toClientError(e)) })
       }
     },
@@ -518,10 +535,11 @@ export function createThreads(
         })
         const now = store.getState().messages[threadId]
         if (!now) return
-        for (const m of older) if (m.status === 'streaming' && !settled.has(m.id)) absorbSnapshot(m)
         const ids = new Set(now.list.map((m) => m.id))
+        const added = older.filter((m) => !ids.has(m.id)).map(current)
+        for (const m of added) absorbSnapshot(m)
         setMessages(threadId, {
-          list: [...older.filter((m) => !ids.has(m.id)).map(project), ...now.list],
+          list: [...added.map(project), ...now.list],
           hasMore: older.length === PAGE,
         })
       } catch (e) {
@@ -666,10 +684,23 @@ export function createThreads(
     },
 
     async promote(threadId) {
+      if (hasAttachments(threadId)) {
+        // Refused here, before any request: the server refuses it too.
+        store.setState({
+          mutation: failed(
+            new ApiClientError(
+              'client',
+              'thread_has_private_attachments',
+              'A thread with attached pages cannot be shared',
+            ),
+          ),
+        })
+        return null
+      }
       const thread = await mutate(() => ctx.api.call(api.shareThread, { params: { threadId } }))
       if (thread) {
         upsertThread(thread)
-        // Attachments are not carried over by the server; drop any unsent ones too.
+        // A Space thread takes no pages: drop any unsent ones.
         const { [threadId]: _d, ...drafts } = store.getState().drafts
         store.setState({ drafts })
       }
@@ -685,6 +716,8 @@ export function createThreads(
     thread(threadId) {
       return store.getState().threads.find((t) => t.id === threadId) ?? null
     },
+
+    hasAttachments,
 
     async stop(messageId) {
       const ok = await mutate(() => ctx.api.call(api.abortMessage, { params: { messageId } }))
@@ -752,8 +785,9 @@ export function createThreads(
             upsertMessage({
               ...cur.message,
               status: 'error',
-              errorCode: e.code,
+              errorCode: messageErrorCode(e.code),
               content: partial || cur.message.content,
+              streamSeq: null,
             })
             // The server keeps exactly the text it had sent. If this client missed some of it,
             // read the stored message.

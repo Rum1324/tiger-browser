@@ -1,33 +1,44 @@
 import type { Dictionary } from './keys'
 
 export const en: Dictionary = {
-  'error.invalid_request': 'Something in the request is not valid.',
-  'error.unauthenticated': 'Please sign in.',
-  'error.forbidden': 'You do not have permission to do that.',
-  'error.not_found': 'Not found.',
-  'error.space_not_found': 'Space not found.',
-  'error.item_not_found': 'Shared item not found.',
-  'error.thread_not_found': 'Thread not found.',
-  'error.invite_not_found': 'Invite not found. Check the link.',
-  'error.invite_expired': 'This invite has expired.',
-  'error.invite_revoked': 'This invite was revoked.',
-  'error.invite_used': 'This invite has already been used.',
-  'error.invite_email_mismatch': 'This invite is for a different email address.',
-  'error.member_not_found': 'Member not found.',
-  'error.last_owner': 'The last owner cannot be removed.',
-  'error.capture_blocked': 'This page cannot be shared.',
-  'error.attachments_not_allowed': 'Pages cannot be attached in a Space thread.',
-  'error.already_shared': 'Already shared.',
-  'error.budget_exceeded': 'This Space has reached its usage limit for the month.',
-  'error.model_unavailable': 'This model is not available right now.',
-  'error.ai_unavailable': 'AI is not available right now.',
-  'error.dev_login_disabled': 'Developer sign-in is turned off.',
-  'error.google_auth_unavailable': 'Google sign-in is not set up.',
+  'error.invalid_request':
+    'Something in the request is not valid. Check what you entered and try again.',
+  'error.unauthenticated': 'You are signed out. Please sign in again.',
+  'error.forbidden': 'You do not have permission to do that. Ask a Space owner if you need it.',
+  'error.not_found': 'This could not be found. It may have been deleted; refresh and try again.',
+  'error.space_not_found':
+    'This Space could not be found. It may have been deleted; choose another Space.',
+  'error.item_not_found':
+    'This shared item could not be found. It may have been unshared; refresh the list.',
+  'error.thread_not_found':
+    'This thread could not be found. It may have been deleted; refresh the list.',
+  'error.invite_not_found':
+    'This invite could not be found. Check the link, or ask for a new invite.',
+  'error.invite_expired': 'This invite has expired. Ask the Space owner for a new one.',
+  'error.invite_revoked': 'This invite was revoked. Ask the Space owner for a new one.',
+  'error.invite_used': 'This invite has already been used. Ask the Space owner for a new one.',
+  'error.invite_email_mismatch':
+    'This invite is for a different email address. Sign in with that address, or ask for a new invite.',
+  'error.member_not_found': 'This member could not be found. Refresh the member list.',
+  'error.last_owner': 'A Space needs at least one owner. Make another member an owner first.',
+  'error.capture_blocked': 'This page cannot be shared. Share a different page instead.',
+  'error.attachments_not_allowed':
+    'Pages cannot be attached in a Space thread. Share the page to the Space instead.',
+  'error.already_shared': 'This is already shared. You can find it in the Space.',
+  'error.thread_has_private_attachments':
+    'A thread with attached pages cannot be shared to the Space. Share the pages to the Space and ask again in a Space thread.',
+  'error.budget_exceeded':
+    'This Space has reached its AI limit for the month. Ask a Space owner to raise it.',
+  'error.model_unavailable': 'This model is not available right now. Choose another model.',
+  'error.ai_unavailable': 'AI is not available on this server right now. Please try again later.',
+  'error.dev_login_disabled': 'Developer sign-in is turned off. Sign in with Google instead.',
+  'error.google_auth_unavailable':
+    'Google sign-in is not set up on this server. Ask your administrator.',
   'error.google_token_invalid': 'Google sign-in failed. Please try again.',
-  'error.rate_limited': 'Too many attempts. Please wait a moment.',
-  'error.payload_too_large': 'That is too large to send.',
+  'error.rate_limited': 'Too many attempts. Please wait a moment and try again.',
+  'error.payload_too_large': 'This is too large to send. Try a shorter text or fewer pages.',
   'error.contract_violation': 'The server answered in an unexpected way. Please update the app.',
-  'error.internal': 'Something went wrong on the server.',
+  'error.internal': 'Something went wrong on the server. Please try again later.',
   'error.network': 'Cannot reach the server. Check your connection.',
   'error.aborted': 'Cancelled.',
 
@@ -61,15 +72,19 @@ export const en: Dictionary = {
   'share.stale.not-shared': 'This page is not shared yet.',
   'share.noSpace': 'Choose a Space to share to.',
 
-  'ai.ai_aborted': 'The answer was stopped.',
-  'ai.ai_unavailable': 'AI is not available right now.',
+  'ai.ai_aborted': 'The answer was stopped. Ask again to get a full answer.',
+  'ai.ai_failed': 'The answer could not be produced. Please ask again.',
+  'ai.ai_interrupted': 'The answer was cut off when the server restarted. Please ask again.',
+  'ai.ai_refused': 'The AI declined to answer this. Try rephrasing the question.',
+  'ai.ai_unavailable': 'AI is not available right now. Please try again later.',
   'ai.ai_busy': 'The AI is busy. Please try again shortly.',
-  'ai.ai_context_too_long': 'There is too much content to answer.',
-  'ai.ai_timeout': 'The answer took too long.',
-  'ai.ai_failed': 'The answer could not be produced.',
-  'ai.ai_refused': 'The AI declined to answer this.',
-  'ai.model_unavailable': 'This model is not available right now.',
-  'ai.budget_exceeded': 'This Space has reached its usage limit for the month.',
+  'ai.ai_context_too_long':
+    'There is too much content to answer. Start a new thread or attach fewer pages.',
+  'ai.ai_timeout': 'The answer took too long. Please ask again.',
+  'ai.model_unavailable':
+    'This model is not available right now. Choose another model and ask again.',
+  'ai.budget_exceeded':
+    'This Space has reached its AI limit for the month. Ask a Space owner to raise it.',
 
   'attach.notAllowed': 'Pages cannot be attached in a Space thread.',
   'attach.limit': 'You can attach up to 3 pages per message.',

@@ -72,6 +72,44 @@ export async function settleCitations(
   return { stored, live }
 }
 
+/** How long a stopped provider gets to settle (and report the tokens it spent) before it is dropped. */
+const PROVIDER_STOP_WAIT_MS = 200
+
+/**
+ * Settles with `work`, or, once `signal` aborts, with whatever `work` settles to within
+ * PROVIDER_STOP_WAIT_MS, else with ai_aborted. A stop must not depend on the provider honouring the
+ * signal: one that keeps going (or never settles) would leave the message 'streaming' past shutdown.
+ * What it produces after that window is discarded.
+ */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  work.catch(() => {})
+  return new Promise<T>((resolve, reject) => {
+    let timer: NodeJS.Timeout | undefined
+    const onAbort = () => {
+      timer = setTimeout(
+        () => reject(new AnswerError('ai_aborted', 'The answer was stopped')),
+        PROVIDER_STOP_WAIT_MS,
+      )
+    }
+    if (signal.aborted) onAbort()
+    else signal.addEventListener('abort', onAbort, { once: true })
+    const done = () => {
+      signal.removeEventListener('abort', onAbort)
+      clearTimeout(timer)
+    }
+    work.then(
+      (value) => {
+        done()
+        resolve(value)
+      },
+      (err: unknown) => {
+        done()
+        reject(err)
+      },
+    )
+  })
+}
+
 /** Runs the Answerer in the background and forwards its stream to the thread's audience. */
 export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
   const { sql, hub } = ctx
@@ -143,21 +181,26 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
         { status: string }[]
       >`select status from messages where id = ${messageId}`
       if (row?.status !== 'streaming') return
-      const result = await ctx.answerer.answer({
-        thread: p.thread,
-        spaceId,
-        user: p.user,
-        model: p.model,
-        history: p.history,
-        message: p.message,
-        attachments: p.attachments,
-        assistantMessageId: messageId,
-        emit,
-        signal: controller.signal,
-      })
+      const result = await untilAborted(
+        ctx.answerer.answer({
+          thread: p.thread,
+          spaceId,
+          user: p.user,
+          model: p.model,
+          history: p.history,
+          message: p.message,
+          attachments: p.attachments,
+          assistantMessageId: messageId,
+          emit,
+          signal: controller.signal,
+        }),
+        controller.signal,
+      )
       await sourcesChain.catch(() => {})
       settled = true
-      if (controller.signal.aborted) throw new AnswerError('ai_aborted', 'The answer was stopped')
+      if (controller.signal.aborted) {
+        throw new AnswerError('ai_aborted', 'The answer was stopped', result.usage)
+      }
       const usage = {
         inputTokens: result.usage.inputTokens,
         outputTokens: result.usage.outputTokens,

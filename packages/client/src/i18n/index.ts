@@ -1,4 +1,9 @@
-import type { GoogleFlowError, Locale } from '@tiger/shared'
+import {
+  type GoogleFlowError,
+  type Locale,
+  MESSAGE_ERROR_CODES,
+  type MessageErrorCode,
+} from '@tiger/shared'
 import type { ApiClientError } from '../api'
 import type { CaptureOutcome } from '../capture'
 import type { GoogleExportError } from '../export'
@@ -6,15 +11,9 @@ import type { ShareFailure } from '../stores/share'
 import type { AttachFailure } from '../stores/threads'
 import { en } from './en'
 import { ja } from './ja'
-import { AI_FAILURE_CODES, type AiFailureCode, type Dictionary, type MessageKey } from './keys'
+import type { Dictionary, MessageKey } from './keys'
 
-export {
-  AI_FAILURE_CODES,
-  type AiFailureCode,
-  type Dictionary,
-  MESSAGE_KEYS,
-  type MessageKey,
-} from './keys'
+export { type Dictionary, MESSAGE_KEYS, type MessageKey } from './keys'
 export { en, ja }
 
 export const dictionaries: Readonly<Record<Locale, Dictionary>> = { ja, en }
@@ -54,9 +53,10 @@ export function attachFailureKey(failure: AttachFailure): MessageKey {
   return captureKey(failure.outcome)
 }
 
-const AI_CODES = new Set<string>(AI_FAILURE_CODES)
+const MESSAGE_CODES = new Set<string>(MESSAGE_ERROR_CODES)
+/** The message for an answer's failure (`Message.errorCode` or `message.failed.code`). */
 export function aiFailureKey(code: string | null): MessageKey {
-  return AI_CODES.has(code ?? '') ? `ai.${code as AiFailureCode}` : 'ai.ai_failed'
+  return MESSAGE_CODES.has(code ?? '') ? `ai.${code as MessageErrorCode}` : 'ai.ai_failed'
 }
 
 export function googleExportKey(error: GoogleExportError): MessageKey {

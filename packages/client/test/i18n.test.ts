@@ -1,7 +1,11 @@
-import { API_ERROR_CODES, CAPTURE_BLOCK_REASONS, GoogleFlowError } from '@tiger/shared'
+import {
+  API_ERROR_CODES,
+  CAPTURE_BLOCK_REASONS,
+  GoogleFlowError,
+  MESSAGE_ERROR_CODES,
+} from '@tiger/shared'
 import { describe, expect, it } from 'vitest'
 import {
-  AI_FAILURE_CODES,
   ApiClientError,
   aiFailureKey,
   CAPTURE_ERRORS,
@@ -30,7 +34,7 @@ describe('message dictionaries', () => {
     'share.outcome.new',
     'share.outcome.version',
     'share.outcome.unchanged',
-    ...AI_FAILURE_CODES.map((c) => `ai.${c}` as const),
+    ...MESSAGE_ERROR_CODES.map((c) => `ai.${c}` as const),
     ...GOOGLE_EXPORT_ERRORS.map((e) => `export.google.${e}` as const),
     ...GoogleFlowError.options.map((e) => `google.flow.${e}` as const),
   ]
@@ -44,6 +48,31 @@ describe('message dictionaries', () => {
       }
       expect(ja[key], key).toMatch(JAPANESE)
       expect(en[key], key).not.toMatch(JAPANESE)
+    }
+  })
+
+  it('every ApiErrorCode and message error code says what went wrong and what the member can do next', () => {
+    expect(API_ERROR_CODES).toContain('thread_has_private_attachments')
+    expect(MESSAGE_ERROR_CODES).toEqual(
+      expect.arrayContaining([
+        'ai_aborted',
+        'ai_failed',
+        'ai_interrupted',
+        'ai_refused',
+        'ai_unavailable',
+      ]),
+    )
+    const keys: MessageKey[] = [
+      ...API_ERROR_CODES.map((c) => `error.${c}` as const),
+      ...MESSAGE_ERROR_CODES.map((c) => `ai.${c}` as const),
+    ]
+    for (const key of keys) {
+      // Two sentences: the problem, then the next step.
+      expect(ja[key].split('。').filter(Boolean).length, `ja ${key}`).toBeGreaterThanOrEqual(2)
+      expect(
+        en[key].split(/[.!?](?:\s|$)/).filter(Boolean).length,
+        `en ${key}`,
+      ).toBeGreaterThanOrEqual(2)
     }
   })
 
@@ -73,6 +102,8 @@ describe('message dictionaries', () => {
       'capture.error.no-text-layer',
     )
     expect(aiFailureKey('ai_busy')).toBe('ai.ai_busy')
+    expect(aiFailureKey('ai_interrupted')).toBe('ai.ai_interrupted')
+    expect(aiFailureKey(null)).toBe('ai.ai_failed')
     expect(aiFailureKey('something_new')).toBe('ai.ai_failed')
     expect(t('ja', 'provider.sendsTo', { company: 'Anthropic' })).toBe(
       '内容は Anthropic に送られます。',

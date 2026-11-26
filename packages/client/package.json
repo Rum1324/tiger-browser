@@ -26,7 +26,6 @@
     }
   },
   "devDependencies": {
-    "@tiger/llm": "workspace:*",
     "@tiger/server": "workspace:*",
     "@types/node": "^22.20.7",
     "@types/react": "19.3.3",

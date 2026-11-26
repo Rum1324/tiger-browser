@@ -58,7 +58,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  for (const c of [A, B, C]) await c?.idle().catch(() => {})
   for (const c of [A, B, C]) c?.client.dispose()
   await server?.close()
 })

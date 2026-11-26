@@ -52,6 +52,7 @@ function placeholder(id = randomUUID()): Message {
     status: 'streaming',
     errorCode: null,
     usage: null,
+    streamSeq: 0,
     createdAt: now(),
   }
 }
@@ -292,7 +293,7 @@ describe('message lists fetched while an answer streams', () => {
     s.d(m.id, 0, 'Hello ')
     s.d(m.id, 1, 'world')
     const loading = s.t.loadMessages(THREAD)
-    s.replies[0]?.resolve([{ ...m, content: 'Hello world' }])
+    s.replies[0]?.resolve([{ ...m, content: 'Hello world', streamSeq: 2 }])
     await loading
     expect(s.v(m.id)?.text).toBe('Hello world')
     s.d(m.id, 2, '!')
@@ -303,7 +304,7 @@ describe('message lists fetched while an answer streams', () => {
     const s = withServer()
     const m = placeholder()
     const loading = s.t.loadMessages(THREAD)
-    s.replies[0]?.resolve([{ ...m, content: 'Hello ' }])
+    s.replies[0]?.resolve([{ ...m, content: 'Hello ', streamSeq: 1 }])
     await loading
     expect(s.v(m.id)?.text).toBe('Hello ')
     s.d(m.id, 1, 'world')
@@ -311,18 +312,59 @@ describe('message lists fetched while an answer streams', () => {
     expect(s.v(m.id)?.text).toBe('Hello world!')
   })
 
-  // Known defect, deferred: a snapshot does not say which delta seq its text covers, so a delta it
-  // already contains that arrives after it is appended again. Needs `streamSeq` on the REST message
-  // (contract request). `it.fails` turns red once the contract lands and this passes.
-  it.fails('a delta the snapshot already covered, arriving after it over the socket, is not shown twice', async () => {
+  it('a delta the snapshot already covered, arriving after it over the socket, is not shown twice', async () => {
     const s = withServer()
     const m = placeholder()
     const loading = s.t.loadMessages(THREAD)
-    s.replies[0]?.resolve([{ ...m, content: 'Hello world' }]) // covers seq 0 and 1
+    s.replies[0]?.resolve([{ ...m, content: 'Hello world', streamSeq: 2 }]) // covers seq 0 and 1
     await loading
     s.d(m.id, 1, 'world') // published before the snapshot was read, delivered after it
     s.d(m.id, 2, '!')
     expect(s.v(m.id)?.text).toBe('Hello world!')
+  })
+
+  it('a snapshot older than the deltas already shown keeps them, without repeating any', async () => {
+    const s = withServer()
+    const m = placeholder()
+    s.d(m.id, 0, 'One ')
+    s.d(m.id, 1, 'two ')
+    s.d(m.id, 2, 'three')
+    const loading = s.t.loadMessages(THREAD)
+    s.replies[0]?.resolve([{ ...m, content: 'One ', streamSeq: 1 }]) // read before seq 1 went out
+    await loading
+    expect(s.v(m.id)?.text).toBe('One two three')
+    s.d(m.id, 3, '.')
+    expect(s.v(m.id)?.text).toBe('One two three.')
+  })
+
+  it('a snapshot ahead of the socket: its deltas arriving late are skipped, later ones continue it', async () => {
+    const s = withServer()
+    const m = placeholder()
+    s.d(m.id, 0, 'A')
+    const loading = s.t.loadMessages(THREAD)
+    s.replies[0]?.resolve([{ ...m, content: 'ABCD', streamSeq: 4 }])
+    await loading
+    expect(s.v(m.id)?.text).toBe('ABCD')
+    s.d(m.id, 2, 'C') // covered by the snapshot
+    s.d(m.id, 1, 'B')
+    s.d(m.id, 3, 'D')
+    expect(s.v(m.id)?.text).toBe('ABCD')
+    s.d(m.id, 5, 'F') // seq 4 is still missing: wait for it
+    expect(s.v(m.id)?.text).toBe('ABCD')
+    s.d(m.id, 4, 'E')
+    expect(s.v(m.id)?.text).toBe('ABCDEF')
+  })
+
+  it('an empty snapshot of an answer that has not streamed yet takes the deltas from seq 0', async () => {
+    const s = withServer()
+    const m = placeholder()
+    const loading = s.t.loadMessages(THREAD)
+    s.replies[0]?.resolve([m])
+    await loading
+    s.d(m.id, 1, 'b')
+    expect(s.v(m.id)?.text).toBe('')
+    s.d(m.id, 0, 'a')
+    expect(s.v(m.id)?.text).toBe('ab')
   })
 
   it('a list fetched before the answer completed does not roll the completed answer back', async () => {
@@ -340,9 +382,89 @@ describe('message lists fetched while an answer streams', () => {
       message: { ...m, status: 'complete', content: 'Full answer.' },
       usage: null,
     })
-    s.replies[0]?.resolve([{ ...m, content: 'Full ans' }]) // the server's snapshot was taken earlier
+    s.replies[0]?.resolve([{ ...m, content: 'Full ans', streamSeq: 1 }]) // taken earlier
     await loading
     expect(s.v(m.id)).toMatchObject({ phase: 'complete', text: 'Full answer.' })
+  })
+
+  it('an older list response that lands after a newer one does not roll the streaming text back', async () => {
+    const s = withServer()
+    const m = placeholder()
+    const first = s.t.loadMessages(THREAD) // its reply is read early and delivered late
+    const second = s.t.loadMessages(THREAD)
+    s.replies[1]?.resolve([{ ...m, content: 'ABCDE', streamSeq: 5 }])
+    await second
+    s.d(m.id, 5, 'F')
+    expect(s.v(m.id)?.text).toBe('ABCDEF')
+    s.replies[0]?.resolve([{ ...m, content: 'AB', streamSeq: 2 }])
+    await first
+    expect(s.v(m.id)?.text).toBe('ABCDEF')
+    s.d(m.id, 6, 'G')
+    expect(s.v(m.id)?.text).toBe('ABCDEFG')
+  })
+
+  it('an older list response that lands after a newer one does not drop messages the newer one had', async () => {
+    const s = withServer()
+    const m = placeholder()
+    const later = {
+      ...placeholder(),
+      content: 'next',
+      status: 'complete' as const,
+      streamSeq: null,
+    }
+    const first = s.t.loadMessages(THREAD)
+    const second = s.t.loadMessages(THREAD)
+    s.replies[1]?.resolve([{ ...m, status: 'complete', content: 'done', streamSeq: null }, later])
+    await second
+    s.replies[0]?.resolve([{ ...m, content: 'do', streamSeq: 1 }])
+    await first
+    expect(s.t.store.getState().messages[THREAD]?.list.map((v) => [v.id, v.phase])).toEqual([
+      [m.id, 'complete'],
+      [later.id, 'complete'],
+    ])
+  })
+
+  it('a snapshot covering less than the text already assembled from an earlier snapshot is ignored', async () => {
+    const s = withServer()
+    const m = placeholder()
+    const first = s.t.loadMessages(THREAD)
+    s.replies[0]?.resolve([{ ...m, content: 'ABCDE', streamSeq: 5 }])
+    await first
+    s.d(m.id, 5, 'F')
+    // A copy read from storage (empty text, streamSeq 0) of the same answer, delivered afterwards.
+    const second = s.t.loadMessages(THREAD)
+    s.replies[1]?.resolve([m])
+    await second
+    expect(s.v(m.id)?.text).toBe('ABCDEF')
+    s.d(m.id, 6, 'G')
+    expect(s.v(m.id)?.text).toBe('ABCDEFG')
+  })
+
+  it('a failure reported while the list is loading is applied to the streaming copy that list brings', async () => {
+    const s = withServer()
+    const m = placeholder()
+    s.t.store.setState({
+      messages: { [THREAD]: { list: [], load: { status: 'ready', error: null }, hasMore: false } },
+    })
+    const loading = s.t.loadMessages(THREAD)
+    s.d(m.id, 0, 'half')
+    s.t.handleEvent({
+      type: 'message.failed',
+      spaceId: SPACE,
+      threadId: THREAD,
+      messageId: m.id,
+      code: 'ai_failed',
+      message: 'The provider failed',
+    })
+    s.replies[0]?.resolve([{ ...m, content: 'half', streamSeq: 1 }]) // read before the failure
+    await loading
+    expect(s.v(m.id)).toMatchObject({
+      phase: 'failed',
+      text: 'half',
+      failure: { code: 'ai_failed', message: 'The provider failed' },
+    })
+    s.d(m.id, 1, ' more') // a straggler delta changes nothing
+    expect(s.v(m.id)).toMatchObject({ phase: 'failed', text: 'half' })
   })
 })
 

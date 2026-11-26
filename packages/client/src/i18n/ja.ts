@@ -2,33 +2,45 @@ import type { Dictionary } from './keys'
 
 /** Japanese is the primary market: short, plain, です/ます. */
 export const ja: Dictionary = {
-  'error.invalid_request': '入力内容に誤りがあります。',
-  'error.unauthenticated': 'サインインが必要です。',
-  'error.forbidden': 'この操作の権限がありません。',
-  'error.not_found': '見つかりません。',
-  'error.space_not_found': 'スペースが見つかりません。',
-  'error.item_not_found': '共有アイテムが見つかりません。',
-  'error.thread_not_found': 'スレッドが見つかりません。',
-  'error.invite_not_found': '招待が見つかりません。リンクを確認してください。',
-  'error.invite_expired': '招待の期限が切れています。',
-  'error.invite_revoked': 'この招待は取り消されました。',
-  'error.invite_used': 'この招待はすでに使われています。',
-  'error.invite_email_mismatch': 'この招待は別のメールアドレス宛てです。',
-  'error.member_not_found': 'メンバーが見つかりません。',
-  'error.last_owner': '最後のオーナーは外せません。',
-  'error.capture_blocked': 'このページは共有できません。',
-  'error.attachments_not_allowed': 'スペースのスレッドにはページを添付できません。',
-  'error.already_shared': 'すでに共有されています。',
-  'error.budget_exceeded': 'このスペースの今月の利用上限に達しました。',
-  'error.model_unavailable': 'このモデルは今使えません。',
-  'error.ai_unavailable': 'AI を今使えません。',
-  'error.dev_login_disabled': '開発用ログインは無効です。',
-  'error.google_auth_unavailable': 'Google サインインは設定されていません。',
+  'error.invalid_request': '入力内容に誤りがあります。確認してもう一度お試しください。',
+  'error.unauthenticated': 'サインインが切れました。もう一度サインインしてください。',
+  'error.forbidden':
+    'この操作の権限がありません。必要な場合はスペースのオーナーに依頼してください。',
+  'error.not_found': '見つかりません。削除された可能性があります。更新してもう一度お試しください。',
+  'error.space_not_found': 'スペースが見つかりません。別のスペースを選んでください。',
+  'error.item_not_found':
+    '共有アイテムが見つかりません。共有が解除された可能性があります。一覧を更新してください。',
+  'error.thread_not_found':
+    'スレッドが見つかりません。削除された可能性があります。一覧を更新してください。',
+  'error.invite_not_found':
+    '招待が見つかりません。リンクを確認するか、新しい招待を依頼してください。',
+  'error.invite_expired': '招待の期限が切れています。オーナーに新しい招待を依頼してください。',
+  'error.invite_revoked': 'この招待は取り消されました。オーナーに新しい招待を依頼してください。',
+  'error.invite_used': 'この招待はすでに使われています。オーナーに新しい招待を依頼してください。',
+  'error.invite_email_mismatch':
+    'この招待は別のメールアドレス宛てです。そのアドレスでサインインするか、新しい招待を依頼してください。',
+  'error.member_not_found': 'メンバーが見つかりません。メンバー一覧を更新してください。',
+  'error.last_owner':
+    'スペースにはオーナーが 1 人以上必要です。先に別のメンバーをオーナーにしてください。',
+  'error.capture_blocked': 'このページは共有できません。別のページを共有してください。',
+  'error.attachments_not_allowed':
+    'スペースのスレッドにはページを添付できません。ページはスペースに共有してください。',
+  'error.already_shared': 'すでに共有されています。スペースの一覧から開けます。',
+  'error.thread_has_private_attachments':
+    'ページを添付したスレッドはスペースに共有できません。ページをスペースに共有してから、スペースのスレッドで質問してください。',
+  'error.budget_exceeded':
+    'このスペースは今月の AI 利用上限に達しました。上限の変更はオーナーに依頼してください。',
+  'error.model_unavailable': 'このモデルは今使えません。別のモデルを選んでください。',
+  'error.ai_unavailable': 'このサーバーでは今 AI を使えません。しばらくしてからお試しください。',
+  'error.dev_login_disabled': '開発用ログインは無効です。Google でサインインしてください。',
+  'error.google_auth_unavailable':
+    'このサーバーでは Google サインインが設定されていません。管理者に問い合わせてください。',
   'error.google_token_invalid': 'Google サインインに失敗しました。もう一度お試しください。',
   'error.rate_limited': '操作が多すぎます。少し待ってからお試しください。',
-  'error.payload_too_large': 'データが大きすぎます。',
+  'error.payload_too_large':
+    'データが大きすぎて送れません。文章を短くするか、ページを減らしてください。',
   'error.contract_violation': 'サーバーの応答が想定と異なります。アプリを更新してください。',
-  'error.internal': 'サーバーでエラーが起きました。',
+  'error.internal': 'サーバーでエラーが起きました。しばらくしてからお試しください。',
   'error.network': 'サーバーに接続できません。ネットワークを確認してください。',
   'error.aborted': '中止しました。',
 
@@ -62,15 +74,18 @@ export const ja: Dictionary = {
   'share.stale.not-shared': 'このページはまだ共有されていません。',
   'share.noSpace': '共有先のスペースを選んでください。',
 
-  'ai.ai_aborted': '回答を中止しました。',
-  'ai.ai_unavailable': 'AI を今使えません。',
+  'ai.ai_aborted': '回答を中止しました。続きが必要な場合はもう一度質問してください。',
+  'ai.ai_failed': '回答を作れませんでした。もう一度質問してください。',
+  'ai.ai_interrupted': 'サーバーの再起動で回答が途中で止まりました。もう一度質問してください。',
+  'ai.ai_refused': 'AI がこの質問への回答を断りました。質問の言い方を変えてお試しください。',
+  'ai.ai_unavailable': 'AI を今使えません。しばらくしてからお試しください。',
   'ai.ai_busy': 'AI が混み合っています。少し待ってからお試しください。',
-  'ai.ai_context_too_long': '内容が長すぎて回答できません。',
-  'ai.ai_timeout': '回答に時間がかかりすぎました。',
-  'ai.ai_failed': '回答を作れませんでした。',
-  'ai.ai_refused': 'AI がこの質問への回答を断りました。',
-  'ai.model_unavailable': 'このモデルは今使えません。',
-  'ai.budget_exceeded': 'このスペースの今月の利用上限に達しました。',
+  'ai.ai_context_too_long':
+    '内容が長すぎて回答できません。新しいスレッドで質問するか、添付するページを減らしてください。',
+  'ai.ai_timeout': '回答に時間がかかりすぎました。もう一度質問してください。',
+  'ai.model_unavailable': 'このモデルは今使えません。別のモデルを選んで質問してください。',
+  'ai.budget_exceeded':
+    'このスペースは今月の AI 利用上限に達しました。上限の変更はオーナーに依頼してください。',
 
   'attach.notAllowed': 'スペースのスレッドにはページを添付できません。',
   'attach.limit': '添付できるのは 1 回に 3 ページまでです。',

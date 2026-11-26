@@ -455,8 +455,42 @@ describe('threads and AI', () => {
     await server.settle()
   })
 
-  it('promoting a private thread makes it visible to the Space', async () => {
+  it('a private thread with an attached page is not promoted: refused before any request, and by the server', async () => {
     const privateId = A.client.threads.store.getState().privateThreadId as string
+    const shares = () => A.count('POST', /\/share$/)
+    expect(A.client.threads.hasAttachments(privateId)).toBe(true)
+
+    // The loaded messages show an attachment: refused locally.
+    const s0 = shares()
+    expect(await A.client.threads.promote(privateId)).toBeNull()
+    expect(shares()).toBe(s0)
+    expect(A.client.threads.store.getState().mutation.error).toMatchObject({
+      kind: 'client',
+      code: 'thread_has_private_attachments',
+    })
+
+    // Without the messages loaded, the request goes out and the server refuses it the same way.
+    const { [privateId]: _loaded, ...rest } = A.client.threads.store.getState().messages
+    A.client.threads.store.setState({ messages: rest })
+    expect(await A.client.threads.promote(privateId)).toBeNull()
+    expect(shares()).toBe(s0 + 1)
+    expect(A.client.threads.store.getState().mutation.error).toMatchObject({
+      kind: 'server',
+      code: 'thread_has_private_attachments',
+      status: 409,
+    })
+    expect(A.client.threads.thread(privateId)?.visibility).toBe('private')
+    expect(A.client.threads.store.getState().privateThreadId).toBe(privateId)
+    expect(B.client.threads.thread(privateId)).toBeNull()
+    await A.client.threads.loadMessages(privateId)
+  })
+
+  it('promoting a private thread without attachments makes it visible to the Space', async () => {
+    A.client.threads.store.setState({ privateThreadId: null })
+    const fresh = await A.client.threads.ensurePrivateThread()
+    const privateId = fresh?.id as string
+    expect(await A.client.threads.post(privateId, 'No pages here', { askAi: false })).not.toBeNull()
+    expect(A.client.threads.hasAttachments(privateId)).toBe(false)
     const promoted = await A.client.threads.promote(privateId)
     expect(promoted?.visibility).toBe('space')
     expect(A.client.threads.store.getState().privateThreadId).toBeNull()

@@ -20,11 +20,6 @@ export interface TestClient {
   count(method: string, path: RegExp): number
   /** Reconnection gate: while closed, new sockets go to a dead port and fail. */
   gate: { blocked: boolean }
-  /**
-   * Resolves when no request of this client is in flight. Tests call it before closing the server:
-   * the server's close hangs while requests are in flight (reported, apps/server).
-   */
-  idle(timeoutMs?: number): Promise<void>
 }
 
 export interface MakeClientOptions {
@@ -42,7 +37,6 @@ export function makeClient(
 ): TestClient {
   const requests: RecordedRequest[] = []
   const gate = { blocked: false }
-  let inflight = 0
   const Native = globalThis.WebSocket as unknown as new (url: string) => WebSocket
   class GatedWebSocket extends Native {
     constructor(url: string) {
@@ -85,12 +79,7 @@ export function makeClient(
         body: rawBody ? JSON.parse(rawBody) : undefined,
         rawBody,
       })
-      inflight += 1
-      try {
-        return await fetch(input, init)
-      } finally {
-        inflight -= 1
-      }
+      return fetch(input, init)
     },
   })
   return {
@@ -98,8 +87,6 @@ export function makeClient(
     bridge,
     requests,
     gate,
-    idle: (timeoutMs = 5000) =>
-      waitFor(() => inflight === 0, timeoutMs, 'requests settled').then(() => undefined),
     count: (method, path) =>
       requests.filter((r) => r.method === method && path.test(r.path)).length,
   }
