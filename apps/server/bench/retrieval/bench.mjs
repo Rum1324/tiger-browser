@@ -126,7 +126,7 @@ const dirSize = (p) => {
 
 async function embedCmd(key) {
   const spec = MODELS[key]
-  if (!spec) throw new Error('unknown model ' + key)
+  if (!spec) throw new Error(`unknown model ${key}`)
   const tf = await import(pathToFileURL(req.resolve('@huggingface/transformers')).href)
   const { AutoTokenizer, AutoModel, env } = tf
   env.cacheDir = path.join(CACHE, 'models')
@@ -175,7 +175,7 @@ async function embedCmd(key) {
   }
   const docTexts = corpus.map((c) => spec.d + c.text)
   const t1 = performance.now()
-  const first = await run([docTexts[0]])
+  const _first = await run([docTexts[0]])
   const firstMs = performance.now() - t1
   const docs = await batched(docTexts, 8)
   const qs = await batched(
@@ -214,7 +214,7 @@ async function embedCmd(key) {
     avgTokens: Math.round(tokSum / docTexts.length),
     peakRssMB: Math.round(process.resourceUsage().maxRSS / 1024),
   }
-  fs.writeFileSync(path.join(CACHE, key + '.json'), JSON.stringify({ stats, docs, queries: qs }))
+  fs.writeFileSync(path.join(CACHE, `${key}.json`), JSON.stringify({ stats, docs, queries: qs }))
   console.log(JSON.stringify(stats))
 }
 
@@ -253,7 +253,7 @@ async function pgConnect() {
   return c
 }
 const terms = (q) => q.trim().split(/\s+/).filter(Boolean)
-const lit = (v) => '[' + v.join(',') + ']'
+const lit = (v) => `[${v.join(',')}]`
 
 async function setupKeyword(c) {
   await c.query(
@@ -263,7 +263,7 @@ async function setupKeyword(c) {
     'drop table if exists kw_chunks; create table kw_chunks (id text primary key, space_id int not null, body text not null)',
   )
   for (const p of corpus)
-    await c.query('insert into kw_chunks values ($1,$2,$3)', [p.id, 1, p.title + '\n' + p.text])
+    await c.query('insert into kw_chunks values ($1,$2,$3)', [p.id, 1, `${p.title}\n${p.text}`])
   await c.query(`create index kw_trgm on kw_chunks using gin (body gin_trgm_ops);
                  create index kw_bigm on kw_chunks using gin (body gin_bigm_ops);
                  create index kw_groonga on kw_chunks using pgroonga (body);
@@ -363,7 +363,7 @@ async function kwCmd() {
   return rows
 }
 
-const loadCache = (key) => JSON.parse(fs.readFileSync(path.join(CACHE, key + '.json'), 'utf8'))
+const loadCache = (key) => JSON.parse(fs.readFileSync(path.join(CACHE, `${key}.json`), 'utf8'))
 
 async function setupVec(c, key, dim) {
   const m = loadCache(key)
@@ -375,7 +375,7 @@ async function setupVec(c, key, dim) {
   for (let i = 0; i < corpus.length; i++)
     await c.query('insert into vec_chunks values ($1,1,$2,$3)', [
       corpus[i].id,
-      corpus[i].title + '\n' + corpus[i].text,
+      `${corpus[i].title}\n${corpus[i].text}`,
       lit(m.docs[i]),
     ])
   await c.query(
@@ -397,7 +397,7 @@ async function vecCmd(keys) {
     const run = async (mode, qi) => {
       const q = queries[qi]
       const qv = lit(m.queries[qi])
-      const t = terms(q.query)
+      const _t = terms(q.query)
       if (mode === 'vector')
         return (
           await c.query(
@@ -461,10 +461,10 @@ async function chunkCmd(key) {
       const mask = inp.attention_mask.data
       for (let b = 0; b < B; b++) {
         const v = new Float64Array(D)
-        let n = 0
+        let _n = 0
         for (let l = 0; l < L; l++) {
           if (Number(mask[b * L + l]) === 0) continue
-          n++
+          _n++
           for (let d = 0; d < D; d++) v[d] += h.data[(b * L + l) * D + d]
         }
         const nn = Math.hypot(...v)
