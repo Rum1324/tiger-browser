@@ -19,6 +19,7 @@ import {
 export const ClientEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('auth'), token: z.string() }),
   z.object({ type: z.literal('subscribe'), spaceIds: z.array(Id).max(100) }),
+  z.object({ type: z.literal('unsubscribe'), spaceIds: z.array(Id).max(100) }),
   z.object({ type: z.literal('ping') }),
 ])
 export type ClientEvent = z.infer<typeof ClientEvent>

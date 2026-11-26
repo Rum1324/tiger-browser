@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { CaptureBlockReason, CaptureEligibility } from './blocklist'
-import { ExtractedPage, IsoDate } from './domain'
+import { ExtractedPage, IsoDate, ModelRef } from './domain'
 
 /**
  * The engine contract: everything the browser's own UI can ask of the engine, and everything the engine
@@ -99,7 +99,7 @@ export const Settings = z.object({
   userBlockedHosts: z.array(z.string()),
   /** The Space last worked in; restored at launch. */
   lastSpaceId: z.string().nullable(),
-  defaultModel: z.object({ provider: z.string(), id: z.string() }).nullable(),
+  defaultModel: ModelRef.nullable(),
 })
 export type Settings = z.infer<typeof Settings>
 
@@ -135,6 +135,23 @@ export const GoogleConnection = z.object({
   configured: z.boolean(),
 })
 export type GoogleConnection = z.infer<typeof GoogleConnection>
+
+/** Why a Google consent flow did not complete. */
+export const GoogleFlowError = z.enum([
+  'not-configured',
+  'denied',
+  'timeout',
+  'cancelled',
+  'failed',
+])
+export type GoogleFlowError = z.infer<typeof GoogleFlowError>
+
+export const GoogleFlowResult = z.object({
+  connection: GoogleConnection,
+  /** Null when the flow completed. */
+  error: GoogleFlowError.nullable(),
+})
+export type GoogleFlowResult = z.infer<typeof GoogleFlowResult>
 
 /** Site permissions the engine asks the member about. Everything else is denied without asking. */
 export const SitePermission = z.enum([
@@ -277,10 +294,18 @@ export const engineCommands = {
   'auth.getToken': cmd(Void, z.string().nullable()),
   'auth.setToken': cmd(z.object({ token: z.string().nullable() }), Void),
   /** Run Google sign-in and return an ID token for the server to verify. */
-  'auth.googleSignIn': cmd(Void, z.object({ idToken: z.string() }).nullable()),
+  'auth.googleSignIn': cmd(
+    Void,
+    z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), idToken: z.string() }),
+      z.object({ ok: z.literal(false), error: GoogleFlowError }),
+    ]),
+  ),
 
   'google.status': cmd(Void, GoogleConnection),
-  'google.connect': cmd(Void, GoogleConnection),
+  'google.connect': cmd(Void, GoogleFlowResult),
+  /** Stop waiting for a consent flow the member abandoned in the system browser. */
+  'google.cancel': cmd(Void, Void),
   'google.disconnect': cmd(Void, GoogleConnection),
   /** Create a new Google Doc from Markdown in the member's Drive. Tokens never leave the machine. */
   'google.exportDoc': cmd(
@@ -336,6 +361,8 @@ export const engineEvents = {
   'google.changed': GoogleConnection,
   /** A site asked for a permission; the UI shows the prompt and answers with `permission.respond`. */
   'permission.request': PermissionRequest,
+  /** The member opened a Tiger invite link; the UI offers to accept it. */
+  'invite.open': z.object({ token: z.string() }),
 } as const
 
 export type EngineEventName = keyof typeof engineEvents

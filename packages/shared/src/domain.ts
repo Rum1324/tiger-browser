@@ -147,6 +147,22 @@ export const ItemDetail = Item.extend({
 })
 export type ItemDetail = z.infer<typeof ItemDetail>
 
+/**
+ * One row of the member's item index: enough to tell, on the member's own machine, whether a page
+ * they have open is shared, where, by whom and at which version. `urlKey` is `canonicalUrl(url)`.
+ */
+export const ItemIndexEntry = z.object({
+  itemId: Id,
+  spaceId: Id,
+  urlKey: z.string(),
+  title: z.string(),
+  sharedBy: UserRef,
+  versionNumber: z.number().int().positive(),
+  contentHash: z.string(),
+  updatedAt: IsoDate,
+})
+export type ItemIndexEntry = z.infer<typeof ItemIndexEntry>
+
 // ── Models ──────────────────────────────────────────────────────────────────
 
 export const Provider = z.enum(['anthropic', 'openai', 'google', 'mock'])

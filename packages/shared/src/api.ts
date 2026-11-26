@@ -6,6 +6,7 @@ import {
   Invite,
   Item,
   ItemDetail,
+  ItemIndexEntry,
   ItemVersionRef,
   Locale,
   Message,
@@ -221,14 +222,15 @@ export const api = {
     params: SpaceParams,
     response: z.array(Item),
   }),
-  /** Which Spaces already hold this URL: drives the per-tab shared state in the UI. */
-  lookupItemsByUrl: route({
-    method: 'POST',
-    path: '/v1/items/lookup',
-    body: z.object({ urls: z.array(z.string()).min(1).max(100) }),
-    response: z.array(
-      z.object({ url: z.string(), itemId: Id, spaceId: Id, sharedBy: Id, updatedAt: z.string() }),
-    ),
+  /**
+   * Every shared item across the caller's Spaces, as keys. The client matches open tabs against this
+   * list locally and keeps it current from socket events, so the URL of a page a member merely has
+   * open is never sent to the server.
+   */
+  listItemIndex: route({
+    method: 'GET',
+    path: '/v1/items/index',
+    response: z.array(ItemIndexEntry),
   }),
   getItem: route({
     method: 'GET',
@@ -288,6 +290,7 @@ export const api = {
     body: z.object({ visibility: ThreadVisibility, title: z.string().max(200).optional() }),
     response: Thread,
   }),
+  /** A message whose status is `streaming` carries the text generated so far. */
   listMessages: route({
     method: 'GET',
     path: '/v1/threads/:threadId/messages',
@@ -321,6 +324,13 @@ export const api = {
     method: 'DELETE',
     path: '/v1/threads/:threadId',
     params: ThreadParams,
+    response: Ok,
+  }),
+  /** Stop an answer that is still streaming. The message ends with status `error` and errorCode `ai_aborted`. */
+  abortMessage: route({
+    method: 'POST',
+    path: '/v1/messages/:messageId/abort',
+    params: z.object({ messageId: Id }),
     response: Ok,
   }),
   /** Record that an answer left for Google Docs (the upload itself happens on the member's machine). */
