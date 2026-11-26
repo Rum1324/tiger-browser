@@ -1,34 +1,10 @@
+import type { ApiErrorCode } from '@tiger/shared'
+
 /**
- * Stable machine codes. Clients branch on these, so renaming one is a breaking change.
+ * Stable machine codes, taken from the shared contract so the server and its clients cannot drift.
+ * Clients branch on these, so renaming one is a breaking change.
  */
-export type ErrorCode =
-  | 'invalid_request'
-  | 'unauthenticated'
-  | 'forbidden'
-  | 'not_found'
-  | 'space_not_found'
-  | 'item_not_found'
-  | 'thread_not_found'
-  | 'invite_not_found'
-  | 'invite_expired'
-  | 'invite_revoked'
-  | 'invite_used'
-  | 'invite_email_mismatch'
-  | 'member_not_found'
-  | 'last_owner'
-  | 'capture_blocked'
-  | 'attachments_not_allowed'
-  | 'already_shared'
-  | 'budget_exceeded'
-  | 'model_unavailable'
-  | 'ai_unavailable'
-  | 'dev_login_disabled'
-  | 'google_auth_unavailable'
-  | 'google_token_invalid'
-  | 'rate_limited'
-  | 'payload_too_large'
-  | 'contract_violation'
-  | 'internal'
+export type ErrorCode = ApiErrorCode
 
 export class AppError extends Error {
   constructor(

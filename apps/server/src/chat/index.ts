@@ -74,7 +74,9 @@ export function createChat(deps: {
     ) {
       return configured
     }
-    return cheapestModel(router, catalog)
+    // The mock would only echo the prompt back; the provisional title (the first question) reads better.
+    const cheapest = cheapestModel(router, catalog)
+    return cheapest?.provider === 'mock' ? null : cheapest
   }
   const titles = createTitleWriter({
     sql: deps.sql,

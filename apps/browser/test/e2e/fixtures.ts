@@ -6,6 +6,15 @@ export function makeTextPdf(lines: readonly string[]): Buffer {
   const stream = lines
     .map((l, i) => `BT /F1 14 Tf 72 ${760 - i * 24} Td (${l.replace(/[\\()]/g, '\\$&')}) Tj ET`)
     .join('\n')
+  return pdfWithContent(stream)
+}
+
+/** A page that only paints shapes, like a scan: pdf.js finds no text layer. */
+export function makeScanLikePdf(): Buffer {
+  return pdfWithContent('0.2 0.2 0.2 rg 72 72 451 698 re f 1 1 1 rg 100 600 300 20 re f')
+}
+
+function pdfWithContent(stream: string): Buffer {
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -112,6 +121,10 @@ const ROUTES: Record<string, Route> = {
     res.writeHead(200, { 'content-type': 'application/pdf' })
     res.end(makeTextPdf(['Quarterly report for the Tiger team', 'Revenue grew in every region']))
   },
+  '/scan.pdf': (_q, res) => {
+    res.writeHead(200, { 'content-type': 'application/pdf' })
+    res.end(makeScanLikePdf())
+  },
   '/download-page': (_q, res) =>
     html(res, page('Downloads', '<a id="dl" href="/file.txt" download>get file</a>')),
   '/file.txt': (_q, res) => {
@@ -121,6 +134,15 @@ const ROUTES: Record<string, Route> = {
       'content-length': String(Buffer.byteLength(DOWNLOAD_BODY)),
     })
     res.end(DOWNLOAD_BODY)
+  },
+  '/slow.bin': (_q, res) => {
+    // Sends a little and then stalls, so the download stays in progress until cancelled.
+    res.writeHead(200, {
+      'content-type': 'application/octet-stream',
+      'content-disposition': 'attachment; filename="slow.bin"',
+      'content-length': String(10 * 1024 * 1024),
+    })
+    res.write(Buffer.alloc(64 * 1024))
   },
   '/clicks': (_q, res) =>
     html(

@@ -111,6 +111,10 @@ export function websocketRoute(app: FastifyInstance): void {
                   `
               const allowed = new Set(rows.map((r) => r.space_id))
               for (const id of allowed) hub.subscribe(current, id)
+              hub.send(current, {
+                type: 'subscribed',
+                spaceIds: ids.filter((id) => allowed.has(id)),
+              })
               if (allowed.size < ids.length) {
                 hub.send(current, {
                   type: 'error',

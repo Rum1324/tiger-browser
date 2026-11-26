@@ -78,8 +78,8 @@ describe('route registry', () => {
     expect(r.json().error.code).toBe('contract_violation')
   })
 
-  it('reports listModels as unavailable when the directory has no default', async () => {
+  it('returns defaultModel null from listModels when no provider is configured', async () => {
     const { token } = await h.login('Models')
-    await h.fails('listModels', {}, token, 503, 'ai_unavailable')
+    expect(await h.ok('listModels', {}, token)).toEqual({ models: [], defaultModel: null })
   })
 })

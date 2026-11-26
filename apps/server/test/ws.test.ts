@@ -41,6 +41,8 @@ describe('/v1/ws', () => {
     c.send({ type: 'auth', token: mine.member.token })
     await c.next('ready')
     c.send({ type: 'subscribe', spaceIds: [mine.space.id, theirs.space.id] })
+    // The confirmation lists only the Space the user belongs to, then the denial for the rest.
+    expect(await c.next('subscribed')).toEqual({ type: 'subscribed', spaceIds: [mine.space.id] })
     expect(await c.next('error')).toMatchObject({
       code: 'subscribe_denied',
       message: '1 Space(s) not found',
@@ -91,7 +93,7 @@ describe('/v1/ws', () => {
     })
     await memberWs.sync()
     expect(JSON.stringify(memberWs.events)).not.toContain(t.id)
-    expect(memberWs.events.map((e) => e.type)).toEqual(['ready', 'pong', 'pong'])
+    expect(memberWs.events.map((e) => e.type)).toEqual(['ready', 'subscribed', 'pong', 'pong'])
 
     // Once shared, the same thread's events reach the member too.
     const t2 = await h.ok(
@@ -135,6 +137,32 @@ describe('/v1/ws', () => {
     await memberWs.sync()
     expect(memberWs.events.some((e) => e.type === 'thread.created')).toBe(false)
     memberWs.close()
+  })
+
+  it('tells members, and only members, when a Space is renamed or recoloured', async () => {
+    const { owner, member, space } = await spaceWithMembers(h, 'WsRename')
+    const other = await spaceWithMembers(h, 'WsRenameOther')
+    const memberWs = await connectAs(port, member.token, [space.id])
+    const outsiderWs = await connectAs(port, other.member.token, [other.space.id])
+    await h.ok(
+      'updateSpace',
+      { params: { spaceId: space.id }, body: { name: 'Renamed', hue: 'violet' } },
+      owner.token,
+    )
+    expect(await memberWs.next('space.updated')).toEqual({
+      type: 'space.updated',
+      spaceId: space.id,
+      name: 'Renamed',
+      hue: 'violet',
+    })
+    await h.ok('updateSpace', { params: { spaceId: space.id }, body: { hue: 'teal' } }, owner.token)
+    expect(await memberWs.next('space.updated', (e) => e.hue === 'teal')).toMatchObject({
+      name: 'Renamed',
+    })
+    await outsiderWs.sync()
+    expect(JSON.stringify(outsiderWs.events)).not.toContain(space.id)
+    memberWs.close()
+    outsiderWs.close()
   })
 
   it('tells members when someone joins', async () => {

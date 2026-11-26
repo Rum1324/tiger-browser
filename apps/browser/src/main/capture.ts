@@ -67,7 +67,7 @@ const blocked = (e: CaptureEligibility): CaptureResult => ({
   reason: e.reason,
   detail: e.rule,
 })
-const failure = (error: 'empty' | 'failed', detail: string | null): CaptureResult => ({
+const failure = (error: 'empty' | 'no-text-layer' | 'failed', detail: string | null): CaptureResult => ({
   ok: false,
   error,
   reason: null,
@@ -135,7 +135,11 @@ export async function captureTab(target: CaptureTarget, deps: CaptureDeps): Prom
           return failure('failed', `not a PDF: ${res.contentType}`)
         }
         const pdf = await deps.extractPdf(res.body)
-        if (!pdf.extraction) return failure('empty', `${pdf.reason}: ${pdf.detail}`)
+        if (!pdf.extraction) {
+          // A scanned PDF has pages but no text; the UI explains that OCR is not supported.
+          if (pdf.reason === 'no-text-layer') return failure('no-text-layer', pdf.detail)
+          return failure('failed', `${pdf.reason}: ${pdf.detail}`)
+        }
         extraction = pdf.extraction
       } else {
         extraction = reply.extraction

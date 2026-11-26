@@ -1,4 +1,5 @@
 import { Readability } from '@mozilla/readability'
+import { sourceTypeForUrl } from '@tiger/shared/classify'
 import { cloneVisible, liveSkipFilter, stripBoilerplate, stripUnsafe } from './clean'
 import { declaredLang, resolveLang } from './lang'
 import { createContext, elementToMarkdown, type MdContext } from './markdown'
@@ -136,25 +137,13 @@ function landmarkOf(doc: Document): Element {
   return doc.body ?? doc.documentElement
 }
 
-function hostIs(host: string, domain: string): boolean {
-  return host === domain || host.endsWith(`.${domain}`)
-}
-
 /**
- * Which app handler a URL gets. Mirrors `sourceTypeForUrl` in @tiger/shared for the two DOM-handled
- * apps (a test keeps them in agreement); importing the shared package here would pull zod into the
- * per-tab preload bundle.
+ * Which app handler a URL gets, from the shared URL classification. Imported from the zod-free
+ * `@tiger/shared/classify` entry because this module is bundled into the per-tab preload.
  */
 export function appKind(rawUrl: string): 'slack' | 'notion' | null {
-  let host: string
-  try {
-    host = new URL(rawUrl).hostname.toLowerCase()
-  } catch {
-    return null
-  }
-  if (hostIs(host, 'slack.com')) return 'slack'
-  if (hostIs(host, 'notion.so') || hostIs(host, 'notion.site')) return 'notion'
-  return null
+  const type = sourceTypeForUrl(rawUrl)
+  return type === 'slack' || type === 'notion' ? type : null
 }
 
 function finish(ctx: MdContext, ex: Extraction): Extraction | null {

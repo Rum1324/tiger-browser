@@ -157,7 +157,12 @@ describe('askAi pipeline', () => {
     expect(completed.message.citations).toEqual([
       { ...citationOf(1, item, 'Q3 revenue rose 12%'), available: true },
     ])
-    expect(completed.usage).toEqual({ inputTokens: 120, outputTokens: 30, cachedInputTokens: 100 })
+    expect(completed.usage).toEqual({
+      inputTokens: 120,
+      outputTokens: 30,
+      cachedInputTokens: 100,
+      cacheWriteTokens: 5,
+    })
 
     const stream = eventsFor(memberWs.events, thread.id)
     // Sources are validated asynchronously, so they may land between deltas, but always before completion.
@@ -298,7 +303,7 @@ describe('askAi pipeline', () => {
     ])
     await memberWs.sync()
     expect(eventsFor(memberWs.events, thread.id)).toEqual([])
-    expect(memberWs.events.map((e) => e.type)).toEqual(['ready', 'pong', 'pong'])
+    expect(memberWs.events.map((e) => e.type)).toEqual(['ready', 'subscribed', 'pong', 'pong'])
     ownerWs.close()
     memberWs.close()
   })

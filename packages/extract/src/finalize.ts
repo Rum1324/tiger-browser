@@ -1,9 +1,5 @@
-import {
-  type ExtractedPage,
-  ExtractedPage as ExtractedPageSchema,
-  MAX_MARKDOWN_CHARS,
-  sourceTypeForUrl,
-} from '@tiger/shared'
+import { type ExtractedPage, ExtractedPage as ExtractedPageSchema } from '@tiger/shared'
+import { MAX_MARKDOWN_CHARS, sourceTypeForUrl } from '@tiger/shared/classify'
 import { clip } from './text'
 import type { Extraction } from './types'
 

@@ -54,7 +54,14 @@ export async function updateSpace(
     update spaces set name = coalesce(${patch.name ?? null}, name), hue = coalesce(${patch.hue ?? null}, hue)
     where id = ${spaceId}
   `
-  return getSpaceFor(ctx.sql, spaceId, user.id)
+  const space = await getSpaceFor(ctx.sql, spaceId, user.id)
+  ctx.hub.publishToSpace(spaceId, {
+    type: 'space.updated',
+    spaceId,
+    name: space.name,
+    hue: space.hue,
+  })
+  return space
 }
 
 export async function listMembers(sql: Sql, spaceId: string): Promise<SpaceMember[]> {

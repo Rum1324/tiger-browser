@@ -94,6 +94,16 @@ export class EngineWindow {
     b.on('enter-full-screen', () => this.emitWindowState())
     b.on('leave-full-screen', () => this.emitWindowState())
     b.on('closed', () => this.dispose())
+
+    // The UI views hold the bridge: they must never show anything but our own UI. Links and
+    // window.open from the UI are refused; the UI opens pages through tabs.create instead.
+    for (const wc of [this.uiWc, this.overlayWc]) {
+      wc.on('will-navigate', (e) => e.preventDefault())
+      wc.on('will-frame-navigate', (e) => {
+        if (!e.isMainFrame) e.preventDefault()
+      })
+      wc.setWindowOpenHandler(() => ({ action: 'deny' }))
+    }
   }
 
   // ── Events ───────────────────────────────────────────────────────────────

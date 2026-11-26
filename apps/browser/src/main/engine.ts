@@ -20,6 +20,7 @@ import {
   webContents,
 } from 'electron'
 import { type CaptureDeps, captureTab, DomReply, type FetchedResource } from './capture'
+import { TAB_CAPTURE_REQUEST, TAB_CAPTURE_RESULT, TAB_NOTIFICATION_STATE } from './channels'
 import { createHandlers, type Handlers } from './commands'
 import { DownloadManager } from './downloads'
 import { devServerUrl, env } from './env'
@@ -42,10 +43,6 @@ import { EngineWindow } from './window'
 export const TAB_PARTITION = 'persist:tabs'
 export const UI_PARTITION = 'persist:chrome-ui'
 
-/** Channels between the main process and the tab preload. Tab pages see none of this. */
-export const TAB_CAPTURE_REQUEST = 'tiger:tab:capture-request'
-export const TAB_CAPTURE_RESULT = 'tiger:tab:capture-result'
-export const TAB_NOTIFICATION_STATE = 'tiger:tab:notification-state'
 
 const CAPTURE_TIMEOUT_MS = 15_000
 const MAX_FETCH_BYTES = 150 * 1024 * 1024

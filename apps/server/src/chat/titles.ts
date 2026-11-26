@@ -20,12 +20,11 @@ export function cleanTitle(raw: string): string {
       .split('\n')
       .map((l) => l.trim())
       .find((l) => l.length > 0) ?? ''
+  // Quotes, emphasis and closing punctuation come in any order, e.g. 「計画」。 or "Plan."
   const t = line
     .replace(/^(title|タイトル)\s*[:：]\s*/i, '')
-    .replace(/^[#*\s]+|[*\s]+$/g, '')
     .replace(/\[(?:A?\d{1,3})\]/g, '')
-    .replace(/^["'「『“]+|["'」』”]+$/g, '')
-    .replace(/[。.!！]+$/, '')
+    .replace(/^[\s#*"'「『“]+|[\s*"'」』”。.!！]+$/g, '')
     .trim()
   return [...t].slice(0, 80).join('')
 }

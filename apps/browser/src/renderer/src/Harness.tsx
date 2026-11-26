@@ -165,6 +165,7 @@ export function Harness() {
         <button type="submit">{t.go}</button>
         <button
           type="button"
+          data-testid="capture"
           disabled={!active?.capture.allowed}
           title={active?.capture.reason ?? ''}
           onClick={async () => active && setCapture(await tiger.invoke('capture.extract', { tabId: active.id }))}

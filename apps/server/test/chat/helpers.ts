@@ -54,6 +54,11 @@ export async function startChatHarness(
     /** Registered as the anthropic provider: counts as a configured key. */
     anthropic?: ChatProvider
     env?: Record<string, string>
+    /** Server configuration overrides, e.g. a provider key for the live test. */
+    serverEnv?: Record<string, string>
+    retryAttempts?: number
+    /** False leaves the mock provider out of the router entirely (the live test). */
+    withMock?: boolean
   } = {},
 ): Promise<ChatHarness> {
   let chat: Chat | null = null
@@ -63,6 +68,7 @@ export async function startChatHarness(
     return v
   }
   const h = await startHarness({
+    ...(opts.serverEnv ? { env: opts.serverEnv } : {}),
     indexer: { index: (i) => must(retrieval).indexer.index(i) },
     retriever: { search: (i) => must(retrieval).retriever.search(i) },
     answerer: { answer: (i) => must(chat).answerer.answer(i) },
@@ -73,11 +79,18 @@ export async function startChatHarness(
   const traces: AnswerTrace[] = []
   chat = createChat({
     sql: h.sql,
-    config: loadChatConfig(h.config, { CHAT_ENABLE_MOCK: '1', ...opts.env }),
+    config: loadChatConfig(h.config, {
+      CHAT_ENABLE_MOCK: '1',
+      CHAT_TITLE_MODEL: 'mock/mock-chat',
+      ...opts.env,
+    }),
     contextBuilder: retrieval.contextBuilder,
     routerOptions: {
-      providers: { mock: provider, ...(opts.anthropic ? { anthropic: opts.anthropic } : {}) },
-      retry: { maxAttempts: 1 },
+      providers: {
+        ...(opts.withMock === false ? {} : { mock: provider }),
+        ...(opts.anthropic ? { anthropic: opts.anthropic } : {}),
+      },
+      retry: { maxAttempts: opts.retryAttempts ?? 1 },
     },
     onRequest: (t) => traces.push(t),
   })
@@ -108,7 +121,10 @@ export async function ask(
   token: string,
   threadId: string,
   content: string,
-  extra: { attachments?: ReturnType<typeof page>[]; model?: { provider: 'mock' | 'anthropic'; id: string } } = {},
+  extra: {
+    attachments?: ReturnType<typeof page>[]
+    model?: { provider: 'mock' | 'anthropic'; id: string }
+  } = {},
 ) {
   const posted = await h.ok(
     'postMessage',

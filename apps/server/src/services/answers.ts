@@ -131,6 +131,7 @@ export function runAnswer(ctx: AppContext, p: RunAnswerParams): void {
         inputTokens: result.usage.inputTokens,
         outputTokens: result.usage.outputTokens,
         cachedInputTokens: result.usage.cachedInputTokens,
+        cacheWriteTokens: result.usage.cacheWriteTokens ?? 0,
       }
       const written = await sql.begin(async (tx) => {
         const rows = await tx`
