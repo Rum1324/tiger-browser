@@ -14,6 +14,9 @@ const SPACES = {
   fund: { name: "資金調達 2027", seal: "資", hue: "amber", members: 4, items: 41 },
   hire: { name: "採用", seal: "採", hue: "green", members: 3, items: 18 },
   product: { name: "プロダクト", seal: "製", hue: "indigo", members: 4, items: 27 },
+  /* part 2: a Space the member is invited to (16c) and one being created (16a2) */
+  cs: { name: "導入支援", seal: "導", hue: "teal", members: 3, items: 12 },
+  sales: { name: "営業", seal: "営", hue: "coral", members: 1, items: 0 },
 };
 
 /* ── pages a tab can show. fav = stand-in favicon; block = CaptureBlockReason ── */
@@ -58,6 +61,9 @@ const PAGES = {
   codepin: { fav: "code", title: "kotonoha/app", url: ["", "github.com", "/kotonoha/app"] },
   drive: { fav: "drive", title: "マイドライブ", url: ["drive.", "google.com", "/drive/my-drive"] },
   ntp: { fav: "tab", title: "新しいタブ", url: ["", "", ""] },
+  meet: { fav: "video", title: "接続テスト：ミズナラ・キャピタル面談", url: ["meet.", "google.com", "/mzn-ktnh-dec"] },
+  dead: { fav: "warn", title: "startup-houmu.jp", url: ["", "startup-houmu.jp", "/guide/j-kiss-2027"] },
+  exported: { fav: "gdoc", title: "TAMを3,150億円に揃えた一文", url: ["docs.", "google.com", "/document/d/1TamOneLine"] },
   welcome: { fav: "tab", title: "はじめに", url: ["", "", ""] },
 };
 
@@ -131,8 +137,8 @@ const FAVS = {
   drive: `<path d="M1.750 4.250A1.250 1.250 0 0 1 3 3h3.250l1.500 1.750H13a1.250 1.250 0 0 1 1.250 1.250v6A1.250 1.250 0 0 1 13 13.250H3a1.250 1.250 0 0 1-1.250-1.250z" style="fill:var(--mock-yellow)"/>`,
 };
 function favicon(kind, size = 16) {
-  if (kind === "web" || kind === "search" || kind === "key" || kind === "tab") {
-    const map = { web: "globe", search: "search", key: "key", tab: "page" };
+  if (kind === "web" || kind === "search" || kind === "key" || kind === "tab" || kind === "warn") {
+    const map = { web: "globe", search: "search", key: "key", tab: "page", warn: "warn" };
     return `<span class="fav fav--glyph">${icon(map[kind], size)}</span>`;
   }
   return `<svg class="fav" width="${size}" height="${size}" viewBox="0 0 16 16" aria-hidden="true">${FAVS[kind]}</svg>`;
@@ -200,6 +206,9 @@ function tabMark(id, s) {
   const m = (s.marks || {})[id];
   const out = [];
   if (p.audible) out.push(`<span class="tab-sound" title="音が出ています">${icon("sound", 14)}</span>`);
+  /* part 2: a site permission request waits in this tab; the page process ended */
+  if (m && m.includes("asks:")) out.push(`<span class="tab-asks" title="サイトが許可を求めています">${icon(m.split("asks:")[1].split(" ")[0], 14)}<i></i></span>`);
+  if (m && m.includes("crashed")) out.push(`<span class="tab-lock" title="このタブのページが止まりました">${icon("warn", 14)}</span>`);
   if (m && m.includes("attached")) out.push(`<span class="tab-frame" title="次の質問に添付">${icon("frame", 16)}</span>`);
   if (p.block) out.push(`<span class="tab-lock" title="${BLOCK[p.block].full}">${icon("lock", 14)}</span>`);
   else if (m && m.includes("fresh")) out.push(seal(s.space, 16));
@@ -253,14 +262,17 @@ function sidebar(s) {
   return `
   <aside class="sidebar">
     <div class="sb-top">${lights(s.inactive)}<button class="ibtn" aria-label="サイドバーをたたむ">${icon("sidebar")}</button></div>
-    <button class="space-head${s.home ? " is-active" : ""}" aria-label="スペースホームを開く">
-      ${seal(s.space, 28)}
-      <span class="space-head-text">
-        <span class="space-name">${sp.name}</span>
-        <span class="space-sub">メンバー${s.members ?? sp.members}人<i class="sep">・</i>共有${count}件</span>
-      </span>
-      ${icon("chevDown", 14, "space-chev")}
-    </button>
+    <div class="space-head${s.home ? " is-active" : ""}${s.menu ? " is-open" : ""}">
+      <button class="space-home" aria-label="スペースホームを開く">
+        ${seal(s.space, 28)}
+        <span class="space-head-text">
+          <span class="space-name">${sp.name}</span>
+          <span class="space-sub">メンバー${s.members ?? sp.members}人<i class="sep">・</i>共有${count}件</span>
+        </span>
+      </button>
+      <button class="ibtn space-more" aria-label="スペースを切り替える" aria-expanded="${s.menu ? "true" : "false"}">${icon("chevDown", 14)}</button>
+    </div>
+    ${s.conn ? `<p class="conn" role="status">${icon("offline", 14)}<span class="conn-text">${s.conn[0]}</span><span class="conn-note">${s.conn[1]}</span></p>` : ""}
     ${shelf}
     <section class="pocket${s.scrolled ? " is-scrolled" : ""}" aria-label="このMacのタブ">
       <header class="zone-head zone-head--pocket">
@@ -274,9 +286,10 @@ function sidebar(s) {
       ${s.scrollbar ? `<i class="scrollbar" style="top:${s.scrollbar[0]}px;height:${s.scrollbar[1]}px"></i>` : ""}
       <button class="tab tab--new"><span class="tab-ico">${icon("plus")}</span><span class="tab-title">新しいタブ</span>${kbd(["kCmd", "T"])}</button>
     </section>
+    ${s.notice || ""}
     <footer class="sb-foot">
       <div class="doors">${doors}<button class="ibtn" aria-label="スペースをつくる">${icon("plus")}</button></div>
-      <button class="me" aria-label="佐伯 遥：設定とアカウント">${avatar("saeki", 24)}</button>
+      <button class="me${s.settings ? " is-active" : ""}" aria-label="佐伯 遥：設定とアカウント">${avatar("saeki", 24)}</button>
     </footer>
     ${s.ghost ? `<div class="tab tab--ghost" id="ghost"><span class="tab-ico">${favicon(PAGES[s.ghost].fav)}</span><span class="tab-title">${PAGES[s.ghost].title}</span></div>` : ""}
   </aside>`;
@@ -330,7 +343,7 @@ function stateCluster(s) {
   const act = (label, cls = "") => `<button class="st-act ${cls}">${icon("cross", 14)}${label}</button>`;
   switch (s.state) {
     case "local":
-      return `<span class="st st--local">${attach}<span class="st-main"><span class="st-glyph">${icon("laptop")}</span><span class="st-label">このMacのみ</span></span>${s.noShare ? "" : act("スペースに共有…")}</span>`;
+      return `<span class="st st--local">${attach}<span class="st-main"><span class="st-glyph">${icon("laptop")}</span><span class="st-label">このMacのみ</span>${s.note ? `<span class="byline">${s.note}</span>` : ""}</span>${s.noShare ? "" : act("スペースに共有…")}</span>`;
     case "fresh":
       return `<span class="st st--fresh">${attach}<button class="st-main" aria-label="共有の状態">${seal(sp, 20)}<span class="st-label">${s.label || "共有中"}</span>${byline(s.by)}${icon("chevDown", 14, "st-chev")}</button></span>`;
     case "done":
@@ -366,7 +379,7 @@ function toolbar(s) {
       : urlText(s.url);
   const capsule = `
     <div class="capsule${s.focus ? " is-focus" : ""}" role="group" aria-label="このページ">
-      <button class="where" aria-label="アドレスとコマンド">${s.insecure ? `<span class="url-warn">${icon("warn", 14)}保護されていない通信</span>` : ""}${where}</button>
+      <button class="where${s.whereOpen ? " is-open" : ""}" aria-label="アドレスとコマンド">${s.insecure ? `<span class="url-warn">${icon("warn", 14)}保護されていない通信</span>` : ""}${s.lead || ""}${where}</button>
       ${s.state ? `<span class="capsule-rule"></span>${stateCluster(s)}` : ""}
     </div>`;
   const ask =
