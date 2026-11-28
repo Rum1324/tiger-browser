@@ -151,7 +151,7 @@
 .book td { height: var(--h-row-item); padding: 0 var(--sp-4); border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; font-size: var(--fs-13); }
 .book-cell { display: flex; align-items: center; gap: var(--sp-5); min-width: 0; }
 .book-ico { flex: none; display: flex; color: var(--ink-2); }
-.book-title { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.book-title { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; } /* fills the cell, so a title fades only when it is really cut */
 .book-title > span:first-child { line-height: var(--lh-tight); overflow: hidden; mask-image: var(--fade-tail); font-feature-settings: "palt" 1; }
 .book td:nth-child(2) { font-feature-settings: "palt" 1; }
 .book td.num { color: var(--ink-2); }

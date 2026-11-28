@@ -43,6 +43,15 @@ const PAIRS = [
   ["--space-accent", "--paper", 3, "ring against a white page, hollow seal outline"],
   ["--ink", "--space-frame", 3, "dashed frame against the frame"],
   ["--line-control", "--paper", 3, "boundary of inputs"],
+  /* part 2 */
+  ["--on-inverse-2", "--inverse", 4.5, "second line and glyph of a notice"],
+  ["--space-ink", "--space-frame-2", 4.5, "connection status on the frame"],
+  ["--space-ink-2", "--space-frame-2", 4.5, "connection status, time"],
+  ["--ink-2", "--paper-2", 4.5, "notes in menu and popover footers, notes of a thread block"],
+  ["--ink", "--paper-3", 4.5, "chosen item of a choice, current version row"],
+  ["--ink-2", "--paper-3", 4.5, "bylines on a hovered menu row"],
+  ["--line-control", "--paper-2", 3, "choice box in a block that still needs a decision"],
+  ["--ink", "--space-field", 4.5, "find field at rest"],
 ];
 
 const SPACES = ["amber", "coral", "rose", "violet", "indigo", "sky", "teal", "green", "graphite", "private"];

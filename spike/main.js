@@ -11,7 +11,10 @@ const os = require('node:os');
 const { CHECKS, detectBlock, checkForUrl } = require('./checks');
 
 const UA_MODES = ['chrome-like', 'electron-default', 'firefox-google'];
-const UA_MODE = UA_MODES.includes(process.env.SPIKE_UA) ? process.env.SPIKE_UA : 'chrome-like';
+// Default is Electron's own User-Agent. Measured 2026-11-28: a Chrome-shaped User-Agent with Electron's
+// empty window.chrome object is what Google's sign-in page refuses; the honest User-Agent passed the
+// same step. `chrome-like` stays available to reproduce the refusal.
+const UA_MODE = UA_MODES.includes(process.env.SPIKE_UA) ? process.env.SPIKE_UA : 'electron-default';
 const SMOKE = process.env.SPIKE_SMOKE === '1';
 const SPIKE_DIR = __dirname;
 const PARTITION = 'persist:tiger-spike';
