@@ -203,6 +203,16 @@ SCREENS["03-share-preview"] = () =>
     stageHtml: pageCard(mockGrid()) + shareSheet(),
   });
 
+/* 03c: the moment after the share is confirmed. No toast over the page and no shortcut: the capsule
+   says it, with the undo next to it for 8 s; the copy has landed as the newest item on the shelf. */
+SCREENS["03c-shared"] = () =>
+  windowShell({
+    space: "fund",
+    sidebarHtml: sidebar({ ...FUND_NAV, items: ["dilution", "pitch", "slack", "pdf"], itemCount: 42, current: "dilution", landing: "dilution", marks: { ...FUND_NAV.marks, dilution: "fresh" } }),
+    toolbarHtml: toolbar({ space: "fund", url: PAGES.dilution.url, state: "done", label: "共有しました", by: ["佐伯 遥", "第1版", "今日 14:36"] }),
+    stageHtml: pageCard(mockGrid(), { ring: "closed" }),
+  });
+
 /* 03b: a new version of a page the Space already holds. Same sheet, the changed lines marked. */
 function updateSheet() {
   const md = pitchMarkdown({ edited: true });

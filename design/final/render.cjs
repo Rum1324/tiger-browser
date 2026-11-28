@@ -20,6 +20,7 @@ const SCREENS = [
   "02-ask-panel",
   "03-share-preview",
   "03b-share-update",
+  "03c-shared",
   "04-space-home",
   "05-cannot-share",
   "05b-private-window",

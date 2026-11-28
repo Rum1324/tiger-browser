@@ -87,7 +87,7 @@ const ITEMS = [
   { id: "slack", title: "#fundraising", type: "slack", host: "kotonoha.slack.com", by: "ono", at: "昨日 18:40", v: 5 },
   { id: "pdf", title: "国内介護ソフト市場規模 2026.pdf", type: "pdf", host: "drive.google.com", by: "mori", at: "11/23 09:02", v: 1, extra: "14ページ" },
   { id: "mizunara", title: "面談メモ：ミズナラ・キャピタル", type: "notion", host: "notion.so", by: "ono", at: "11/21 17:26", v: 2 },
-  { id: "dilution", title: "希薄化シミュレーション（個人メモ）", type: "google-sheet", host: "docs.google.com", by: "saeki", at: "11/21 15:48", v: 2, gone: { by: "saeki", at: "11/21 16:30" } },
+  { id: "termsheet", title: "タームシート比較メモ", type: "google-doc", host: "docs.google.com", by: "saeki", at: "11/21 15:48", v: 2, gone: { by: "saeki", at: "11/21 16:30" } },
   { id: "notion", title: "資本政策メモ", type: "notion", host: "notion.so", by: "saeki", at: "11/20 10:15", v: 2 },
   { id: "kpi", title: "月次KPI 2026年10月", type: "google-sheet", host: "docs.google.com", by: "mori", at: "11/18 19:31", v: 4 },
   { id: "compete", title: "競合比較", type: "google-doc", host: "docs.google.com", by: "kashiwagi", at: "11/15 13:07", v: 2 },
@@ -107,7 +107,9 @@ const PRODUCT_ITEMS = [
   { id: "p-eval", title: "記録下書きの評価 10月", type: "google-sheet", host: "docs.google.com", by: "mori", at: "11/22 14:20", v: 2 },
   { id: "p-req", title: "導入14事業所の要望一覧", type: "notion", host: "notion.so", by: "kashiwagi", at: "11/19 10:36", v: 3 },
 ];
-const ALL_ITEMS = [...ITEMS, ...PRODUCT_ITEMS];
+/* the item that exists once 03-share-preview is confirmed (shown in 03c) */
+const NEW_ITEM = { id: "dilution", title: "希薄化シミュレーション", type: "google-sheet", host: "docs.google.com", by: "saeki", at: "今日 14:36", v: 1 };
+const ALL_ITEMS = [...ITEMS, ...PRODUCT_ITEMS, NEW_ITEM];
 
 /* ── atoms ── */
 const FAVS = {

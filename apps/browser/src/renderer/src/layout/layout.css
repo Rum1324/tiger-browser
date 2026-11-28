@@ -1,0 +1,100 @@
+/* Layout plumbing only: the grid of the named regions, sized from the design tokens. No colour,
+   type or decoration here; the designed components bring their own styles. A token missing from
+   tokens.css falls back to the value after the comma. */
+
+[data-region="window"] {
+  --sidebar-current: var(--sidebar-width, var(--w-sidebar, 248px));
+  --panel-current: var(--panel-width, var(--w-panel, 400px));
+  display: grid;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: var(--sidebar-current) minmax(0, 1fr) 0;
+  grid-template-rows: var(--h-toolbar, 48px) minmax(0, 1fr);
+  grid-template-areas:
+    "sidebar toolbar toolbar"
+    "sidebar stage panel";
+  background: var(--space-frame, Canvas);
+  color: var(--ink, CanvasText);
+}
+
+[data-region="window"][data-sidebar="collapsed"] {
+  --sidebar-current: var(--w-rail, 52px);
+}
+
+[data-region="window"][data-panel="open"] {
+  grid-template-columns: var(--sidebar-current) minmax(0, 1fr) var(--panel-current);
+}
+
+[data-region="sidebar"] {
+  grid-area: sidebar;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+[data-region="toolbar"] {
+  grid-area: toolbar;
+  min-width: 0;
+}
+
+[data-region="stage"] {
+  grid-area: stage;
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  /* The gutter is chrome-owned space around the page card: the ring is drawn there. */
+  padding: 0 var(--gutter, 8px) var(--gutter, 8px);
+}
+
+[data-region="ask-panel"] {
+  grid-area: panel;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The native page view is placed exactly over this element, with the same corner radius. */
+[data-region="page"] {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--r-card, 10px);
+}
+
+[data-region="surface"] {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* The overlay view: transparent everywhere except the surface. */
+html[data-view="overlay"],
+html[data-view="overlay"] body {
+  background: transparent;
+}
+
+[data-overlay-root] {
+  position: fixed;
+  inset: 0;
+}
+
+[data-overlay-backdrop] {
+  position: absolute;
+  inset: 0;
+}
+
+[data-overlay-root][data-mode="popover"] [data-overlay-surface] {
+  position: absolute;
+  inset: 0;
+}
+
+[data-overlay-root][data-mode="modal"] [data-overlay-surface] {
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  outline: none;
+}
