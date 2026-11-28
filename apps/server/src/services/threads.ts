@@ -5,6 +5,7 @@ import type {
   SpaceRole,
   Thread,
   ThreadVisibility,
+  TokenUsage,
   User,
 } from '@tiger/shared'
 import type { AppContext } from '../context'
@@ -12,10 +13,18 @@ import type { Sql } from '../db/sql'
 import { AppError, notFound } from '../errors'
 import { newId } from '../ids'
 import { requireMember, requireThreadAccess, type ThreadAccess } from './access'
-import { runAnswer } from './answers'
+import { runAnswer, settleCitations } from './answers'
 import { appendAudit } from './audit'
 import { assertCaptureAllowed } from './items'
-import { getMessage, selectMessages, selectThreads, toMessages, toThread, userRef } from './rows'
+import {
+  getMessage,
+  type StoredCitation,
+  selectMessages,
+  selectThreads,
+  toMessages,
+  toThread,
+  userRef,
+} from './rows'
 import { budgetExceeded, getSpaceUsage } from './usage'
 
 const DEFAULT_PAGE = 50
@@ -347,46 +356,162 @@ export async function postMessage(
   return { message, assistantMessage }
 }
 
+/** One message of a private thread as the share plan sees it, in thread order. */
+export interface ShareCandidate {
+  id: string
+  role: 'user' | 'assistant'
+  status: Message['status']
+  attached: boolean
+}
+
 /**
- * Promote a private thread to the Space. Refused, changing nothing, while any of its messages has a
- * page attachment: the answers and the title were derived from those private pages, and showing them
- * to every member needs a product decision first.
+ * Decide which messages of a private thread a share copies, or why it is refused. An attached question
+ * (a user message with a page attached) must be listed in exactly one of the two lists; excluding a
+ * user message also excludes its answers (the assistant messages after it, up to the next user
+ * message). Throws an AppError and decides nothing when the request does not fit the thread.
  */
-export async function shareThread(ctx: AppContext, user: User, threadId: string): Promise<Thread> {
-  const access = await requireThreadAccess(ctx.sql, threadId, user.id)
-  if (access.visibility === 'space') return getThread(ctx.sql, threadId)
-  const event = await ctx.sql.begin(async (tx) => {
-    // A post with attachments holds the thread FOR SHARE until its rows are in, so this lock waits
-    // for it and the check below sees its attachments.
-    const [held] = await tx<{ visibility: ThreadVisibility }[]>`
-      select visibility from threads where id = ${threadId} for update
-    `
-    if (!held) throw notFound('thread_not_found', 'Thread')
-    if (held.visibility === 'space') return null
-    const [attached] = await tx`
-      select 1 from message_attachments a join messages m on m.id = a.message_id
-      where m.thread_id = ${threadId}
-      limit 1
-    `
-    if (attached) {
+export function planThreadShare(
+  messages: ShareCandidate[],
+  includeAttached: string[],
+  exclude: string[],
+): ShareCandidate[] {
+  const byId = new Map(messages.map((m) => [m.id, m]))
+  const include = new Set(includeAttached)
+  const excluded = new Set(exclude)
+  if (include.size !== includeAttached.length || excluded.size !== exclude.length) {
+    throw new AppError(400, 'invalid_request', 'A message is listed twice')
+  }
+  for (const id of [...include, ...excluded]) {
+    if (!byId.has(id)) throw new AppError(400, 'invalid_request', 'A listed message is not in this thread')
+    if (include.has(id) && excluded.has(id)) {
+      throw new AppError(400, 'invalid_request', 'A message is both included and excluded')
+    }
+  }
+  for (const id of include) {
+    if (!byId.get(id)?.attached) {
       throw new AppError(
-        409,
-        'thread_has_private_attachments',
-        'A thread with attached pages cannot be shared to the Space',
+        400,
+        'invalid_request',
+        'includeAttachedMessageIds may list only questions that had a page attached',
       )
     }
-    await tx`update threads set visibility = 'space' where id = ${threadId}`
+  }
+  if (messages.some((m) => m.attached && !include.has(m.id) && !excluded.has(m.id))) {
+    throw new AppError(
+      409,
+      'thread_has_private_attachments',
+      'Every question with an attached page must be included or excluded',
+    )
+  }
+  const chosen: ShareCandidate[] = []
+  let questionExcluded = false
+  for (const m of messages) {
+    if (m.role === 'user') questionExcluded = excluded.has(m.id)
+    if (questionExcluded || excluded.has(m.id)) continue
+    chosen.push(m)
+  }
+  if (chosen.length === 0) throw new AppError(400, 'invalid_request', 'Nothing is left to share')
+  if (chosen.some((m) => m.status === 'streaming')) {
+    throw new AppError(400, 'invalid_request', 'An answer is still being written; share it once it ends')
+  }
+  return chosen
+}
+
+/** How an untitled thread is named after a message (the same rule postMessage applies). */
+const titleFrom = (content: string): string => content.replace(/\s+/g, ' ').trim().slice(0, 80)
+
+/**
+ * Share a private thread with the Space as a new Space thread holding copies of the chosen messages,
+ * in their order and with their times, authors, models and citations. The private thread and its
+ * attachments are left as they were; no attachment (content, title or URL) is copied. One
+ * transaction; the Space hears one `thread.created` and one `audit.appended`.
+ */
+export async function shareThread(
+  ctx: AppContext,
+  user: User,
+  threadId: string,
+  includeAttached: string[],
+  exclude: string[],
+): Promise<Thread> {
+  const access = await requireThreadAccess(ctx.sql, threadId, user.id)
+  if (access.ownerId !== user.id) {
+    throw new AppError(403, 'forbidden', 'Only the member who owns a thread can share it')
+  }
+  if (access.visibility !== 'private') {
+    throw new AppError(409, 'already_shared', 'This thread is already in the Space')
+  }
+  const newThreadId = newId()
+  const event = await ctx.sql.begin(async (tx) => {
+    // Posts hold the thread FOR SHARE until their rows are in, so this waits for them, and no
+    // message or attachment lands in the thread while it is read.
+    const [held] = await tx<{ title: string }[]>`
+      select title from threads where id = ${threadId} for update
+    `
+    if (!held) throw notFound('thread_not_found', 'Thread')
+    const rows = await tx<
+      {
+        id: string
+        role: 'user' | 'assistant'
+        author_id: string
+        model_provider: string | null
+        model_id: string | null
+        content: string
+        citations: StoredCitation[]
+        status: Message['status']
+        error_code: string | null
+        usage: TokenUsage | null
+        created_at: Date
+        attached: boolean
+      }[]
+    >`
+      select m.id, m.role, m.author_id, m.model_provider, m.model_id, m.content, m.citations,
+             m.status, m.error_code, m.usage, m.created_at,
+             exists (select 1 from message_attachments a where a.message_id = m.id) as attached
+      from messages m
+      where m.thread_id = ${threadId}
+      order by m.created_at, m.id
+      for share of m
+    `
+    const chosen = new Set(planThreadShare(rows, includeAttached, exclude).map((m) => m.id))
+    const copies = rows.filter((r) => chosen.has(r.id))
+
+    // The private title was taken from the first question (or given before it). If that question had
+    // a page attached, the title may come from it, so the copy is named after what it shares instead.
+    const firstQuestion = rows.find((r) => r.role === 'user')
+    const firstIncluded = copies.find((r) => r.role === 'user')
+    const title =
+      firstQuestion && !firstQuestion.attached
+        ? held.title
+        : firstIncluded
+          ? titleFrom(firstIncluded.content)
+          : ''
+    const last = copies[copies.length - 1]
+    await tx`
+      insert into threads (id, space_id, visibility, owner_id, title, last_message_at)
+      values (${newThreadId}, ${access.spaceId}, 'space', ${user.id}, ${title},
+              ${last ? last.created_at : null})
+    `
+    for (const r of copies) {
+      // Cited items are held until commit, as when an answer settles: an unshare either committed
+      // first (the quote is emptied here) or waits and then scrubs this copy too.
+      const { stored } = await settleCitations(tx, access.spaceId, r.citations, true)
+      await tx`
+        insert into messages (id, thread_id, role, author_id, model_provider, model_id, content,
+                              citations, status, error_code, usage, created_at)
+        values (${newId()}, ${newThreadId}, ${r.role}, ${r.author_id}, ${r.model_provider},
+                ${r.model_id}, ${r.content}, ${tx.json(stored)}, ${r.status}, ${r.error_code},
+                ${r.usage === null ? null : tx.json(r.usage)}, ${r.created_at})
+      `
+    }
     return appendAudit(tx, {
       spaceId: access.spaceId,
       actor: userRef(user.id, user.name, user.avatarUrl),
       action: 'thread.shared',
-      target: { type: 'thread', id: threadId, title: access.title || null, url: null },
+      target: { type: 'thread', id: newThreadId, title: title || null, url: null },
     })
   })
-  const thread = await getThread(ctx.sql, threadId)
-  // Shared concurrently by another request, which announced it.
-  if (!event) return thread
-  ctx.hub.publishToSpace(access.spaceId, { type: 'thread.updated', thread })
+  const thread = await getThread(ctx.sql, newThreadId)
+  ctx.hub.publishToSpace(access.spaceId, { type: 'thread.created', thread })
   ctx.hub.publishToSpace(access.spaceId, { type: 'audit.appended', event })
   return thread
 }

@@ -395,11 +395,11 @@ describe('private attachments', () => {
     )
     expect(JSON.stringify(memberReq)).not.toContain('ZEBRA-7731')
 
-    // The answer was built from a private page, so the thread cannot be promoted to the Space; the
-    // member still cannot read it and the attachment stays with its owner.
+    // The answer was built from a private page, so the thread cannot be shared without deciding that
+    // question; the member still cannot read it and the attachment stays with its owner.
     await h.fails(
       'shareThread',
-      { params: { threadId: thread.id } },
+      { params: { threadId: thread.id }, body: { includeAttachedMessageIds: [], excludeMessageIds: [] } },
       owner.token,
       409,
       'thread_has_private_attachments',

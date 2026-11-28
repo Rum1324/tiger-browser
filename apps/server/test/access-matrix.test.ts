@@ -80,7 +80,10 @@ const requests = (threadId: string): Partial<Record<ApiRouteName, () => Input>> 
   createThread: () => ({ params: { spaceId: ids.spaceId }, body: { visibility: 'space' } }),
   listMessages: () => ({ params: { threadId }, query: {} }),
   postMessage: () => ({ params: { threadId }, body: { content: 'hi', askAi: false } }),
-  shareThread: () => ({ params: { threadId } }),
+  shareThread: () => ({
+    params: { threadId },
+    body: { includeAttachedMessageIds: [], excludeMessageIds: [] },
+  }),
   deleteThread: () => ({ params: { threadId } }),
   recordExport: () => ({
     params: { spaceId: ids.spaceId },

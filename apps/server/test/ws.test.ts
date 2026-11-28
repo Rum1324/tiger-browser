@@ -95,20 +95,29 @@ describe('/v1/ws', () => {
     expect(JSON.stringify(memberWs.events)).not.toContain(t.id)
     expect(memberWs.events.map((e) => e.type)).toEqual(['ready', 'subscribed', 'pong', 'pong'])
 
-    // Once shared, the same thread's events reach the member too.
+    // Once shared, the new Space thread's events reach the member too.
     const t2 = await h.ok(
       'createThread',
       { params: { spaceId: space.id }, body: { visibility: 'private' } },
       owner.token,
     )
-    await h.ok('shareThread', { params: { threadId: t2.id } }, owner.token)
-    expect((await memberWs.next('thread.updated')).thread).toMatchObject({
-      id: t2.id,
+    await h.ok(
+      'postMessage',
+      { params: { threadId: t2.id }, body: { content: 'worth sharing', askAi: false } },
+      owner.token,
+    )
+    const copy = await h.ok(
+      'shareThread',
+      { params: { threadId: t2.id }, body: { includeAttachedMessageIds: [], excludeMessageIds: [] } },
+      owner.token,
+    )
+    expect((await memberWs.next('thread.created')).thread).toMatchObject({
+      id: copy.id,
       visibility: 'space',
     })
     await h.ok(
       'postMessage',
-      { params: { threadId: t2.id }, body: { content: 'now public', askAi: false } },
+      { params: { threadId: copy.id }, body: { content: 'now public', askAi: false } },
       owner.token,
     )
     expect((await memberWs.next('message.created')).message.content).toBe('now public')

@@ -35,8 +35,8 @@ export function threadRoutes(app: FastifyInstance): void {
   registerRoute(app, api.postMessage, async ({ params, body }, { user }) =>
     postMessage(ctx, user, params.threadId, body),
   )
-  registerRoute(app, api.shareThread, async ({ params }, { user }) =>
-    shareThread(ctx, user, params.threadId),
+  registerRoute(app, api.shareThread, async ({ params, body }, { user }) =>
+    shareThread(ctx, user, params.threadId, body.includeAttachedMessageIds, body.excludeMessageIds),
   )
   registerRoute(app, api.deleteThread, async ({ params }, { user }) => {
     await deleteThread(ctx, user, params.threadId)
