@@ -34,6 +34,7 @@ export class PageSlotReporter {
   private covered = false
   private disposed = false
   private cancelPending: (() => void) | null = null
+  private pending = false
   private lastSent: SlotReport | null = null
   private readonly radiusOf: (el: SlotElement) => number
   private readonly schedule: (cb: () => void) => () => void
@@ -61,17 +62,22 @@ export class PageSlotReporter {
 
   /** Something may have moved the slot: measure on the next frame. */
   invalidate(): void {
-    if (this.disposed || this.cancelPending) return
-    this.cancelPending = this.schedule(() => {
+    if (this.disposed || this.pending) return
+    this.pending = true
+    const cancel = this.schedule(() => {
+      this.pending = false
       this.cancelPending = null
       this.flush()
     })
+    // A scheduler may run the callback at once (tests); then there is nothing left to cancel.
+    if (this.pending) this.cancelPending = cancel
   }
 
   /** Measure now and report if anything changed. */
   flush(): SlotReport {
     this.cancelPending?.()
     this.cancelPending = null
+    this.pending = false
     const report = this.measure()
     if (!this.disposed && !sameReport(report, this.lastSent)) {
       this.lastSent = report
@@ -93,6 +99,7 @@ export class PageSlotReporter {
     if (this.disposed) return
     this.cancelPending?.()
     this.cancelPending = null
+    this.pending = false
     const hidden: SlotReport = { bounds: null, cornerRadius: this.lastSent?.cornerRadius ?? 0 }
     if (this.lastSent && !sameReport(hidden, this.lastSent))
       void Promise.resolve(this.opts.send(null, hidden.cornerRadius)).catch(() => {})
@@ -156,8 +163,9 @@ export function observePageSlot(
   const invalidate = () => reporter.invalidate()
   const cleanups: (() => void)[] = []
 
-  if (typeof win.ResizeObserver === 'function') {
-    const ro = new win.ResizeObserver(invalidate)
+  const RO = (win as Window & typeof globalThis).ResizeObserver
+  if (typeof RO === 'function') {
+    const ro = new RO(invalidate)
     ro.observe(el)
     // The slot can move without changing size (a toolbar that grows above it).
     ro.observe(win.document.documentElement)

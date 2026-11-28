@@ -213,6 +213,17 @@ SCREENS["03c-shared"] = () =>
     stageHtml: pageCard(mockGrid(), { ring: "closed" }),
   });
 
+/* The share sequence of motion 6.1, playable: ?screen=03c-crossing&play=1 runs it,
+   &t=<ms> freezes it at that time (the shot uses t=150). Chrome pixels only. */
+SCREENS["03c-crossing"] = () =>
+  windowShell({
+    space: "fund",
+    cls: "is-sharing",
+    sidebarHtml: sidebar({ ...FUND_NAV, items: ["dilution", "pitch", "slack", "pdf"], itemCount: 42, current: "dilution", marks: { ...FUND_NAV.marks, dilution: "fresh" }, ghost: "dilution" }),
+    toolbarHtml: toolbar({ space: "fund", url: PAGES.dilution.url, state: "done", label: "共有しました", by: ["佐伯 遥", "第1版", "今日 14:36"] }),
+    stageHtml: pageCard(mockGrid(), { ring: "closed", cls: "is-closing" }),
+  });
+
 /* 03b: a new version of a page the Space already holds. Same sheet, the changed lines marked. */
 function updateSheet() {
   const md = pitchMarkdown({ edited: true });
@@ -288,7 +299,7 @@ function spaceHome() {
       </table>
     </section>
     <aside class="home-thread" aria-label="スレッド">
-      <header class="panel-head"><span class="panel-title">スレッド</span><span class="thread-title">数字合わせ：ピッチと市場レポート</span><span class="grow"></span><button class="ibtn ibtn--paper" aria-label="スレッドの一覧">${icon("thread")}</button></header>
+      <header class="panel-head"><span class="panel-title">スレッド</span><span class="thread-title">数字合わせ：ピッチと市場レポート</span><button class="ibtn ibtn--paper" aria-label="スレッドの一覧">${icon("thread")}</button></header>
       <div class="thread thread--end">${thread}</div>
       <p class="thread-note">${seal("ai", 16)}<span>@Tiger が読むのは、共有41件とこのスレッドだけです。ページは添付できません。</span></p>
       ${composer({ placeholder: "メッセージを書く。@Tiger でAIに質問", post: true })}
@@ -726,7 +737,13 @@ function drawEdges(root = document) {
     if (ring) {
       const o = RW / 2;
       const x0 = P - o, y0 = P - o, x1 = P + w + o, y1 = P + h + o, r = R + o;
-      if (ring === "closed") out += `<rect class="edge-ring" x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="${r}" style="stroke-width:${RW}"/>`;
+      const cx = (x0 + x1) / 2;
+      if (ring === "closed" && card.dataset.anim === "close") {
+        /* two arms from the bottom centre that meet at the top centre (motion 6.1) */
+        const arm = (xa, sweep) =>
+          `<path class="edge-ring edge-ring--arm" pathLength="1" style="stroke-width:${RW}" d="M${cx} ${y1}H${xa === x0 ? x0 + r : x1 - r}A${r} ${r} 0 0 ${sweep} ${xa} ${y1 - r}V${y0 + r}A${r} ${r} 0 0 ${sweep} ${xa === x0 ? x0 + r : x1 - r} ${y0}H${cx}"/>`;
+        out += arm(x0, 1) + arm(x1, 0);
+      } else if (ring === "closed") out += `<rect class="edge-ring" x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="${r}" style="stroke-width:${RW}"/>`;
       else
         out += `<path class="edge-ring" style="stroke-width:${RW}" d="M${x0 + r + LID} ${y0}H${x0 + r}A${r} ${r} 0 0 0 ${x0} ${y0 + r}V${y1 - r}A${r} ${r} 0 0 0 ${x0 + r} ${y1}H${x1 - r}A${r} ${r} 0 0 0 ${x1} ${y1 - r}V${y0 + r}A${r} ${r} 0 0 0 ${x1 - r} ${y0}H${x1 - r - LID}"/>`;
     }
@@ -777,8 +794,20 @@ function place() {
   const sc = document.querySelector(".pocket-scroll[data-scroll]");
   if (sc) sc.scrollTop = Number(sc.dataset.scroll);
   document.fonts.ready.then(() => {
+    document.querySelectorAll(".card.is-closing").forEach((c) => (c.dataset.anim = "close"));
     drawEdges();
     place();
+    /* the ghost of the tab row starts on its tab and lands on the first slot of the shelf */
+    const ghost = document.getElementById("ghost");
+    if (ghost) {
+      const side = ghost.parentElement.getBoundingClientRect();
+      const slot = document.querySelector(".items .item").getBoundingClientRect();
+      const tab = document.querySelector(".tab.is-active").getBoundingClientRect();
+      ghost.style.top = `${slot.top - side.top + 6}px`;
+      ghost.style.setProperty("--from", `${tab.top - slot.top - 6}px`);
+    }
+    const t = q.get("t");
+    if (t !== null) for (const a of document.getAnimations()) (a.pause(), (a.currentTime = Number(t)));
     document.documentElement.dataset.ready = "1";
   });
 })();

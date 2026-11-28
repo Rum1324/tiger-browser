@@ -69,6 +69,7 @@ export class FakeEngine implements EngineBridge {
   overlay: { open: boolean; bounds: Rect | null } = { open: false, bounds: null }
   findText = ''
   private listeners = new Map<EngineEventName, Set<(p: unknown) => void>>()
+  private observers = new Set<() => void>()
   private nextTab = 1
   private closed: Tab[] = []
   private readonly validate: boolean
@@ -132,6 +133,16 @@ export class FakeEngine implements EngineBridge {
   emit<E extends EngineEventName>(event: E, payload: EngineEventPayload<E>): void {
     const value = this.validate ? engineEvents[event].parse(payload) : payload
     for (const l of [...(this.listeners.get(event) ?? [])]) l(value)
+  }
+
+  /** Called after the page bounds or the overlay change (the rig draws them). */
+  observe(cb: () => void): () => void {
+    this.observers.add(cb)
+    return () => this.observers.delete(cb)
+  }
+
+  private changed(): void {
+    for (const o of [...this.observers]) o()
   }
 
   /** How many listeners an event has (tests check that hooks unsubscribe). */
@@ -322,6 +333,7 @@ export class FakeEngine implements EngineBridge {
       },
       'page.setBounds': (req) => {
         this.pageBounds = req
+        this.changed()
         return undefined
       },
       'page.find': ({ tabId, text }) => {
@@ -356,6 +368,7 @@ export class FakeEngine implements EngineBridge {
       },
       'overlay.setOpen': ({ open, bounds }) => {
         this.overlay = { open, bounds: open ? (bounds ?? null) : null }
+        this.changed()
         return undefined
       },
       'permission.respond': () => undefined,

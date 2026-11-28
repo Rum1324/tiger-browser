@@ -20,6 +20,7 @@ const SCREENS = [
   "02-ask-panel",
   "03-share-preview",
   "03b-share-update",
+  "03c-crossing",
   "03c-shared",
   "04-space-home",
   "05-cannot-share",
@@ -69,7 +70,8 @@ const SCREENS = [
   page.on("requestfailed", (r) => problems.push(`request failed: ${r.url()}`));
 
   for (const id of list) {
-    await page.goto(`${index}?screen=${id}${theme ? `&theme=${theme}` : ""}`);
+    /* 03c-crossing is the share sequence frozen 150 ms after the server's answer */
+    await page.goto(`${index}?screen=${id}${theme ? `&theme=${theme}` : ""}${id === "03c-crossing" ? "&t=150" : ""}`);
     await page.evaluate(async () => {
       await document.fonts.ready;
       /* force every declared face to load, then wait again, so no frame is captured in fallback */

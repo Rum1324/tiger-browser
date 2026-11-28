@@ -1,7 +1,7 @@
-import { downloadsPlacement } from '../features/downloads-popover'
 import { presentPalette } from '../features/palette'
 import { shareActions } from '../features/share'
 import { tabsActions } from '../features/tabs'
+import { popoverAt } from '../overlay/anchors'
 import { runCommand } from './commands'
 import type { AppServices } from './services'
 
@@ -49,7 +49,7 @@ export function bindDefaultShortcuts(s: AppServices): () => void {
     s.shortcuts.on('open-history', () => void presentPalette(s, 'history')),
     s.shortcuts.on('open-downloads', () => {
       if (s.overlay.store.getState().open?.surface === 'downloads') s.overlay.closeAll('closed')
-      else void s.overlay.open('downloads', {}, downloadsPlacement()).outcome
+      else void s.overlay.open('downloads', {}, popoverAt('downloads', 'downloads')).outcome
     }),
     s.shortcuts.on('open-settings', () => s.router.toggle({ name: 'settings', section: 'general' })),
   ]

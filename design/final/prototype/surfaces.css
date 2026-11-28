@@ -164,14 +164,14 @@
 
 .home-thread { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); }
 .home-thread .panel-head { border-bottom: 1px solid var(--line); }
-.thread-title { min-width: 0; color: var(--ink-2); white-space: nowrap; overflow: hidden; mask-image: var(--fade-tail); font-feature-settings: "palt" 1; }
+.thread-title { flex: 1 1 auto; min-width: 0; color: var(--ink-2); white-space: nowrap; overflow: hidden; mask-image: var(--fade-tail); font-feature-settings: "palt" 1; }
 .home-thread .thread { gap: var(--sp-5); }
 .day { display: flex; align-items: center; gap: var(--sp-5); font-size: var(--fs-12); color: var(--ink-3); }
 .day::before, .day::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 /* a share is an event in the room: the Space's wash, the crossing glyph, a time */
 .event { display: flex; align-items: center; gap: var(--sp-3); min-height: var(--h-row-dense); padding: 0 var(--sp-4); border-radius: var(--r-row); background: var(--space-wash); box-shadow: inset 0 0 0 1px var(--space-wash-line); font-size: var(--fs-12); color: var(--space-ink); font-feature-settings: "palt" 1; }
-.event span { min-width: 0; white-space: nowrap; overflow: hidden; mask-image: var(--fade-tail); }
-.event time { margin-left: auto; font-size: var(--fs-11); color: var(--space-ink-2); }
+.event span { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; mask-image: var(--fade-tail); }
+.event time { flex: none; font-size: var(--fs-11); color: var(--space-ink-2); }
 .thread-note { flex: none; display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-4) var(--sp-6) 0; border-top: 1px solid var(--line); font-size: var(--fs-12); line-height: var(--lh-ui); color: var(--ink-2); }
 .thread-note .seal { margin-top: 1px; }
 .answer-note { margin-top: var(--sp-4); display: flex; align-items: flex-start; gap: var(--sp-3); font-size: var(--fs-12); line-height: var(--lh-ui); color: var(--ink-2); }

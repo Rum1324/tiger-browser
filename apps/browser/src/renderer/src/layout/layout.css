@@ -2,6 +2,13 @@
    type or decoration here; the designed components bring their own styles. A token missing from
    tokens.css falls back to the value after the comma. */
 
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
 [data-region="window"] {
   --sidebar-current: var(--sidebar-width, var(--w-sidebar, 248px));
   --panel-current: var(--panel-width, var(--w-panel, 400px));

@@ -2,7 +2,7 @@
 
 As of 2026-11-28. Base: the Rooms direction, with the dashed page frame from Lens and the typographic
 provenance from Paper. This part covers the boundary system, the review resolutions, the window, the
-components used by the 26 core screens, and motion. Part 2 (next pass) is listed in section 9.
+components used by the 28 shots, and motion. Part 2 (next pass) is listed in section 9.
 
 Regenerate everything: `node design/final/render.cjs` (shots at 2x into `shots/`),
 `node design/final/contrast.cjs` (token pairs, every Space hue, both themes),
@@ -191,7 +191,7 @@ Same component for 「スペースに共有」 (03), 「新しい版を共有」
 | C-M8 | Mincho set with auto-phrase; never shown long | Answers: `word-break: normal`, `line-break: strict`, justified. 02 shows a table, a list and Latin terms. Tables and code in an answer are Gothic or mono 13. | 02 |
 | C-M9 | `palt` on by default | Off on `body`; on for a listed set of one-line labels only. | all |
 | C-M10 | Four sizes within 3 px; Japanese at 11 px | 12 / 13 / 15 / 20 (28 for generated documents). 11 px is for Latin and digits only. | all |
-| C-M11 | ⌘Z on the undo toast | No toast, no shortcut. After a share the capsule reads 「共有しました」 with a 「取り消す」 button for 8 s. | spec, 6.1 |
+| C-M11 | ⌘Z on the undo toast | No toast, no shortcut. After a share the capsule reads 「共有しました」 with a 「取り消す」 button for 8 s. | 03c-shared |
 | U-B1 | Attaching sends content with no preview | The attach sheet (2.6). The switch is gone: the ledger row is a button that opens the sheet. First-run copy rewritten. | 09, 09b, 06 |
 | U-M1 | Consent surface hides the outside companies | 「読める人と送り先」 lists Tiger's server and the provider companies; the send button reads 「Anthropic に送信」; the model menu is grouped by receiving company. | 03, 02, 12 |
 | U-M2 | Page title in the address field | The capsule shows the URL only: registrable domain in ink 600, subdomain and path in `--space-ink-2`, truncated from the right with a fade, never inside the domain. Titles live on tab rows. The palette (⌘L) and a 300 ms hover tooltip show the full URL. Punycode hosts get a 「見た目が似た文字を含むアドレス」 warning before the URL (**spec only**, not drawn). | 01 |
@@ -370,6 +370,10 @@ except the single `setBounds` named in 6.3.
 
 ### 6.1 Sharing (after 「スペースに共有」 in the sheet)
 
+Prototyped from T onward in CSS and SVG (`app.css`, "motion: sharing"): `?screen=03c-crossing&play=1`
+plays it, `&t=150` freezes it (**verified**: rendered at t = 150 ms as `shots/03c-crossing.png`).
+The other sequences in this section are specified, not prototyped.
+
 | At | What | Duration, easing |
 | --- | --- | --- |
 | 0 | Sheet fades and scales to 0.98; scrim fades. Capsule reads 「共有しています…」 until the server answers (`sending` cannot be cancelled). | 160 ms, `--ease-in` |
@@ -438,7 +442,7 @@ place, no scale. An answer streams as text; the current step has a still dot (no
   fit: `share.stale.*`, `capture.reason.*`, `ai.ai_aborted`, `ai.budget_exceeded`,
   `provider.sendsTo`. New strings in the prototype need keys in both `ja.ts` and `en.ts`.
 
-## 8. Screens (`shots/*.png`, 2880 × 1800)
+## 8. Screens (`shots/*.png`, 28 files, 2880 × 1800)
 
 | File | What it shows |
 | --- | --- |
@@ -446,11 +450,13 @@ place, no scale. An answer streams as text; the current step has a still dot (no
 | 02-ask-panel | The private thread: a cited answer with a table and a list in Mincho, sources with bylines, the expanded ledger, the model button, 「Anthropic に送信」. |
 | 03-share-preview | First share of a spreadsheet: the exact Markdown, readers and recipients, what happens after, capture time. |
 | 03b-share-update | A new version: the two changed lines marked, the old lines above them. |
+| 03c-crossing | The share sequence frozen 150 ms after the server's answer: the ghost of the tab row over the shelf, the items making room, the ring's two arms on their way up. Live: `?screen=03c-crossing&play=1`. |
+| 03c-shared | Where it settles: closed ring, the new item first on the shelf, 「共有しました」 with 「取り消す」 in the capsule. No toast. |
 | 04-space-home | The ledger with a tombstone and a hover action; the team thread with people, a share event and the AI. |
 | 05-cannot-share | A bank page (navy and crimson) inside the amber frame; the reason popover with the matched rule. |
 | 05b-private-window | No Space, no hue, no shelf, no ask button; what the window does and does not do. |
 | 06-first-run | Create the first Space (name, seal, one of nine colours) and learn the four page edges. |
-| 07-dark-01-browse, -02-ask-panel, -04-space-home, -05b-private-window | The same screens in the dark theme. |
+| 07-dark-01-browse, 07-dark-02-ask-panel, 07-dark-04-space-home, 07-dark-05b-private-window | The same screens in the dark theme. |
 | 08-command | The palette over a news page, on the scrim: tabs, shared items with bylines, history, search, ask. |
 | 09-attach-preview | The attach sheet over a stale page: exact text, 送り先 Anthropic, あなただけ. |
 | 09b-attached | After confirming: dashed frame outside the open ring, chip in the composer and the capsule, ledger row. |

@@ -274,7 +274,7 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
       const b = r.body as { content: string; askAi: boolean; model?: Message['model']; attachments?: { url: string; title: string; sourceType: Item['sourceType']; markdown: string }[] }
       if (t.visibility === 'space' && b.attachments?.length) throw new HttpError(400, 'attachments_not_allowed')
       const author = { id: me.id, name: me.name, avatarUrl: null }
-      const base = { threadId: t.id, author, citations: [], errorCode: null, usage: null, streamSeq: null } as const
+      const base = { threadId: t.id, author, citations: [] as Message['citations'], errorCode: null, usage: null, streamSeq: null }
       const message: Message = {
         ...base,
         id: nextId(),

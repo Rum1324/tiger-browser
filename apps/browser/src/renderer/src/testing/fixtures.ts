@@ -137,10 +137,11 @@ export const pages = {
     'web',
     '',
   ),
+  // A host on the built-in banking list (the prototype's bank is fictional, so no rule matches it).
   bank: page(
     'bank',
-    'https://biz.tsubamebank.co.jp/account/statement',
-    'つばめ銀行 ビジネスダイレクト',
+    'https://www.paypay-bank.co.jp/business/statement',
+    'PayPay銀行 ビジネス口座',
     'web',
     '',
   ),
@@ -225,7 +226,7 @@ const ITEM_SPECS: ItemSpec[] = [
     page: 'slack',
     by: 'ono',
     sharedMinutesAgo: 9 * DAY,
-    versions: [1, 2, 3, 4, 5].map((v) => ({ by: 'ono' as const, minutesAgo: (10 - 2 * v) * DAY })),
+    versions: [1, 2, 3, 4, 5].map((v) => ({ by: 'ono' as const, minutesAgo: (11 - 2 * v) * DAY })),
   },
   {
     n: 203,

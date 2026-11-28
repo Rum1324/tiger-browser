@@ -5,7 +5,7 @@
 
    1. Static scales: type, spacing, density, layout, radii, motion.
    2. Neutral colour roles, light then dark.
-   3. Space colour roles, computed from four inputs per Space hue.
+   3. Space colour roles, computed from four inputs per Space hue; seals.
    4. The nine Space hues (keys of SpaceHue in packages/shared/src/domain.ts).
    5. The private window.
    6. Mock content: third-party pages, favicons and member photos drawn inside the mock.
@@ -231,6 +231,20 @@
   --space-wash-line: oklch(0.41 calc(var(--space-ct) * 1.7) var(--space-ht));
   --pocket: oklch(0.165 0.004 80); /* a recess, darker than the frame */
   --pocket-line: oklch(1 0 0 / 0.08);
+}
+
+/* Seals. A seal is one Mincho character (Space.seal, chosen at creation) on the Space's solid.
+   Sizes 16 / 20 / 24 / 28 / 40 px with radii --r-key / --r-key / --r-row / --r-control / --r-card
+   and type --fs-11 / 12 / 13 / 15 / 20 at --fw-voice-strong. */
+[data-space],
+:root {
+  --seal-fill: var(--space-solid);
+  --seal-ink: var(--on-space-solid);
+  --seal-hollow-fill: var(--paper); /* the Space holds an older version */
+  --seal-hollow-line: var(--space-accent);
+  --seal-hollow-ink: var(--space-ink);
+  --seal-ai-fill: var(--inverse); /* 虎: the AI is ink, never a hue */
+  --seal-ai-ink: var(--on-inverse);
 }
 
 /* ───────────────────────── 4. The nine Space hues ─────────────────────────

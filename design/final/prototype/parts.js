@@ -112,21 +112,23 @@ const NEW_ITEM = { id: "dilution", title: "希薄化シミュレーション", t
 const ALL_ITEMS = [...ITEMS, ...PRODUCT_ITEMS, NEW_ITEM];
 
 /* ── atoms ── */
+/* Stand-in favicons: generic glyphs in real-world hues, not the marks of any product.
+   They are page content (a live favicon paints itself); colours are --mock-* tokens. */
 const FAVS = {
-  gdoc: `<path d="M3.5 2.5a1.5 1.5 0 0 1 1.5-1.5h4.5L12.5 4v9.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z" style="fill:var(--mock-blue)"/><path d="M5.75 7.5h4.5M5.75 9.75h4.5M5.75 12h3" style="stroke:var(--mock-white);stroke-width:1.1;fill:none"/>`,
-  gsheet: `<path d="M3.5 2.5a1.5 1.5 0 0 1 1.5-1.5h4.5L12.5 4v9.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z" style="fill:var(--mock-green)"/><path d="M5.75 7.25h4.5v4.5h-4.5zM5.75 9.5h4.5M8 7.25v4.5" style="stroke:var(--mock-white);stroke-width:1;fill:none"/>`,
-  pdf: `<rect x="2" y="2" width="12" height="12" rx="2.5" style="fill:var(--mock-red)"/><path d="M5 5.5h6M5 8h6M5 10.5h3.5" style="stroke:var(--mock-white);stroke-width:1.2;fill:none"/>`,
+  gdoc: `<rect x="2" y="1.5" width="12" height="13" rx="2.5" style="fill:var(--mock-blue)"/><path d="M5 5.5h6M5 8h6M5 10.5h3.5" style="stroke:var(--mock-white);stroke-width:1.2;fill:none;stroke-linecap:round"/>`,
+  gsheet: `<rect x="2" y="1.5" width="12" height="13" rx="2.5" style="fill:var(--mock-green)"/><path d="M5 5h6v6H5zM5 8h6M8 5v6" style="stroke:var(--mock-white);stroke-width:1.1;fill:none"/>`,
+  pdf: `<rect x="2" y="1.5" width="12" height="13" rx="2.5" style="fill:var(--mock-red)"/><path d="M5 5h6M5 7.25h4" style="stroke:var(--mock-white);stroke-width:1.2;fill:none;stroke-linecap:round"/><rect x="4.5" y="9.25" width="7" height="2.5" rx=".6" style="fill:var(--mock-white)"/>`,
   chat: `<rect x="1.5" y="1.5" width="13" height="13" rx="3.5" style="fill:var(--mock-aubergine)"/><path d="M6.6 4.5 5.9 11.5M10.1 4.5 9.4 11.5M4.5 6.6h7.2M4.3 9.4h7.2" style="stroke:var(--mock-white);stroke-width:1.2;fill:none;stroke-linecap:round"/>`,
-  notes: `<rect x="2" y="2" width="12" height="12" rx="2.5" style="fill:var(--mock-white);stroke:var(--mock-black);stroke-width:1.2"/><path d="M5.25 11V5l5.5 6V5" style="stroke:var(--mock-black);stroke-width:1.3;fill:none;stroke-linejoin:round;stroke-linecap:round"/>`,
-  mail: `<rect x="1.5" y="3" width="13" height="10" rx="2" style="fill:var(--mock-white);stroke:var(--mock-line);stroke-width:1"/><path d="M2.5 4.5 8 9l5.5-4.5" style="stroke:var(--mock-red);stroke-width:1.6;fill:none;stroke-linejoin:round;stroke-linecap:round"/>`,
-  cal: `<rect x="2" y="2" width="12" height="12" rx="2.5" style="fill:var(--mock-white);stroke:var(--mock-line);stroke-width:1"/><path d="M2 5.5V4.5A2.5 2.5 0 0 1 4.5 2h7A2.5 2.5 0 0 1 14 4.5v1z" style="fill:var(--mock-blue)"/><path d="M6 8.2h4L7.6 12" style="stroke:var(--mock-ink);stroke-width:1.2;fill:none;stroke-linecap:round;stroke-linejoin:round"/>`,
-  news: `<rect x="1.5" y="1.5" width="13" height="13" rx="3" style="fill:var(--mock-teal)"/><path d="M5 5h6M5 5v6M5 8h4.5M5 11h6" style="stroke:var(--mock-white);stroke-width:1.4;fill:none;stroke-linecap:round"/>`,
-  bank: `<rect x="1.5" y="1.5" width="13" height="13" rx="3" style="fill:var(--mock-navy)"/><path d="M3.75 6.25c1.9.2 3.3 1.3 4.25 3.5.95-2.2 2.35-3.3 4.25-3.5" style="stroke:var(--mock-crimson);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round"/>`,
-  code: `<rect x="1.5" y="1.5" width="13" height="13" rx="6.5" style="fill:var(--mock-black)"/><path d="M6.5 6 4.5 8l2 2M9.5 6l2 2-2 2" style="stroke:var(--mock-white);stroke-width:1.3;fill:none;stroke-linecap:round;stroke-linejoin:round"/>`,
+  notes: `<rect x="2" y="2" width="12" height="12" rx="2.5" style="fill:var(--mock-white);stroke:var(--mock-black);stroke-width:1.2"/><rect x="4.75" y="4.75" width="2.75" height="2.75" style="fill:var(--mock-black)"/><path d="M9 5.25h2.25M9 7h2.25M4.75 9.5h6.5M4.75 11.25h4.5" style="stroke:var(--mock-black);stroke-width:1.1;fill:none;stroke-linecap:round"/>`,
+  mail: `<rect x="1.5" y="3" width="13" height="10" rx="2.25" style="fill:var(--mock-red)"/><path d="M3.75 5.75 8 9l4.25-3.25" style="stroke:var(--mock-white);stroke-width:1.4;fill:none;stroke-linejoin:round;stroke-linecap:round"/>`,
+  cal: `<rect x="2" y="2" width="12" height="12" rx="2.5" style="fill:var(--mock-white);stroke:var(--mock-line);stroke-width:1"/><path d="M2 5.5V4.5A2.5 2.5 0 0 1 4.5 2h7A2.500 2.500 0 0 1 14 4.500v1z" style="fill:var(--mock-blue)"/><path d="M6 8.2h4L7.6 12" style="stroke:var(--mock-ink);stroke-width:1.2;fill:none;stroke-linecap:round;stroke-linejoin:round"/>`,
+  news: `<rect x="1.5" y="1.5" width="13" height="13" rx="3" style="fill:var(--mock-teal)"/><path d="M5 5h6M5 5v6M5 8h4.500M5 11h6" style="stroke:var(--mock-white);stroke-width:1.4;fill:none;stroke-linecap:round"/>`,
+  bank: `<rect x="1.5" y="1.5" width="13" height="13" rx="3" style="fill:var(--mock-navy)"/><path d="M3.750 6.250c1.900.2 3.300 1.300 4.250 3.500.950-2.200 2.350-3.300 4.250-3.500" style="stroke:var(--mock-crimson);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round"/>`,
+  code: `<rect x="1.5" y="1.5" width="13" height="13" rx="3.5" style="fill:var(--mock-black)"/><path d="M6.500 6 4.500 8l2 2M9.500 6l2 2-2 2" style="stroke:var(--mock-white);stroke-width:1.3;fill:none;stroke-linecap:round;stroke-linejoin:round"/>`,
   design: `<rect x="1.5" y="1.5" width="13" height="13" rx="3.5" style="fill:var(--mock-violet)"/><circle cx="8" cy="8" r="2.6" style="stroke:var(--mock-white);stroke-width:1.3;fill:none"/>`,
-  analytics: `<rect x="1.5" y="1.5" width="13" height="13" rx="3" style="fill:var(--mock-orange)"/><path d="M5 11V8.5M8 11V5M11 11V7" style="stroke:var(--mock-white);stroke-width:1.6;fill:none;stroke-linecap:round"/>`,
-  video: `<rect x="1.5" y="2.5" width="13" height="11" rx="2.5" style="fill:var(--mock-crimson)"/><path d="M6.75 5.75v4.5L10.5 8z" style="fill:var(--mock-white)"/>`,
-  drive: `<path d="M5.6 2.5h4.8l4.1 7-2.4 4H3.9l-2.4-4z" style="fill:var(--mock-yellow)"/><path d="M5.6 2.5 1.5 9.5l2.4 4 4.1-7z" style="fill:var(--mock-green)"/><path d="M14.5 9.5H6.3l-2.4 4h8.2z" style="fill:var(--mock-blue)"/>`,
+  analytics: `<rect x="1.5" y="1.5" width="13" height="13" rx="3" style="fill:var(--mock-orange)"/><path d="M5 11V8.500M8 11V5M11 11V7" style="stroke:var(--mock-white);stroke-width:1.6;fill:none;stroke-linecap:round"/>`,
+  video: `<rect x="1.5" y="1.5" width="13" height="13" rx="3" style="fill:var(--mock-teal)"/><path d="M6.500 5.250v5.500L11 8z" style="fill:var(--mock-white)"/>`,
+  drive: `<path d="M1.750 4.250A1.250 1.250 0 0 1 3 3h3.250l1.500 1.750H13a1.250 1.250 0 0 1 1.250 1.250v6A1.250 1.250 0 0 1 13 13.250H3a1.250 1.250 0 0 1-1.250-1.250z" style="fill:var(--mock-yellow)"/>`,
 };
 function favicon(kind, size = 16) {
   if (kind === "web" || kind === "search" || kind === "key" || kind === "tab") {

@@ -158,10 +158,11 @@ export function createOverlayHost(opts: OverlayHostOptions): OverlayHost {
         timer: null,
         shown: false,
       }
+      // Props must survive a structured clone; a surface that cannot cross fails here, not later.
+      opts.transport.post(msg)
       p.timer = setTimeout(() => finish(p, { status: 'dismissed', reason: 'unavailable' }), timeoutMs)
       current = p
       store.setState({ open: { id, surface, placement, shown: false } })
-      opts.transport.post(msg)
       return {
         id,
         outcome: outcome as Promise<OverlayOutcome<SurfaceResult<typeof surface>>>,

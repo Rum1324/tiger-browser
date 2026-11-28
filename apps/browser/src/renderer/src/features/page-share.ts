@@ -90,9 +90,7 @@ export function pageShareState(i: PageShareInput): PageShareState {
   const key = tab ? tabLookupKey(tab) : null
   const flow = i.shareFlow
   const sharing =
-    tab && 'tabId' in flow && flow.tabId === tab.id && flow.phase !== 'error'
-      ? (flow.phase as 'extracting' | 'preview' | 'sending')
-      : null
+    tab && 'tabId' in flow && flow.tabId === tab.id ? flow.phase : null
   const base = {
     tabId: tab?.id ?? null,
     attached: !!key && i.attachedKeys.includes(key),

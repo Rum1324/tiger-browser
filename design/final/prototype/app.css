@@ -23,6 +23,7 @@ time, .num { font-variant-numeric: tabular-nums; }
 .grow { flex: 1 1 auto; }
 .nb { white-space: nowrap; }
 :focus-visible, .is-kbd-focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+::selection { background: var(--selection); }
 
 /* labels: short, one line, proportional kana */
 .zone-label, .tab-title, .item-title, .byline, .btn, .st-label, .st-act, .st-attach, .space-name, .space-sub,
@@ -69,15 +70,15 @@ time, .num { font-variant-numeric: tabular-nums; }
 .space-chev { margin-left: auto; color: var(--space-ink-2); }
 
 /* seals: a Space by one character and its hue; the AI in ink. Mincho. */
-.seal { flex: none; display: inline-grid; place-items: center; background: var(--space-solid); color: var(--on-space-solid); font-family: var(--font-voice); font-weight: var(--fw-voice-strong); font-feature-settings: normal; line-height: 1; }
+.seal { flex: none; display: inline-grid; place-items: center; background: var(--seal-fill); color: var(--seal-ink); font-family: var(--font-voice); font-weight: var(--fw-voice-strong); font-feature-settings: normal; line-height: 1; }
 .seal--16 { width: 16px; height: 16px; border-radius: var(--r-key); font-size: var(--fs-11); }
 .seal--20 { width: 20px; height: 20px; border-radius: var(--r-key); font-size: var(--fs-12); }
 .seal--24 { width: 24px; height: 24px; border-radius: var(--r-row); font-size: var(--fs-13); }
 .seal--28 { width: 28px; height: 28px; border-radius: var(--r-control); font-size: var(--fs-15); }
 .seal--40 { width: 40px; height: 40px; border-radius: var(--r-card); font-size: var(--fs-20); }
-.seal--ai { background: var(--inverse); color: var(--on-inverse); }
+.seal--ai { background: var(--seal-ai-fill); color: var(--seal-ai-ink); }
 /* hollow: the Space holds an older version of what this mark sits on */
-.seal--hollow { background: var(--paper); color: var(--space-ink); box-shadow: inset 0 0 0 1.5px var(--space-accent); }
+.seal--hollow { background: var(--seal-hollow-fill); color: var(--seal-hollow-ink); box-shadow: inset 0 0 0 1.5px var(--seal-hollow-line); }
 
 /* people: a photo when the account has one, a neutral monogram otherwise */
 .av { flex: none; display: inline-grid; place-items: center; overflow: hidden; border-radius: var(--r-round); background: var(--paper-3); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); font-weight: var(--fw-strong); line-height: 1; }
@@ -176,7 +177,7 @@ time, .num { font-variant-numeric: tabular-nums; }
 .capsule { flex: 1 1 auto; min-width: 0; height: var(--h-capsule); display: flex; align-items: center; border-radius: var(--r-capsule); background: var(--space-field); box-shadow: inset 0 0 0 1px var(--space-line); }
 .capsule.is-focus { background: var(--paper); box-shadow: inset 0 0 0 1.5px var(--ink); }
 .where { flex: 1 1 auto; min-width: 0; height: 100%; display: flex; align-items: center; gap: var(--sp-4); padding: 0 var(--sp-5); border-radius: var(--r-capsule) 0 0 var(--r-capsule); }
-.url { min-width: 0; white-space: nowrap; overflow: hidden; mask-image: var(--fade-tail); font-size: var(--fs-13); color: var(--space-ink-2); font-feature-settings: normal; }
+.url { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; mask-image: var(--fade-tail); font-size: var(--fs-13); color: var(--space-ink-2); font-feature-settings: normal; }
 .url-domain { color: var(--ink); font-weight: var(--fw-strong); }
 .url--placeholder { color: var(--space-ink-2); }
 .url-warn { flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-12); font-weight: var(--fw-strong); color: var(--ink); }
@@ -332,3 +333,23 @@ button.st-main:hover, .st-main.is-open { background: var(--space-frame-2); }
 .attach-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--sp-3); height: 26px; padding: 0 var(--sp-1) 0 var(--sp-3); border-radius: var(--r-row); outline: 1.5px dashed var(--ink); outline-offset: -1.5px; font-size: var(--fs-12); white-space: nowrap; font-feature-settings: "palt" 1; }
 .attach-chip b { font-weight: var(--fw-strong); }
 .attach-chip .byline { color: var(--ink-2); }
+
+/* ───────────── motion: sharing (DESIGN.md 6.1) ─────────────
+   Runs only on .window.is-sharing. Reduced motion: one cross-fade, nothing travels. */
+@keyframes ring-arm { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes ghost-lift { from { transform: translateY(var(--from)) scale(1); box-shadow: none; } to { transform: translateY(var(--from)) scale(1.02); box-shadow: var(--shadow-lift); } }
+@keyframes ghost-cross { from { transform: translateY(var(--from)) scale(1.02); } to { transform: translateY(0) scale(1.02); } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes make-room { from { transform: translateY(calc((var(--h-row-item) + 1px) * -1)); } }
+@keyframes seal-in { from { opacity: 0; transform: scale(0.8); } }
+.edge-ring--arm { stroke-dasharray: 1; animation: ring-arm var(--dur-close) var(--ease-close) both; }
+.is-sharing .tab--ghost { box-shadow: var(--shadow-lift); animation: ghost-lift var(--dur-press) var(--ease-out) both, ghost-cross var(--dur-cross) var(--ease-cross) var(--dur-press) both, fade-out var(--dur-fade) var(--ease-out) 450ms forwards; }
+.is-sharing .items li:first-child { animation: fade-in var(--dur-fade) var(--ease-out) 450ms both; }
+.is-sharing .items li:not(:first-child) { animation: make-room var(--dur-move) var(--ease-out) var(--dur-press) both; }
+.is-sharing .tab.is-active .seal { animation: seal-in var(--dur-fade) var(--ease-out) 120ms both; }
+.is-sharing .st { animation: fade-in var(--dur-fade) var(--ease-out) 120ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .edge-ring--arm, .is-sharing .items li, .is-sharing .tab.is-active .seal { animation: fade-in var(--dur-fade) var(--ease-out) both; stroke-dasharray: none; }
+  .is-sharing .tab--ghost { display: none; }
+}
