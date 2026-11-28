@@ -38,8 +38,11 @@ export interface ExportView {
 
 /** A file name from a title: no path separators or control characters, at most 80 characters. */
 export function fileNameOf(title: string): string {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is removed
-  const cleaned = title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim()
+  const cleaned = title
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is removed
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   return (cleaned || 'tiger').slice(0, 80)
 }
 
@@ -71,8 +74,10 @@ export function useExport(): ExportView {
           markdown: markdownOf(message),
           messageId: message.id,
         })
-        if (r.ok) setStatus({ state: 'done', target: 'google', url: r.url, notice: { key: 'export.done' } })
-        else setStatus({ state: 'error', target: 'google', error: { key: googleExportKey(r.error) } })
+        if (r.ok)
+          setStatus({ state: 'done', target: 'google', url: r.url, notice: { key: 'export.done' } })
+        else
+          setStatus({ state: 'error', target: 'google', error: { key: googleExportKey(r.error) } })
         return r.ok
       },
       async toFile({ title, message }) {
@@ -83,7 +88,11 @@ export function useExport(): ExportView {
             content: markdownOf(message),
             extension: 'md',
           })
-          setStatus(path ? { state: 'done', target: 'file', path, notice: { key: 'export.saved' } } : { state: 'cancelled' })
+          setStatus(
+            path
+              ? { state: 'done', target: 'file', path, notice: { key: 'export.saved' } }
+              : { state: 'cancelled' },
+          )
           return !!path
         } catch {
           setStatus({ state: 'error', target: 'file', error: { key: 'error.internal' } })

@@ -60,7 +60,9 @@ function useThreadView(threadId: string | null): ThreadView {
       mine: m.message.author.id === meId,
       failureNotice: m.failure ? { key: aiFailureKey(m.failure.code) } : null,
       canStop:
-        m.phase === 'streaming' && m.message.role === 'assistant' && (m.message.author.id === meId || isOwner),
+        m.phase === 'streaming' &&
+        m.message.role === 'assistant' &&
+        (m.message.author.id === meId || isOwner),
     }))
     const streaming = [...messages].reverse().find((m) => m.phase === 'streaming') ?? null
     return {
@@ -182,7 +184,9 @@ export function useThreadList(): ThreadListView {
 }
 
 /** Split an answer's text at its `[n]` markers, for drawing citation chips inline. Pure. */
-export type AnswerPart = { kind: 'text'; text: string } | { kind: 'cite'; n: number; citation: Citation | null }
+export type AnswerPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'cite'; n: number; citation: Citation | null }
 
 export function answerParts(text: string, citations: readonly Citation[]): AnswerPart[] {
   const parts: AnswerPart[] = []

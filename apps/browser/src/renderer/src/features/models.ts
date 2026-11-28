@@ -42,9 +42,10 @@ export function useModels(): ModelsView {
     })
     const options = s.models.map(option)
     return {
-      groups: TIERS.map((tier) => ({ tier, options: options.filter((o) => o.model.tier === tier) })).filter(
-        (g) => g.options.length > 0,
-      ),
+      groups: TIERS.map((tier) => ({
+        tier,
+        options: options.filter((o) => o.model.tier === tier),
+      })).filter((g) => g.options.length > 0),
       selected: options.find((o) => o.selected) ?? null,
       defaultRef,
       loading: s.load.status === 'loading',

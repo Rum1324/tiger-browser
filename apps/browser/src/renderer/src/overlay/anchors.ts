@@ -7,7 +7,10 @@ import type { Placement } from './protocol'
  * state chip…) and the popover is placed next to it; without one it goes under the toolbar's right
  * end. Rects are in CSS pixels of the main view, like page.setBounds.
  */
-export function anchorRect(name: string, doc: Document | null = typeof document === 'undefined' ? null : document): Rect {
+export function anchorRect(
+  name: string,
+  doc: Document | null = typeof document === 'undefined' ? null : document,
+): Rect {
   const el = doc?.querySelector(`[data-overlay-anchor="${CSS.escape(name)}"]`)
   if (el) {
     const r = el.getBoundingClientRect()
@@ -17,14 +20,26 @@ export function anchorRect(name: string, doc: Document | null = typeof document 
   return { x: width - 48, y: 8, width: 32, height: 32 }
 }
 
+/** Popover rectangles from DESIGN.md 5.5 and 10.5 (popover 336 wide, model menu 360). */
 export const POPOVER_SIZES = {
-  downloads: { width: 360, height: 420 },
-  permission: { width: 360, height: 180 },
+  popover: { width: 336, height: 240 },
+  downloads: { width: 336, height: 420 },
+  permission: { width: 336, height: 200 },
   find: { width: 360, height: 48 },
   menu: { width: 280, height: 320 },
-  'model-picker': { width: 320, height: 360 },
+  'model-picker': { width: 360, height: 420 },
 } as const
 
-export function popoverAt(anchor: string, size: keyof typeof POPOVER_SIZES, side: 'below' | 'above' | 'start' | 'end' = 'below'): Placement {
-  return { mode: 'popover', anchor: anchorRect(anchor), size: POPOVER_SIZES[size], side, align: 'end' }
+export function popoverAt(
+  anchor: string,
+  size: keyof typeof POPOVER_SIZES,
+  side: 'below' | 'above' | 'start' | 'end' = 'below',
+): Placement {
+  return {
+    mode: 'popover',
+    anchor: anchorRect(anchor),
+    size: POPOVER_SIZES[size],
+    side,
+    align: 'end',
+  }
 }

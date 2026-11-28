@@ -32,7 +32,9 @@ describe('PageSlotReporter', () => {
     r.reporter.setElement(r.el)
     expect(r.sent).toEqual([])
     r.frame()
-    expect(r.sent).toEqual([{ bounds: { x: 256, y: 49, width: 776, height: 843 }, cornerRadius: 10 }])
+    expect(r.sent).toEqual([
+      { bounds: { x: 256, y: 49, width: 776, height: 843 }, cornerRadius: 10 },
+    ])
   })
 
   it('collapses every trigger within one frame into one measurement', () => {
@@ -111,7 +113,9 @@ describe('PageSlotReporter', () => {
         return () => {}
       },
     })
-    reporter.setElement({ getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) })
+    reporter.setElement({
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }),
+    })
     radius = 12.4
     reporter.invalidate()
     expect(sent).toEqual([10, 12])

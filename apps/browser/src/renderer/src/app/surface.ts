@@ -14,7 +14,10 @@ export function useSurface(): {
 } {
   const { router, engine, client, layout } = useServices()
   const route = useStore(router.store, (s) => s.route)
-  const activeTab = useStore(engine.tabs, (s) => s.value?.tabs.find((t) => t.id === s.value?.activeTabId) ?? null)
+  const activeTab = useStore(
+    engine.tabs,
+    (s) => s.value?.tabs.find((t) => t.id === s.value?.activeTabId) ?? null,
+  )
   const session = useStore(client.session.store, (s) => s.status)
   const firstRunDone = useStore(layout.store, (s) => s.firstRunDone)
   return useMemo(

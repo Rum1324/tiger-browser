@@ -26,7 +26,10 @@ export function OverlayApp({
   useEffect(() => {
     let live = true
     const off = bridge.on('settings.changed', setSettings)
-    bridge.invoke('settings.get').then((s) => live && setSettings(s), () => {})
+    bridge.invoke('settings.get').then(
+      (s) => live && setSettings(s),
+      () => {},
+    )
     let g: OverlayGuest | null = null
     bridge.invoke('tabs.get').then(
       (t) => {
@@ -46,5 +49,10 @@ export function OverlayApp({
   useThemeEffect(settings?.theme ?? 'system')
   const t = useMemo(() => translator(settings?.locale ?? 'ja'), [settings?.locale])
   if (!guest) return null
-  return <OverlayRoot guest={guest} fallback={(name) => <Placeholder name={name} t={t} bridge={bridge} />} />
+  return (
+    <OverlayRoot
+      guest={guest}
+      fallback={(name) => <Placeholder name={name} t={t} bridge={bridge} />}
+    />
+  )
 }

@@ -84,8 +84,20 @@ export function useTabs(): TabsView & TabsActions {
   const state = useStore(engine.tabs, (s) => s.value)
   const byUrl = useStore(client.urlShare.store, (s) => s.byUrl)
   const currentSpaceId = useStore(client.spaces.store, (s) => s.currentSpaceId)
-  const view = useMemo(() => tabZones(state, { byUrl }, currentSpaceId), [state, byUrl, currentSpaceId])
-  const actions = useMemo(() => tabsActions(bridge, () => engine.tabs.getState().value, () => client.spaces.store.getState().currentSpaceId, () => client.urlShare.store.getState()), [bridge, engine, client])
+  const view = useMemo(
+    () => tabZones(state, { byUrl }, currentSpaceId),
+    [state, byUrl, currentSpaceId],
+  )
+  const actions = useMemo(
+    () =>
+      tabsActions(
+        bridge,
+        () => engine.tabs.getState().value,
+        () => client.spaces.store.getState().currentSpaceId,
+        () => client.urlShare.store.getState(),
+      ),
+    [bridge, engine, client],
+  )
   return { ...view, ...actions }
 }
 
@@ -118,7 +130,8 @@ export function tabsActions(
       const next = order[(i + step + order.length) % order.length] as string
       quiet(bridge.invoke('tabs.activate', { tabId: next }))
     },
-    move: (tabId, toIndex) => quiet(bridge.invoke('tabs.move', { tabId, toIndex: Math.max(0, toIndex) })),
+    move: (tabId, toIndex) =>
+      quiet(bridge.invoke('tabs.move', { tabId, toIndex: Math.max(0, toIndex) })),
     setPinned: (tabId, pinned) => quiet(bridge.invoke('tabs.setPinned', { tabId, pinned })),
     duplicate: (tabId) => quiet(bridge.invoke('tabs.duplicate', { tabId })),
     reopenClosed: () => quiet(bridge.invoke('tabs.reopenClosed')),

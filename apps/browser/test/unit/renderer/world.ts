@@ -1,14 +1,17 @@
 import { createTigerClient, type TigerClient } from '@tiger/client'
 import { act, createElement, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { memoryPrefsStorage } from '../../../src/renderer/src/app/prefs'
 import { ServicesProvider } from '../../../src/renderer/src/app/context'
+import { memoryPrefsStorage } from '../../../src/renderer/src/app/prefs'
 import { type AppServices, createAppServices } from '../../../src/renderer/src/app/services'
 import { createEngineState } from '../../../src/renderer/src/engine/engine-state'
 import { createOverlayGuest, type OverlayGuest } from '../../../src/renderer/src/overlay/guest'
 import { memoryTransportPair } from '../../../src/renderer/src/overlay/protocol'
 import { FakeEngine, type FakeEngineOptions } from '../../../src/renderer/src/testing/fake-engine'
-import { createFixtureServer, type FixtureServer } from '../../../src/renderer/src/testing/fixture-server'
+import {
+  createFixtureServer,
+  type FixtureServer,
+} from '../../../src/renderer/src/testing/fixture-server'
 import { buildWorld, type FixtureWorld } from '../../../src/renderer/src/testing/fixtures'
 
 export interface World {
@@ -89,7 +92,11 @@ export async function makeWorld(opts: WorldOptions = {}): Promise<World> {
 }
 
 /** Poll until `check` is truthy (or stops throwing). */
-export async function waitFor<T>(check: () => T, label = 'condition', timeoutMs = 3000): Promise<NonNullable<T>> {
+export async function waitFor<T>(
+  check: () => T,
+  label = 'condition',
+  timeoutMs = 3000,
+): Promise<NonNullable<T>> {
   const deadline = Date.now() + timeoutMs
   let last: unknown = null
   for (;;) {
@@ -99,7 +106,8 @@ export async function waitFor<T>(check: () => T, label = 'condition', timeoutMs 
     } catch (e) {
       last = e
     }
-    if (Date.now() > deadline) throw new Error(`timed out waiting for ${label}${last ? `: ${String(last)}` : ''}`)
+    if (Date.now() > deadline)
+      throw new Error(`timed out waiting for ${label}${last ? `: ${String(last)}` : ''}`)
     await act(async () => {
       await new Promise((r) => setTimeout(r, 5))
     })
@@ -119,6 +127,7 @@ export interface RenderedHook<T> {
 export function renderHook<T>(services: AppServices, hook: () => T): RenderedHook<T> {
   const result = { current: undefined as T }
   let count = 0
+  // biome-ignore lint/correctness/noComponentHookFactories: a fresh probe per rendered hook is the point
   function Probe(): ReactNode {
     result.current = hook()
     count++

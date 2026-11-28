@@ -1,10 +1,15 @@
-import { type ShareFlowState, type ShareLocation, shareFailureKey, type TigerClient } from '@tiger/client'
+import {
+  type ShareFlowState,
+  type ShareLocation,
+  shareFailureKey,
+  type TigerClient,
+} from '@tiger/client'
 import type { ExtractedPage, Item } from '@tiger/shared'
 import { useMemo } from 'react'
 import { useServices } from '../app/context'
 import type { Notice } from '../i18n'
-import type { OverlayHost } from '../overlay/host'
 import { useStore } from '../lib/store'
+import type { OverlayHost } from '../overlay/host'
 import { type SpaceRef, spaceRef } from './page-share'
 
 /**
@@ -26,7 +31,10 @@ export type ShareView =
   | { phase: 'done'; space: SpaceRef | null; outcome: 'new' | 'version' | 'unchanged'; item: Item }
   | { phase: 'error'; space: SpaceRef | null; error: Notice }
 
-export function shareView(s: ShareFlowState, spaces: readonly import('@tiger/shared').Space[]): ShareView {
+export function shareView(
+  s: ShareFlowState,
+  spaces: readonly import('@tiger/shared').Space[],
+): ShareView {
   const ref = (id: string | null) => {
     const sp = id ? spaces.find((x) => x.id === id) : undefined
     return sp ? spaceRef(sp) : null
@@ -37,7 +45,13 @@ export function shareView(s: ShareFlowState, spaces: readonly import('@tiger/sha
     case 'extracting':
       return { phase: 'extracting', space: ref(s.spaceId) }
     case 'preview':
-      return { phase: 'preview', space: ref(s.spaceId), page: s.page, existing: s.existing, changed: s.changed }
+      return {
+        phase: 'preview',
+        space: ref(s.spaceId),
+        page: s.page,
+        existing: s.existing,
+        changed: s.changed,
+      }
     case 'sending':
       return { phase: 'sending', space: ref(s.spaceId), page: s.page }
     case 'done':
@@ -66,7 +80,11 @@ export function useShare(): ShareView & ShareActions {
   const flow = useStore(client.share.store, (s) => s)
   const spaces = useStore(client.spaces.store, (s) => s.list)
   return useMemo(() => {
-    const actions = shareActions(services.client, services.overlay, () => services.engine.tabs.getState().value?.activeTabId ?? null)
+    const actions = shareActions(
+      services.client,
+      services.overlay,
+      () => services.engine.tabs.getState().value?.activeTabId ?? null,
+    )
     return { ...shareView(flow, spaces), ...actions }
   }, [flow, spaces, services])
 }
@@ -86,14 +104,20 @@ export function shareActions(
     confirm: () => client.share.confirm(),
     cancel: () => client.share.cancel(),
     async present(tabId, spaceId) {
-      const view = () => shareView(client.share.store.getState(), client.spaces.store.getState().list)
+      const view = () =>
+        shareView(client.share.store.getState(), client.spaces.store.getState().list)
       const started = begin(tabId, spaceId)
-      const handle = overlay.open('share', view(), { mode: 'modal' }, {
-        onEvent(e) {
-          if (e.type === 'confirm') void client.share.confirm()
-          if (e.type === 'cancel') handle.close('closed')
+      const handle = overlay.open(
+        'share',
+        view(),
+        { mode: 'modal' },
+        {
+          onEvent(e) {
+            if (e.type === 'confirm') void client.share.confirm()
+            if (e.type === 'cancel') handle.close('closed')
+          },
         },
-      })
+      )
       const off = client.share.store.subscribe(() => {
         const v = view()
         handle.update(v)

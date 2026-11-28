@@ -24,14 +24,18 @@ export interface LedgerView {
   open(item: Item): void
 }
 
-const byUpdated = (a: Item, b: Item) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0)
+const byUpdated = (a: Item, b: Item) =>
+  a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0
 
 export function useLedger(): LedgerView {
   const services = useServices()
   const { client, router } = services
   const s = useStore(client.items.store, (x) => x, shallow)
   const meId = useStore(client.session.store, (x) => x.user?.id ?? null)
-  const role = useStore(client.spaces.store, (x) => x.list.find((sp) => sp.id === x.currentSpaceId)?.myRole ?? null)
+  const role = useStore(
+    client.spaces.store,
+    (x) => x.list.find((sp) => sp.id === x.currentSpaceId)?.myRole ?? null,
+  )
   return useMemo(() => {
     const canUnshare = (item: Item) => role === 'owner' || item.sharedBy.id === meId
     return {
@@ -41,7 +45,9 @@ export function useLedger(): LedgerView {
       error: s.load.status === 'error' && s.load.error ? { key: errorKey(s.load.error) } : null,
       busy: s.mutation.status === 'loading',
       mutationError:
-        s.mutation.status === 'error' && s.mutation.error ? { key: errorKey(s.mutation.error) } : null,
+        s.mutation.status === 'error' && s.mutation.error
+          ? { key: errorKey(s.mutation.error) }
+          : null,
       canUnshare,
       unshare: (id) => client.items.unshare(id),
       async confirmUnshare(item) {
@@ -91,6 +97,8 @@ export function useItemDetail(itemId: string | null): ItemDetailView {
     itemId ? x.spaceId === null || x.items.some((i) => i.id === itemId) : true,
   )
 
+  // `nonce` is the reload trigger: bumping it loads the item again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: nonce re-runs the load on purpose
   useEffect(() => {
     if (!itemId) return
     let live = true
@@ -102,7 +110,13 @@ export function useItemDetail(itemId: string | null): ItemDetailView {
       (e: unknown) => {
         if (!live) return
         const code = (e as { code?: string }).code
-        setState({ id: itemId, detail: null, versions: [], loading: false, error: { key: code ? (`error.${code}` as Notice['key']) : 'error.internal' } })
+        setState({
+          id: itemId,
+          detail: null,
+          versions: [],
+          loading: false,
+          error: { key: code ? (`error.${code}` as Notice['key']) : 'error.internal' },
+        })
       },
     )
     return () => {

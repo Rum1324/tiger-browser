@@ -7,7 +7,13 @@ import type { AppServices } from './services'
 const ServicesContext = createContext<AppServices | null>(null)
 
 /** Provides the services to every component and hook of the main view. */
-export function ServicesProvider({ services, children }: { services: AppServices; children: ReactNode }) {
+export function ServicesProvider({
+  services,
+  children,
+}: {
+  services: AppServices
+  children?: ReactNode
+}) {
   return <ServicesContext.Provider value={services}>{children}</ServicesContext.Provider>
 }
 

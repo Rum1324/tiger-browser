@@ -71,7 +71,12 @@ export function availableCommands(s: AppServices): CommandDescriptor[] {
   const list: CommandDescriptor[] = [
     c('new-tab', 'command.newTab', ['new tab'], 'new-tab'),
     c('new-window', 'command.newWindow', ['new window'], 'new-window'),
-    c('new-private-window', 'command.newPrivateWindow', ['private', 'incognito'], 'new-private-window'),
+    c(
+      'new-private-window',
+      'command.newPrivateWindow',
+      ['private', 'incognito'],
+      'new-private-window',
+    ),
   ]
   if (active) list.push(c('close-tab', 'command.closeTab', ['close'], 'close-tab'))
   list.push(c('reopen-closed-tab', 'command.reopenClosedTab', ['reopen'], 'reopen-closed-tab'))
@@ -95,7 +100,11 @@ export function availableCommands(s: AppServices): CommandDescriptor[] {
   if (signedIn) {
     for (const sp of spaces.list)
       if (sp.id !== spaces.currentSpaceId)
-        list.push(c(`switch-space:${sp.id}`, 'command.switchSpace', ['space', sp.name], undefined, { space: sp.name }))
+        list.push(
+          c(`switch-space:${sp.id}`, 'command.switchSpace', ['space', sp.name], undefined, {
+            space: sp.name,
+          }),
+        )
     list.push(c('sign-out', 'command.signOut', ['sign out', 'logout']))
   } else list.push(c('sign-in', 'command.signIn', ['sign in', 'login']))
   return list
@@ -167,7 +176,13 @@ export function runCommand(s: AppServices, id: CommandId): boolean {
       return true
     case 'bookmark':
       if (!active?.url) return false
-      quiet(s.bridge.invoke('bookmarks.add', { url: active.url, title: active.title, spaceId: s.client.spaces.store.getState().currentSpaceId }))
+      quiet(
+        s.bridge.invoke('bookmarks.add', {
+          url: active.url,
+          title: active.title,
+          spaceId: s.client.spaces.store.getState().currentSpaceId,
+        }),
+      )
       return true
     case 'sign-in':
       s.router.go({ name: 'sign-in' })

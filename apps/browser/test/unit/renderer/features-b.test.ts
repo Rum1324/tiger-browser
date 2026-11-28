@@ -10,10 +10,15 @@ import { usePermissionPrompts } from '../../../src/renderer/src/features/permiss
 import { useConnection, useSignIn } from '../../../src/renderer/src/features/session'
 import { useSettings } from '../../../src/renderer/src/features/settings'
 import { useShareThread } from '../../../src/renderer/src/features/share-thread'
-import { useActivity, useInvite, useMembers, useSpaces } from '../../../src/renderer/src/features/spaces'
+import {
+  useActivity,
+  useInvite,
+  useMembers,
+  useSpaces,
+} from '../../../src/renderer/src/features/spaces'
 import { useSpaceThread } from '../../../src/renderer/src/features/threads'
 import { pages, people, spaceIds } from '../../../src/renderer/src/testing/fixtures'
-import { guestSurface, makeWorld, renderHook, settle, waitFor, type World } from './world'
+import { guestSurface, makeWorld, renderHook, settle, type World, waitFor } from './world'
 
 let w: World
 afterEach(() => w?.dispose())
@@ -25,12 +30,18 @@ describe('useModels', () => {
     const h = renderHook(w.services, () => useModels())
     await waitFor(() => h.result.current.groups.length === 3, 'models')
     expect(h.result.current.groups.map((g) => g.tier)).toEqual(['best', 'balanced', 'fast'])
-    expect(h.result.current.selected).toMatchObject({ model: { id: 'claude-sonnet-4-5' }, company: 'Anthropic', isDefault: true })
+    expect(h.result.current.selected).toMatchObject({
+      model: { id: 'claude-sonnet-4-5' },
+      company: 'Anthropic',
+      isDefault: true,
+    })
     const gpt = h.result.current.groups[0]?.options.find((o) => o.model.id === 'gpt-5.1')
     expect(gpt).toMatchObject({ company: 'OpenAI', model: { available: false } })
     await settle(() => h.result.current.select({ provider: 'anthropic', id: 'claude-haiku-4-5' }))
     expect(h.result.current.selected?.model.id).toBe('claude-haiku-4-5')
-    await settle(() => h.result.current.setDefault({ provider: 'anthropic', id: 'claude-opus-4-5' }))
+    await settle(() =>
+      h.result.current.setDefault({ provider: 'anthropic', id: 'claude-opus-4-5' }),
+    )
     expect(w.engine.settings.defaultModel).toEqual({ provider: 'anthropic', id: 'claude-opus-4-5' })
     expect(h.result.current.defaultRef?.id).toBe('claude-opus-4-5')
   })
@@ -93,11 +104,16 @@ describe('useShareThread', () => {
     // The streaming answer has to settle before the thread can be shared.
     await settle(() => w.client.threads.loadMessages(w.world.ids.privateThread))
     await settle(() => w.client.threads.stop(w.world.ids.streamingAnswer))
-    await waitFor(() => w.world.messages[w.world.ids.privateThread]?.every((m) => m.status !== 'streaming'), 'stopped')
+    await waitFor(
+      () => w.world.messages[w.world.ids.privateThread]?.every((m) => m.status !== 'streaming'),
+      'stopped',
+    )
     await settle(() => h.result.current.begin())
     await waitFor(() => h.result.current.phase === 'deciding', 'deciding')
     if (h.result.current.phase !== 'deciding') throw new Error('not deciding')
-    expect(h.result.current.questions.map((q) => q.question.id)).toEqual([w.world.ids.attachedQuestion])
+    expect(h.result.current.questions.map((q) => q.question.id)).toEqual([
+      w.world.ids.attachedQuestion,
+    ])
     expect(h.result.current.ready).toBe(false)
     expect(await h.result.current.confirm()).toBe(false)
     expect(w.server.requests.some((r) => r.route === 'shareThread')).toBe(false)
@@ -128,9 +144,16 @@ describe('useExport', () => {
     expect(copied).toContain(`[1] 月次KPI 2026年10月 <${pages.kpi.url}>`)
     expect(h.result.current.status).toMatchObject({ state: 'done', target: 'copy' })
     await settle(() => h.result.current.toFile({ title: '面談/準備: 数字', message: answer }))
-    expect(w.engine.callsOf('export.saveFile').at(-1)).toMatchObject({ suggestedName: '面談 準備 数字', extension: 'md' })
+    expect(w.engine.callsOf('export.saveFile').at(-1)).toMatchObject({
+      suggestedName: '面談 準備 数字',
+      extension: 'md',
+    })
     await settle(() => h.result.current.toGoogleDoc({ title: '面談の準備', message: answer }))
-    expect(h.result.current.status).toMatchObject({ state: 'error', target: 'google', error: { key: 'export.google.not-connected' } })
+    expect(h.result.current.status).toMatchObject({
+      state: 'error',
+      target: 'google',
+      error: { key: 'export.google.not-connected' },
+    })
     expect(w.server.requests.some((r) => r.route === 'recordExport')).toBe(false)
   })
 })
@@ -143,13 +166,22 @@ describe('Spaces, members, invites, activity', () => {
     expect(spaces.result.current.current?.name).toBe('資金調達 2027')
     await waitFor(() => members.result.current.members.length === 4, 'members')
     expect(members.result.current.isOwner).toBe(true)
-    expect(members.result.current.pendingInvites.map((i) => i.email)).toEqual(['advisor@shiraume-law.example'])
+    expect(members.result.current.pendingInvites.map((i) => i.email)).toEqual([
+      'advisor@shiraume-law.example',
+    ])
     await settle(() => members.result.current.createInvite('cfo@kotonoha.example'))
     expect(members.result.current.lastInvite?.url).toMatch(/invite#invite-token-/)
     await settle(() => members.result.current.copyInviteLink())
-    expect(w.engine.callsOf('clipboard.writeText').at(-1)?.text).toBe(members.result.current.lastInvite?.url)
+    expect(w.engine.callsOf('clipboard.writeText').at(-1)?.text).toBe(
+      members.result.current.lastInvite?.url,
+    )
     await settle(() => spaces.result.current.select(spaceIds.product))
-    await waitFor(() => members.result.current.spaceId === spaceIds.product && members.result.current.members.length === 4, 'product members')
+    await waitFor(
+      () =>
+        members.result.current.spaceId === spaceIds.product &&
+        members.result.current.members.length === 4,
+      'product members',
+    )
     expect(members.result.current.isOwner).toBe(false)
     expect(members.result.current.members[0]?.user.id).toBe(people.mori.id)
   })
@@ -161,7 +193,9 @@ describe('Spaces, members, invites, activity', () => {
     await settle(() => w.engine.emit('invite.open', { token: 'invite-token-abcdefghij' }))
     expect(h.result.current.pending).toEqual({ token: 'invite-token-abcdefghij' })
     await settle(() => h.result.current.accept())
-    expect(w.server.requests.find((r) => r.route === 'acceptInvite')?.body).toEqual({ token: 'invite-token-abcdefghij' })
+    expect(w.server.requests.find((r) => r.route === 'acceptInvite')?.body).toEqual({
+      token: 'invite-token-abcdefghij',
+    })
     expect(h.result.current.pending).toBeNull()
   })
 
@@ -180,14 +214,26 @@ describe('engine-only features', () => {
     const [a, b] = w.engine.state.tabs.map((t) => t.id) as [string, string]
     const h = renderHook(w.services, () => usePermissionPrompts())
     await settle(() => {
-      w.engine.emit('permission.request', { requestId: 'r1', tabId: b, origin: 'https://care-keizai.jp', permission: 'notifications' })
-      w.engine.emit('permission.request', { requestId: 'r2', tabId: a, origin: 'https://meet.example', permission: 'screen-capture' })
+      w.engine.emit('permission.request', {
+        requestId: 'r1',
+        tabId: b,
+        origin: 'https://care-keizai.jp',
+        permission: 'notifications',
+      })
+      w.engine.emit('permission.request', {
+        requestId: 'r2',
+        tabId: a,
+        origin: 'https://meet.example',
+        permission: 'screen-capture',
+      })
     })
     expect(h.result.current.current?.requestId).toBe('r2')
     expect(h.result.current.canRemember).toBe(false)
     expect(h.result.current.waitingTabIds).toEqual([b])
     await settle(() => h.result.current.allow(true))
-    expect(w.engine.callsOf('permission.respond')).toEqual([{ requestId: 'r2', allow: true, remember: false }])
+    expect(w.engine.callsOf('permission.respond')).toEqual([
+      { requestId: 'r2', allow: true, remember: false },
+    ])
     expect(h.result.current.current).toBeNull()
     await settle(() => w.engine.invoke('tabs.close', { tabId: b }))
     expect(h.result.current.waitingTabIds).toEqual([])
@@ -215,8 +261,14 @@ describe('engine-only features', () => {
     await waitFor(() => h.result.current.matches === 2, 'matches')
     expect(h.result.current.activeMatch).toBe(1)
     await settle(() => h.result.current.next())
-    expect(w.engine.callsOf('page.find').at(-1)).toMatchObject({ text: '訪問', forward: true, findNext: true })
-    await settle(() => w.engine.invoke('tabs.activate', { tabId: w.engine.state.tabs[1]?.id as string }))
+    expect(w.engine.callsOf('page.find').at(-1)).toMatchObject({
+      text: '訪問',
+      forward: true,
+      findNext: true,
+    })
+    await settle(() =>
+      w.engine.invoke('tabs.activate', { tabId: w.engine.state.tabs[1]?.id as string }),
+    )
     expect(h.result.current.open).toBe(false)
     expect(w.engine.callsOf('page.stopFind')).toHaveLength(1)
   })
@@ -230,7 +282,10 @@ describe('engine-only features', () => {
     expect(w.server.requests.find((r) => r.route === 'updateMe')?.body).toEqual({ locale: 'en' })
     expect(await h.result.current.addBlockedHost('not a host')).toBe(false)
     await settle(() => h.result.current.addBlockedHost('https://Mail.Example.co.jp/inbox'))
-    expect(h.result.current.settings?.userBlockedHosts).toEqual(['kaikei-cloud.jp', 'mail.example.co.jp'])
+    expect(h.result.current.settings?.userBlockedHosts).toEqual([
+      'kaikei-cloud.jp',
+      'mail.example.co.jp',
+    ])
     await settle(() => h.result.current.removeBlockedHost('kaikei-cloud.jp'))
     expect(h.result.current.settings?.userBlockedHosts).toEqual(['mail.example.co.jp'])
   })
@@ -278,7 +333,9 @@ describe('menu shortcuts reach the feature hooks', () => {
     await fire('next-tab')
     expect(w.engine.activeTab()?.title).toBe(pages.news.title)
     await fire('bookmark-tab')
-    expect(w.engine.callsOf('bookmarks.add')).toEqual([{ url: pages.news.url, title: pages.news.title, spaceId: spaceIds.fund }])
+    expect(w.engine.callsOf('bookmarks.add')).toEqual([
+      { url: pages.news.url, title: pages.news.title, spaceId: spaceIds.fund },
+    ])
     await fire('new-tab')
     expect(w.engine.callsOf('tabs.create')).toHaveLength(1)
     await fire('close-tab')

@@ -18,8 +18,18 @@ export type Route =
   | { name: 'sign-in' }
   | { name: 'first-run' }
 
-/** What is actually shown: a route, or the new-tab surface that a blank active tab resolves to. */
-export type Surface = Route | { name: 'new-tab'; tabId: string | null }
+/**
+ * What is actually shown: a route, or a surface the active tab resolves to on its own: the new-tab
+ * surface for a blank tab, and the page-problem surface (drawn by Tiger in the page card, with the
+ * native view hidden) for a page that did not load or whose process ended.
+ */
+export type PageProblem =
+  | { kind: 'load-error'; code: number; description: string }
+  | { kind: 'crashed' }
+export type Surface =
+  | Route
+  | { name: 'new-tab'; tabId: string | null }
+  | { name: 'page-problem'; tabId: string; problem: PageProblem }
 export type SurfaceName = Surface['name']
 
 /** Routes that only make sense for a signed-in member; signed out, they show sign-in instead. */
@@ -39,8 +49,16 @@ export function resolveSurface(route: Route, ctx: SurfaceContext): Surface {
   if (route.name === 'page') {
     // A new tab is blank (the engine reports an empty URL): it shows the new-tab surface.
     if (!ctx.activeTab) return { name: 'new-tab', tabId: null }
-    if (ctx.activeTab.url === '' && !ctx.activeTab.isLoading)
-      return { name: 'new-tab', tabId: ctx.activeTab.id }
+    const tab = ctx.activeTab
+    if (tab.crashed) return { name: 'page-problem', tabId: tab.id, problem: { kind: 'crashed' } }
+    // A failed load stays until the next navigation starts (the engine clears it then).
+    if (tab.loadError && !tab.isLoading)
+      return {
+        name: 'page-problem',
+        tabId: tab.id,
+        problem: { kind: 'load-error', ...tab.loadError },
+      }
+    if (tab.url === '' && !tab.isLoading) return { name: 'new-tab', tabId: tab.id }
   }
   if (route.name === 'sign-in' && ctx.session === 'signedIn') return { name: 'page' }
   return route

@@ -3,6 +3,7 @@ import type { EngineBridge } from '@tiger/shared'
 import { useEffect, useState } from 'react'
 import { createEngineState, type EngineState } from '../engine/engine-state'
 import type { HostTransport } from '../overlay/protocol'
+import { bindAutoSurfaces } from '../features/presenters'
 import { bindDefaultShortcuts } from './default-shortcuts'
 import type { PrefsStorage } from './prefs'
 import { type AppServices, createAppServices } from './services'
@@ -37,7 +38,8 @@ export function useAppBoot(boot: AppBoot): BootState {
     let live = true
     state.start().then(
       () => live && setEngine({ state, error: null }),
-      (e: unknown) => live && setEngine({ state, error: e instanceof Error ? e : new Error(String(e)) }),
+      (e: unknown) =>
+        live && setEngine({ state, error: e instanceof Error ? e : new Error(String(e)) }),
     )
     return () => {
       live = false
@@ -72,12 +74,14 @@ export function useAppBoot(boot: AppBoot): BootState {
       overlayTransport: boot.hostTransport(windowId),
       autoStaleCheck: boot.autoStaleCheck ?? true,
     })
-    const unbind = bindDefaultShortcuts(s)
+    const unbindShortcuts = bindDefaultShortcuts(s)
+    const unbindSurfaces = bindAutoSurfaces(s)
     setServices(s)
     boot.onServices?.(s)
     void (boot.startClient ?? ((c: TigerClient) => c.start()))(client)
     return () => {
-      unbind()
+      unbindShortcuts()
+      unbindSurfaces()
       s.dispose()
       client.dispose()
       setServices(null)

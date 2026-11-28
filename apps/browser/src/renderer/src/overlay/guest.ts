@@ -47,7 +47,12 @@ export function createOverlayGuest(transport: GuestTransport): OverlayGuest {
       case 'sync':
         store.setState({
           current: m.open
-            ? { id: m.open.id, surface: m.open.surface, props: m.open.props, placement: m.open.placement }
+            ? {
+                id: m.open.id,
+                surface: m.open.surface,
+                props: m.open.props,
+                placement: m.open.placement,
+              }
             : null,
         })
         return

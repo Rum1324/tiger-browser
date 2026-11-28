@@ -37,7 +37,9 @@ export function bindDefaultShortcuts(s: AppServices): () => void {
       else void presentPalette(s, 'commands')
     }),
     s.shortcuts.on('toggle-side-panel', () => s.layout.togglePanel()),
-    s.shortcuts.on('toggle-space-home', () => s.router.toggle({ name: 'space-home', section: 'overview' })),
+    s.shortcuts.on('toggle-space-home', () =>
+      s.router.toggle({ name: 'space-home', section: 'overview' }),
+    ),
     s.shortcuts.on('share-tab', () => {
       const id = activeId()
       if (id) void shareActions(s.client, s.overlay, activeId).present(id)
@@ -51,7 +53,9 @@ export function bindDefaultShortcuts(s: AppServices): () => void {
       if (s.overlay.store.getState().open?.surface === 'downloads') s.overlay.closeAll('closed')
       else void s.overlay.open('downloads', {}, popoverAt('downloads', 'downloads')).outcome
     }),
-    s.shortcuts.on('open-settings', () => s.router.toggle({ name: 'settings', section: 'general' })),
+    s.shortcuts.on('open-settings', () =>
+      s.router.toggle({ name: 'settings', section: 'general' }),
+    ),
   ]
   return () => {
     for (const off of offs) off()

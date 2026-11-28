@@ -28,6 +28,7 @@ export const surfaceScreens: Record<Exclude<SurfaceName, 'page'>, ComponentType>
   settings: SurfacePlaceholder,
   item: SurfacePlaceholder,
   'new-tab': SurfacePlaceholder,
+  'page-problem': SurfacePlaceholder,
   'sign-in': SurfacePlaceholder,
   'first-run': SurfacePlaceholder,
 }

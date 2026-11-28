@@ -9,8 +9,8 @@ import type { ExtractedPage, ModelRef } from '@tiger/shared'
 import { useMemo } from 'react'
 import { useServices } from '../app/context'
 import type { Notice } from '../i18n'
-import type { OverlayHost } from '../overlay/host'
 import { shallow, useStore } from '../lib/store'
+import type { OverlayHost } from '../overlay/host'
 
 /**
  * Attach the current page to ONE question of the private ask thread, with a preview and the name of
@@ -42,7 +42,10 @@ export interface AttachActions {
   present(tabId?: string | null): Promise<boolean>
 }
 
-export function receivingCompany(selected: ModelRef | null, fallback: ModelRef | null): string | null {
+export function receivingCompany(
+  selected: ModelRef | null,
+  fallback: ModelRef | null,
+): string | null {
   const ref = selected ?? fallback
   return ref ? PROVIDER_COMPANY[ref.provider] : null
 }
@@ -92,7 +95,11 @@ export function useAttach(): AttachView & AttachActions {
   return useMemo(
     () => ({
       ...viewFrom(t.attach, t.drafts, m.selected, m.fallback),
-      ...attachActions(client, services.overlay, () => services.engine.tabs.getState().value?.activeTabId ?? null),
+      ...attachActions(
+        client,
+        services.overlay,
+        () => services.engine.tabs.getState().value?.activeTabId ?? null,
+      ),
     }),
     [t, m, client, services],
   )
@@ -122,15 +129,20 @@ export function attachActions(
     async present(tabId) {
       const started = begin(tabId)
       let attached = false
-      const handle = overlay.open('attach', attachView(client), { mode: 'modal' }, {
-        onEvent(e) {
-          if (e.type === 'confirm') {
-            attached = client.threads.confirmAttach()
-            if (attached) handle.close('closed')
-          }
-          if (e.type === 'cancel') handle.close('closed')
+      const handle = overlay.open(
+        'attach',
+        attachView(client),
+        { mode: 'modal' },
+        {
+          onEvent(e) {
+            if (e.type === 'confirm') {
+              attached = client.threads.confirmAttach()
+              if (attached) handle.close('closed')
+            }
+            if (e.type === 'cancel') handle.close('closed')
+          },
         },
-      })
+      )
       const offs = [
         client.threads.store.subscribe(() => handle.update(attachView(client))),
         client.models.store.subscribe(() => handle.update(attachView(client))),
@@ -138,7 +150,8 @@ export function attachActions(
       await started
       await handle.outcome
       for (const off of offs) off()
-      if (!attached && client.threads.store.getState().attach.phase !== 'idle') client.threads.cancelAttach()
+      if (!attached && client.threads.store.getState().attach.phase !== 'idle')
+        client.threads.cancelAttach()
       return attached
     },
   }

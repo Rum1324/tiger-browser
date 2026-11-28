@@ -220,12 +220,14 @@ export function Harness({ client }: { client?: TigerClient } = {}) {
               </pre>
             )
           ) : null}
-          {settings ? <TeamPanel
+          {settings ? (
+            <TeamPanel
               t={t}
               serverUrl={settings.serverUrl}
               activeTab={active}
               {...(client ? { client } : {})}
-            /> : null}
+            />
+          ) : null}
           <GooglePanel t={t} markdown={capture?.ok ? capture.page.markdown : null} />
           {downloads.length ? (
             <div>

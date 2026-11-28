@@ -1,17 +1,27 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["node"],
-    "allowImportingTsExtensions": true
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ],
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx"
   },
   "include": [
     "src/main",
     "src/preload",
     "test",
+    "src/renderer/src/css.d.ts",
     "electron.vite.config.ts",
     "vitest.config.ts",
     "vitest.e2e.config.ts",
-    "../../packages/extract/src/pdfjs-worker.d.ts"
+    "../../packages/extract/src/pdfjs-worker.d.ts",
+    "vitest.rig.config.ts",
+    "rig.vite.config.ts"
   ]
 }

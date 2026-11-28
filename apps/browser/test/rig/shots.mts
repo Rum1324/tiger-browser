@@ -10,7 +10,11 @@
 import { type RigTheme, startRig } from './rig.ts'
 
 const args = process.argv.slice(2)
-const themes: RigTheme[] = args.includes('--dark') ? ['dark'] : args.includes('--light') ? ['light'] : ['light', 'dark']
+const themes: RigTheme[] = args.includes('--dark')
+  ? ['dark']
+  : args.includes('--light')
+    ? ['light']
+    : ['light', 'dark']
 const wanted = args.filter((a) => !a.startsWith('--'))
 
 const rig = await startRig()

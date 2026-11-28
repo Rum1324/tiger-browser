@@ -1,4 +1,12 @@
-import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react'
 import { useStore } from '../lib/store'
 import type { OverlayGuest } from './guest'
 import type { DismissReason, ResolvedPlacement } from './protocol'
@@ -36,7 +44,13 @@ const FOCUSABLE =
  * loses focus (the member clicked the page or the main view around it). Only then does it tell the
  * host the surface is shown, so the view is raised with the surface already painted.
  */
-export function OverlayRoot({ guest, fallback }: { guest: OverlayGuest; fallback?: (name: OverlaySurfaceName) => ReactNode }) {
+export function OverlayRoot({
+  guest,
+  fallback,
+}: {
+  guest: OverlayGuest
+  fallback?: (name: OverlaySurfaceName) => ReactNode
+}) {
   const current = useStore(guest.store, (s) => s.current)
   const surfaceRef = useRef<HTMLDivElement>(null)
 
@@ -62,7 +76,9 @@ export function OverlayRoot({ guest, fallback }: { guest: OverlayGuest; fallback
     const root = surfaceRef.current
     if (root) {
       const target =
-        root.querySelector<HTMLElement>('[data-autofocus]') ?? root.querySelector<HTMLElement>(FOCUSABLE) ?? root
+        root.querySelector<HTMLElement>('[data-autofocus]') ??
+        root.querySelector<HTMLElement>(FOCUSABLE) ??
+        root
       target.focus({ preventScroll: true })
     }
     guest.shown(current.id)
@@ -107,7 +123,11 @@ export function OverlayRoot({ guest, fallback }: { guest: OverlayGuest; fallback
   const Component = surfaceComponent(current.surface)
   const popover = current.placement.mode === 'popover'
   return (
-    <div data-overlay-root="" data-mode={current.placement.mode} data-surface-name={current.surface}>
+    <div
+      data-overlay-root=""
+      data-mode={current.placement.mode}
+      data-surface-name={current.surface}
+    >
       {popover ? null : <div data-overlay-backdrop="" />}
       <div
         ref={surfaceRef}

@@ -350,6 +350,12 @@ export const en: Readonly<Record<UiKey, string>> = {
   'common.loading': 'Loading…',
   'common.more': 'More',
 
+  'notice.downloadDone': 'Downloaded “{name}”',
+  'notice.downloadFailed': 'Could not download “{name}”',
+  'notice.open': 'Open',
+  'pageProblem.loadErrorTitle': 'This page could not be opened',
+  'pageProblem.crashedTitle': 'This page stopped',
+  'pageProblem.back': 'Back',
   'boundary.title': 'Something went wrong while drawing this',
   'boundary.body': 'Your pages and tabs are not affected. Show it again, or reload the UI.',
   'boundary.retry': 'Show again',

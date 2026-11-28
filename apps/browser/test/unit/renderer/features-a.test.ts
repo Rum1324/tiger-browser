@@ -4,9 +4,13 @@ import { useAttach } from '../../../src/renderer/src/features/attach'
 import { useOmnibox } from '../../../src/renderer/src/features/omnibox'
 import { presentPalette, usePalette } from '../../../src/renderer/src/features/palette'
 import { useShare } from '../../../src/renderer/src/features/share'
-import { useAskPanel, useSpaceThread, useThreadList } from '../../../src/renderer/src/features/threads'
+import {
+  useAskPanel,
+  useSpaceThread,
+  useThreadList,
+} from '../../../src/renderer/src/features/threads'
 import { pages, spaceIds } from '../../../src/renderer/src/testing/fixtures'
-import { guestSurface, makeWorld, renderHook, settle, waitFor, type World } from './world'
+import { guestSurface, makeWorld, renderHook, settle, type World, waitFor } from './world'
 
 let w: World
 afterEach(() => w?.dispose())
@@ -30,7 +34,9 @@ describe('useOmnibox', () => {
 
     await settle(() => h.result.current.setText('kotonoha.example/demo'))
     await settle(() => h.result.current.commit())
-    expect(w.engine.callsOf('tabs.navigate').at(-1)).toMatchObject({ input: 'kotonoha.example/demo' })
+    expect(w.engine.callsOf('tabs.navigate').at(-1)).toMatchObject({
+      input: 'kotonoha.example/demo',
+    })
   })
 
   it('a late answer for older text is dropped; Escape closes suggestions, then reverts', async () => {
@@ -39,7 +45,9 @@ describe('useOmnibox', () => {
     await settle(() => h.result.current.setText('介'))
     await settle(() => h.result.current.setText('xyz-nothing'))
     await waitFor(() => h.result.current.suggestions.length > 0, 'suggestions')
-    expect(h.result.current.suggestions.every((s) => s.kind === 'search' || s.kind === 'url')).toBe(true)
+    expect(h.result.current.suggestions.every((s) => s.kind === 'search' || s.kind === 'url')).toBe(
+      true,
+    )
     expect(h.result.current.escape()).toBe('closed-suggestions')
     await settle()
     expect(h.result.current.escape()).toBe('reverted')
@@ -56,7 +64,15 @@ describe('palette', () => {
     const s = await guestSurface(w, 'palette')
     expect(h.result.current.open).toBe(true)
     const ids = (s.props as { commands: { id: string }[] }).commands.map((c) => c.id)
-    expect(ids).toEqual(expect.arrayContaining(['new-tab', 'share', 'attach', 'ask', `switch-space:${spaceIds.hire}`]))
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'new-tab',
+        'share',
+        'attach',
+        'ask',
+        `switch-space:${spaceIds.hire}`,
+      ]),
+    )
     expect(ids).not.toContain(`switch-space:${spaceIds.fund}`)
     w.guest.shown(s.id)
     w.guest.resolve(s.id, { kind: 'command', id: 'new-tab' })
@@ -86,12 +102,19 @@ describe('useShare: preview first, the previewed page is exactly what is sent', 
     const off = w.client.share.store.subscribe((s) => seen.push(s.phase))
     expect(h.result.current.phase).toBe('idle')
     await settle(() => h.result.current.begin())
-    expect(h.result.current).toMatchObject({ phase: 'preview', space: { name: '資金調達 2027' }, existing: null, changed: null })
+    expect(h.result.current).toMatchObject({
+      phase: 'preview',
+      space: { name: '資金調達 2027' },
+      existing: null,
+      changed: null,
+    })
     expect(w.server.requests.some((r) => r.route === 'shareItem')).toBe(false)
     const page = h.result.current.phase === 'preview' ? h.result.current.page : null
     await settle(() => h.result.current.confirm())
     expect(h.result.current).toMatchObject({ phase: 'done', outcome: 'new' })
-    expect(w.server.requests.filter((r) => r.route === 'shareItem').map((r) => r.body)).toEqual([{ page }])
+    expect(w.server.requests.filter((r) => r.route === 'shareItem').map((r) => r.body)).toEqual([
+      { page },
+    ])
     expect(seen).toEqual(['extracting', 'preview', 'sending', 'done'])
     off()
   })
@@ -100,11 +123,18 @@ describe('useShare: preview first, the previewed page is exactly what is sent', 
     w = await makeWorld({ tabs: [{ page: 'notion', active: true }, { page: 'gmail' }] })
     const h = renderHook(w.services, () => useShare())
     await settle(() => h.result.current.begin())
-    expect(h.result.current).toMatchObject({ phase: 'preview', changed: true, existing: { versionNumber: 2 } })
+    expect(h.result.current).toMatchObject({
+      phase: 'preview',
+      changed: true,
+      existing: { versionNumber: 2 },
+    })
     await settle(() => h.result.current.cancel())
     expect(h.result.current.phase).toBe('idle')
     await settle(() => h.result.current.begin(w.engine.state.tabs[1]?.id))
-    expect(h.result.current).toMatchObject({ phase: 'error', error: { key: 'capture.reason.email' } })
+    expect(h.result.current).toMatchObject({
+      phase: 'error',
+      error: { key: 'capture.reason.email' },
+    })
     expect(w.server.requests.some((r) => r.route === 'shareItem')).toBe(false)
   })
 
@@ -114,7 +144,12 @@ describe('useShare: preview first, the previewed page is exactly what is sent', 
     const result = h.result.current.present()
     const s = await guestSurface(w, 'share')
     w.guest.shown(s.id)
-    await waitFor(() => (w.guest.store.getState().current?.props as { phase: string }).phase === 'preview', 'preview in the sheet')
+    await waitFor(
+      () =>
+        (w.guest.store.getState().current?.props as { phase: string } | undefined)?.phase ===
+        'preview',
+      'preview in the sheet',
+    )
     w.guest.emit(s.id, { type: 'confirm' })
     expect(await result).toBe(true)
     expect(w.guest.store.getState().current).toBeNull()
@@ -144,7 +179,12 @@ describe('useAttach: one question only, with the receiving company', () => {
       },
     })
     const h = renderHook(w.services, () => useAttach())
-    expect(h.result.current).toMatchObject({ phase: 'idle', company: 'Anthropic', drafts: [], max: 3 })
+    expect(h.result.current).toMatchObject({
+      phase: 'idle',
+      company: 'Anthropic',
+      drafts: [],
+      max: 3,
+    })
     await settle(() => h.result.current.begin())
     expect(h.result.current.phase).toBe('preview')
     expect(h.result.current.page?.url).toBe(pages.news.url)
@@ -196,7 +236,10 @@ describe('ask panel and Space threads', () => {
     await settle(() => answer?.citations[0] && h.result.current.openCitation(answer.citations[0]))
     expect(w.services.router.store.getState().route).toMatchObject({ name: 'item' })
     await settle(() => h.result.current.post('了解です', false))
-    expect(w.server.requests.find((r) => r.route === 'postMessage')?.body).toMatchObject({ content: '了解です', askAi: false })
+    expect(w.server.requests.find((r) => r.route === 'postMessage')?.body).toMatchObject({
+      content: '了解です',
+      askAi: false,
+    })
   })
 
   it('thread list splits Space and private threads; create opens the new one', async () => {
@@ -205,7 +248,10 @@ describe('ask panel and Space threads', () => {
     await waitFor(() => h.result.current.spaceThreads.length === 1, 'threads')
     expect(h.result.current.privateThreads).toHaveLength(1)
     await settle(() => h.result.current.create('12月の面談'))
-    expect(w.services.router.store.getState().route).toMatchObject({ name: 'space-home', section: 'threads' })
+    expect(w.services.router.store.getState().route).toMatchObject({
+      name: 'space-home',
+      section: 'threads',
+    })
     expect(h.result.current.spaceThreads.map((t) => t.title)).toContain('12月の面談')
   })
 })

@@ -379,6 +379,16 @@ export const ja = {
   'common.loading': '読み込んでいます…',
   'common.more': 'その他',
 
+  // ── The notice (15d) ──
+  'notice.downloadDone': '「{name}」のダウンロードが完了しました',
+  'notice.downloadFailed': '「{name}」をダウンロードできませんでした',
+  'notice.open': '開く',
+
+  // ── A page that is not there (20c, 20d) ──
+  'pageProblem.loadErrorTitle': 'このページを開けませんでした',
+  'pageProblem.crashedTitle': 'このページは終了しました',
+  'pageProblem.back': '戻る',
+
   // ── Error boundary ──
   'boundary.title': '表示中に問題が発生しました',
   'boundary.body': 'ページやタブには影響ありません。もう一度表示するか、再読み込みしてください。',

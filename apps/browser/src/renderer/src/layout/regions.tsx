@@ -1,10 +1,17 @@
-import { type CSSProperties, type ReactNode, useCallback, useLayoutEffect, useRef } from 'react'
-import { useServices } from '../app/context'
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+} from 'react'
+import { useServices, useT } from '../app/context'
 import { coversPage } from '../app/router'
 import { useSurface } from '../app/surface'
 import { frameAttributes } from '../app/theme'
-import { useT } from '../app/context'
 import { useStore } from '../lib/store'
+import { effectiveLayout } from './layout-state'
 import { observePageSlot } from './page-slot'
 import './layout.css'
 
@@ -24,10 +31,12 @@ import './layout.css'
  */
 export function WindowFrame({ children }: { children: ReactNode }) {
   const { client, engine, layout } = useServices()
-  const hue = useStore(client.spaces.store, (s) => s.list.find((x) => x.id === s.currentSpaceId)?.hue ?? null)
+  const hue = useStore(
+    client.spaces.store,
+    (s) => s.list.find((x) => x.id === s.currentSpaceId)?.hue ?? null,
+  )
   const privateWindow = useStore(engine.tabs, (s) => s.value?.privateWindow ?? false)
-  const sidebarCollapsed = useStore(layout.store, (s) => s.sidebarCollapsed)
-  const panelOpen = useStore(layout.store, (s) => s.panelOpen)
+  const { mode, sidebar, panel } = useEffectiveLayout()
   const sidebarWidth = useStore(layout.store, (s) => s.sidebarWidth)
   const panelWidth = useStore(layout.store, (s) => s.panelWidth)
   const { surface } = useSurface()
@@ -38,8 +47,9 @@ export function WindowFrame({ children }: { children: ReactNode }) {
     <div
       data-region="window"
       {...frameAttributes({ hue, privateWindow })}
-      data-sidebar={sidebarCollapsed ? 'collapsed' : 'open'}
-      data-panel={panelOpen ? 'open' : 'closed'}
+      data-layout={mode}
+      data-sidebar={sidebar === 'rail' ? 'collapsed' : 'open'}
+      data-panel={panel}
       data-surface={surface.name}
       style={style}
     >
@@ -60,9 +70,9 @@ export function Sidebar({ children }: { children?: ReactNode }) {
 export function Toolbar({ children }: { children?: ReactNode }) {
   const t = useT()
   return (
-    <header data-region="toolbar" aria-label={t('region.toolbar')}>
+    <section data-region="toolbar" aria-label={t('region.toolbar')}>
       {children}
-    </header>
+    </section>
   )
 }
 
@@ -124,6 +134,29 @@ export function PageCoverage() {
     pageSlot.setCovered(covered)
   }, [covered, pageSlot])
   return null
+}
+
+const subscribeWidth = (cb: () => void) => {
+  window.addEventListener('resize', cb)
+  return () => window.removeEventListener('resize', cb)
+}
+const windowWidth = () => window.innerWidth
+
+/** The window's CSS width, following resizes (and zoom, which changes the CSS viewport). */
+export function useWindowWidth(): number {
+  return useSyncExternalStore(subscribeWidth, windowWidth, () => 1440)
+}
+
+/**
+ * The layout as drawn: the member's choices plus the window-width rules (a rail while the panel
+ * is open on a medium window). Components read this, not the raw prefs, to know what is visible.
+ */
+export function useEffectiveLayout() {
+  const { layout } = useServices()
+  const sidebarCollapsed = useStore(layout.store, (s) => s.sidebarCollapsed)
+  const panelOpen = useStore(layout.store, (s) => s.panelOpen)
+  const width = useWindowWidth()
+  return effectiveLayout({ sidebarCollapsed, panelOpen }, width)
 }
 
 /** Re-measure after a layout change made outside React state (a drag that resizes a column). */

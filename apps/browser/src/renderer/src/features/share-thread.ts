@@ -1,10 +1,15 @@
-import { type AttachedQuestion, shareThreadFailureKey, type ShareThreadState, type TigerClient } from '@tiger/client'
+import {
+  type AttachedQuestion,
+  type ShareThreadState,
+  shareThreadFailureKey,
+  type TigerClient,
+} from '@tiger/client'
 import type { Message, Thread } from '@tiger/shared'
 import { useMemo } from 'react'
 import { useServices } from '../app/context'
 import type { Notice } from '../i18n'
-import type { OverlayHost } from '../overlay/host'
 import { useStore } from '../lib/store'
+import type { OverlayHost } from '../overlay/host'
 
 /**
  * Sharing the private ask thread with the Space as a NEW Space thread. Every question that had a
@@ -95,14 +100,19 @@ export function shareThreadActions(client: TigerClient, overlay: OverlayHost): S
     async present(threadId) {
       const view = () => shareThreadView(flow.store.getState(), () => flow.preview())
       const started = begin(threadId)
-      const handle = overlay.open('share-thread', view(), { mode: 'modal' }, {
-        onEvent(e) {
-          if (e.type === 'decide') flow.decide(e.questionId, e.decision)
-          else if (e.type === 'exclude') flow.setExcluded(e.messageId, e.excluded)
-          else if (e.type === 'confirm') void flow.confirm()
-          else handle.close('closed')
+      const handle = overlay.open(
+        'share-thread',
+        view(),
+        { mode: 'modal' },
+        {
+          onEvent(e) {
+            if (e.type === 'decide') flow.decide(e.questionId, e.decision)
+            else if (e.type === 'exclude') flow.setExcluded(e.messageId, e.excluded)
+            else if (e.type === 'confirm') void flow.confirm()
+            else handle.close('closed')
+          },
         },
-      })
+      )
       const off = flow.store.subscribe(() => {
         const v = view()
         handle.update(v)

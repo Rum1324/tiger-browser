@@ -30,7 +30,9 @@ export function createPermissionsModel(deps: {
   const store = createStore<PermissionsState>({ queue: [] })
   const offs = [
     deps.bridge.on('permission.request', (r) =>
-      store.setState((s) => ({ queue: [...s.queue.filter((q) => q.requestId !== r.requestId), r] })),
+      store.setState((s) => ({
+        queue: [...s.queue.filter((q) => q.requestId !== r.requestId), r],
+      })),
     ),
     deps.engine.tabs.subscribe((t) => {
       const ids = new Set(t.value?.tabs.map((x) => x.id) ?? [])

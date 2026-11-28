@@ -53,14 +53,23 @@ export function paletteRows(
     .map((command) => {
       if (!q) return { command, score: 1 }
       const words = [labelOf(command), ...command.keywords].map((w) => w.toLowerCase())
-      const score = words.some((w) => w.startsWith(q)) ? 3 : words.some((w) => w.includes(q)) ? 2 : 0
+      const score = words.some((w) => w.startsWith(q))
+        ? 3
+        : words.some((w) => w.includes(q))
+          ? 2
+          : 0
       return { command, score }
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, MAX_COMMANDS)
-  const rows: PaletteRow[] = scored.map(({ command }) => ({ kind: 'command', group: 'commands', command }))
-  for (const s of suggestions) rows.push({ kind: 'suggestion', group: GROUP_OF[s.kind], suggestion: s })
+  const rows: PaletteRow[] = scored.map(({ command }) => ({
+    kind: 'command',
+    group: 'commands',
+    command,
+  }))
+  for (const s of suggestions)
+    rows.push({ kind: 'suggestion', group: GROUP_OF[s.kind], suggestion: s })
   return rows.sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group))
 }
 
@@ -98,7 +107,12 @@ export function createPaletteModel(deps: {
   const store = createStore<PaletteState>({
     query: props.initialQuery,
     suggestions: [],
-    rows: paletteRows(props.initialQuery, props.mode === 'commands' ? props.commands : [], [], labelOf),
+    rows: paletteRows(
+      props.initialQuery,
+      props.mode === 'commands' ? props.commands : [],
+      [],
+      labelOf,
+    ),
     selected: 0,
   })
   let query = 0
@@ -122,7 +136,11 @@ export function createPaletteModel(deps: {
         suggestions = []
       }
       if (my !== query) return
-      store.setState({ suggestions, rows: paletteRows(text, commands, suggestions, labelOf), selected: 0 })
+      store.setState({
+        suggestions,
+        rows: paletteRows(text, commands, suggestions, labelOf),
+        selected: 0,
+      })
     }, deps.debounceMs ?? 60)
   }
 
@@ -130,7 +148,11 @@ export function createPaletteModel(deps: {
     store,
     setQuery(q) {
       const { suggestions } = store.getState()
-      store.setState({ query: q, rows: paletteRows(q, commands, suggestions, labelOf), selected: 0 })
+      store.setState({
+        query: q,
+        rows: paletteRows(q, commands, suggestions, labelOf),
+        selected: 0,
+      })
       fetch(q)
     },
     move(step) {
@@ -180,7 +202,11 @@ export interface PaletteView {
   toggle(mode?: PaletteMode): void
 }
 
-export async function presentPalette(s: AppServices, mode: PaletteMode = 'commands', initialQuery = ''): Promise<void> {
+export async function presentPalette(
+  s: AppServices,
+  mode: PaletteMode = 'commands',
+  initialQuery = '',
+): Promise<void> {
   const handle = s.overlay.open(
     'palette',
     { mode, initialQuery, commands: availableCommands(s) },
@@ -198,10 +224,12 @@ export function usePalette(): PaletteView {
       open,
       show: (mode, q) => presentPalette(services, mode, q),
       hide: () => {
-        if (services.overlay.store.getState().open?.surface === 'palette') services.overlay.closeAll('closed')
+        if (services.overlay.store.getState().open?.surface === 'palette')
+          services.overlay.closeAll('closed')
       },
       toggle: (mode) => {
-        if (services.overlay.store.getState().open?.surface === 'palette') services.overlay.closeAll('closed')
+        if (services.overlay.store.getState().open?.surface === 'palette')
+          services.overlay.closeAll('closed')
         else if (!services.overlay.justDismissed('palette')) void presentPalette(services, mode)
       },
     }),

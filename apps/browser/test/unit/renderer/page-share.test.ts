@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { usePageShare } from '../../../src/renderer/src/features/page-share'
 import { useTabs } from '../../../src/renderer/src/features/tabs'
 import { spaceIds } from '../../../src/renderer/src/testing/fixtures'
-import { makeWorld, renderHook, settle, waitFor, type World } from './world'
+import { makeWorld, renderHook, settle, type World, waitFor } from './world'
 
 const TABS = [
   { page: 'pitch', active: true },
@@ -28,13 +28,20 @@ describe('usePageShare: every capsule state from the fixture world', () => {
   it('fresh, local, blocked, elsewhere, none', async () => {
     w = await makeWorld({ tabs: TABS })
     const fresh = stateOf(0)
-    expect(fresh.result.current).toMatchObject({ state: 'fresh', space: { id: spaceIds.fund, memberCount: 4 } })
-    if (fresh.result.current.state === 'fresh') expect(fresh.result.current.location.versionNumber).toBe(2)
+    expect(fresh.result.current).toMatchObject({
+      state: 'fresh',
+      space: { id: spaceIds.fund, memberCount: 4 },
+    })
+    if (fresh.result.current.state === 'fresh')
+      expect(fresh.result.current.location.versionNumber).toBe(2)
     expect(stateOf(2).result.current.state).toBe('local')
     expect(stateOf(3).result.current).toMatchObject({ state: 'blocked', reason: 'email' })
     expect(stateOf(5).result.current).toMatchObject({ state: 'blocked', reason: 'banking' })
     const elsewhere = stateOf(4).result.current
-    expect(elsewhere).toMatchObject({ state: 'elsewhere', spaces: [{ id: spaceIds.hire, name: '採用' }] })
+    expect(elsewhere).toMatchObject({
+      state: 'elsewhere',
+      spaces: [{ id: spaceIds.hire, name: '採用' }],
+    })
     expect(stateOf(6).result.current.state).toBe('none')
   })
 
@@ -104,7 +111,9 @@ describe('usePageShare: every capsule state from the fixture world', () => {
     const h = renderHook(w.services, () => usePageShare())
     expect(h.result.current.attached).toBe(false)
     const thread = await w.client.threads.ensurePrivateThread()
-    await settle(() => w.client.threads.beginAttach(thread?.id as string, w.engine.state.activeTabId as string))
+    await settle(() =>
+      w.client.threads.beginAttach(thread?.id as string, w.engine.state.activeTabId as string),
+    )
     await settle(() => w.client.threads.confirmAttach())
     expect(h.result.current.attached).toBe(true)
   })
@@ -121,7 +130,9 @@ describe('useTabs: the sidebar zones', () => {
     expect(titles(h.result.current.shared)).toEqual(['投資家向けピッチ v3', '資本政策メモ'])
     expect(titles(h.result.current.pinned)).toEqual(['PayPay銀行 ビジネス口座'])
     expect(h.result.current.local.map((r) => r.tab.url)).toContain('')
-    expect(h.result.current.local.find((r) => r.tab.title === '採用計画 2027')?.elsewhere).toBe(true)
+    expect(h.result.current.local.find((r) => r.tab.title === '採用計画 2027')?.elsewhere).toBe(
+      true,
+    )
 
     // Switching Space moves the rows: in 採用 the hiring plan is shared, the pitch is not.
     await settle(() => w.client.spaces.select(spaceIds.hire))
@@ -132,7 +143,11 @@ describe('useTabs: the sidebar zones', () => {
     w = await makeWorld({ tabs: TABS })
     const h = renderHook(w.services, () => useTabs())
     await settle(() => h.result.current.create('news'))
-    expect(w.engine.callsOf('tabs.create').at(-1)).toMatchObject({ input: 'news', active: true, spaceId: spaceIds.fund })
+    expect(w.engine.callsOf('tabs.create').at(-1)).toMatchObject({
+      input: 'news',
+      active: true,
+      spaceId: spaceIds.fund,
+    })
     const created = w.engine.state.activeTabId as string
     await settle(() => h.result.current.close(created))
     expect(w.engine.state.tabs.some((t) => t.id === created)).toBe(false)

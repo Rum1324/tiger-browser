@@ -24,7 +24,11 @@ export function normalizeHost(input: string): string | null {
   } catch {
     return null
   }
-  s = s.replace(/^\*?\./, '').replace(/\.$/, '').split('/')[0] ?? ''
+  s =
+    s
+      .replace(/^\*?\./, '')
+      .replace(/\.$/, '')
+      .split('/')[0] ?? ''
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s) ? s : null
 }
 

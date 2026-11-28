@@ -1,12 +1,5 @@
 import { type CreatedInvite, errorKey, type Load } from '@tiger/client'
-import type {
-  AuditEvent,
-  Invite,
-  Space,
-  SpaceHue,
-  SpaceMember,
-  SpaceUsage,
-} from '@tiger/shared'
+import type { AuditEvent, Invite, Space, SpaceHue, SpaceMember, SpaceUsage } from '@tiger/shared'
 import { useEffect, useMemo } from 'react'
 import { useServices } from '../app/context'
 import type { Notice } from '../i18n'
@@ -88,7 +81,11 @@ export function useMembers(): MembersView {
   )
   const meId = useStore(client.session.store, (x) => x.user?.id ?? null)
   useEffect(() => {
-    if (s.currentSpaceId && s.detail?.spaceId !== s.currentSpaceId && s.detailLoad.status !== 'loading')
+    if (
+      s.currentSpaceId &&
+      s.detail?.spaceId !== s.currentSpaceId &&
+      s.detailLoad.status !== 'loading'
+    )
       void client.spaces.loadDetail(s.currentSpaceId)
   }, [s.currentSpaceId, s.detail?.spaceId, s.detailLoad.status, client])
   return useMemo(() => {
@@ -168,8 +165,9 @@ export function useActivity(): ActivityView {
     return {
       audit: s.audit,
       usage: u,
-      usageRatio:
-        u?.budgetTokens ? Math.min(1, (u.inputTokens + u.outputTokens) / u.budgetTokens) : null,
+      usageRatio: u?.budgetTokens
+        ? Math.min(1, (u.inputTokens + u.outputTokens) / u.budgetTokens)
+        : null,
       loading: s.auditLoad.status === 'loading',
       error: noticeOf(s.auditLoad),
       reload: () => client.activity.reload(),

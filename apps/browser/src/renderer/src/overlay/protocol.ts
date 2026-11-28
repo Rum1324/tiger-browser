@@ -212,7 +212,11 @@ export function popoverBounds(
 
   const align = p.align ?? 'start'
   const along = (start: number, length: number, size: number) =>
-    align === 'start' ? start : align === 'end' ? start + length - size : start + (length - size) / 2
+    align === 'start'
+      ? start
+      : align === 'end'
+        ? start + length - size
+        : start + (length - size) / 2
 
   let x: number
   let y: number
@@ -226,7 +230,12 @@ export function popoverBounds(
   x = Math.min(Math.max(MARGIN, x), viewport.width - MARGIN - width)
   y = Math.min(Math.max(MARGIN, y), viewport.height - MARGIN - height)
   return {
-    bounds: { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) },
+    bounds: {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.round(width),
+      height: Math.round(height),
+    },
     side,
   }
 }
@@ -235,7 +244,8 @@ export function resolvePlacement(
   p: Placement,
   viewport: { width: number; height: number },
 ): { resolved: ResolvedPlacement; bounds: Rect | null } {
-  if (p.mode === 'modal') return { resolved: { mode: 'modal', anchor: p.anchor ?? null }, bounds: null }
+  if (p.mode === 'modal')
+    return { resolved: { mode: 'modal', anchor: p.anchor ?? null }, bounds: null }
   const { bounds, side } = popoverBounds(p, viewport)
   return { resolved: { mode: 'popover', bounds, side }, bounds }
 }

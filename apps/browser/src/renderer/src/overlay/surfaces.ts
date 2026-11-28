@@ -1,4 +1,10 @@
-import type { ModelInfo, ModelRef, PermissionRequest } from '@tiger/shared'
+import type {
+  CaptureBlockReason,
+  ModelInfo,
+  ModelRef,
+  PermissionRequest,
+  SpaceHue,
+} from '@tiger/shared'
 import type { PaletteChoice } from '../app/commands'
 import type { AttachSheetEvent, AttachView } from '../features/attach'
 import type { PaletteProps } from '../features/palette'
@@ -58,7 +64,23 @@ export interface OverlaySurfaceMap {
     event: never
   }
   'model-picker': { props: ModelPickerProps; result: ModelRef; event: never }
-  invite: { props: InviteSheetProps; result: never; event: { type: 'accept' } | { type: 'dismiss' } }
+  invite: {
+    props: InviteSheetProps
+    result: never
+    event: { type: 'accept' } | { type: 'dismiss' }
+  }
+  /** Create a Space (16a2): the dialog stays open while the request runs and shows its failure. */
+  'create-space': {
+    props: { busy: boolean; error: Notice | null }
+    result: never
+    event: { type: 'create'; name: string; hue?: SpaceHue } | { type: 'cancel' }
+  }
+  /** Why a page can never be shared, with the rule that matched (05). */
+  'blocked-reason': {
+    props: { reason: CaptureBlockReason | null; rule: string | null; url: string }
+    result: never
+    event: never
+  }
   /** The engine-only surfaces read the engine from the overlay view's own bridge. */
   downloads: { props: Record<string, never>; result: never; event: never }
   find: { props: { tabId: string }; result: never; event: never }
@@ -79,6 +101,8 @@ export const OVERLAY_SURFACES: readonly OverlaySurfaceName[] = [
   'permission',
   'model-picker',
   'invite',
+  'create-space',
+  'blocked-reason',
   'downloads',
   'find',
 ]

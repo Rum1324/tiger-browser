@@ -9,7 +9,10 @@ import type { OverlaySurfaceName } from './surfaces'
  */
 const components = new Map<OverlaySurfaceName, ComponentType>()
 
-export function registerOverlaySurface(name: OverlaySurfaceName, component: ComponentType): () => void {
+export function registerOverlaySurface(
+  name: OverlaySurfaceName,
+  component: ComponentType,
+): () => void {
   components.set(name, component)
   return () => {
     if (components.get(name) === component) components.delete(name)

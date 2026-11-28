@@ -17,9 +17,13 @@ import {
 } from '@tiger/shared'
 import { useMemo } from 'react'
 import { useServices } from '../app/context'
+import type { AppServices } from '../app/services'
 import type { EngineState } from '../engine/engine-state'
 import type { Notice } from '../i18n'
-import { shallow, useStore, type WritableStore, createStore } from '../lib/store'
+import { popoverAt } from '../overlay/anchors'
+import { attachActions } from './attach'
+import { shareActions } from './share'
+import { createStore, shallow, useStore, type WritableStore } from '../lib/store'
 
 /** The minimum the UI needs to draw a Space's seal and name. */
 export interface SpaceRef {
@@ -89,8 +93,7 @@ export function pageShareState(i: PageShareInput): PageShareState {
   const tab = i.tab
   const key = tab ? tabLookupKey(tab) : null
   const flow = i.shareFlow
-  const sharing =
-    tab && 'tabId' in flow && flow.tabId === tab.id ? flow.phase : null
+  const sharing = tab && 'tabId' in flow && flow.tabId === tab.id ? flow.phase : null
   const base = {
     tabId: tab?.id ?? null,
     attached: !!key && i.attachedKeys.includes(key),
@@ -110,7 +113,12 @@ export function pageShareState(i: PageShareInput): PageShareState {
     if (!current) return { state: 'local', canShare: false, why: 'no-space' }
     const js = i.justShared
     if (js && js.tabKey === key && js.spaceId === current.id)
-      return { state: 'just-shared', outcome: js.outcome, item: js.item, canUndo: js.outcome === 'new' }
+      return {
+        state: 'just-shared',
+        outcome: js.outcome,
+        item: js.item,
+        canUndo: js.outcome === 'new',
+      }
     const u = i.urlShare
     if (!u || u.status === 'pending') return { state: 'pending' }
     if (u.status === 'error')
@@ -192,14 +200,13 @@ export function createPageShareModel(deps: {
         r.status === 'stale' ? 'stale' : r.status === 'fresh' ? 'fresh' : 'unavailable'
       store.setState((s) => ({
         stale: { ...s.stale, [k]: status },
-        stalePages:
-          r.status === 'stale' ? { ...s.stalePages, [k]: r.page } : s.stalePages,
+        stalePages: r.status === 'stale' ? { ...s.stalePages, [k]: r.page } : s.stalePages,
       }))
       return status
     },
     async undo() {
       const js = store.getState().justShared
-      if (!js || js.outcome !== 'new') return false
+      if (js?.outcome !== 'new') return false
       model.clearJustShared()
       return client.items.unshare(js.item.id)
     },
@@ -220,7 +227,9 @@ export function createPageShareModel(deps: {
       if (s.phase !== 'done' || prev.phase === 'done') return
       const key = canonicalUrl(s.item.url)
       if (justTimer) clearTimeout(justTimer)
-      store.setState({ justShared: { tabKey: key, spaceId: s.spaceId, outcome: s.outcome, item: s.item } })
+      store.setState({
+        justShared: { tabKey: key, spaceId: s.spaceId, outcome: s.outcome, item: s.item },
+      })
       justTimer = setTimeout(() => model.clearJustShared(), JUST_SHARED_MS)
     }),
   ]
@@ -285,8 +294,10 @@ export function usePageShare(tabId?: string | null): PageShareState {
   )
   return useMemo(() => {
     const currentSpace = list.find((s) => s.id === currentSpaceId) ?? null
-    const here = key && currentSpaceId ? urlShare?.locations.find((l) => l.spaceId === currentSpaceId) : null
-    const staleStatus = tab && key && here ? (stale[staleKey(tab.id, key, here.contentHash)] ?? null) : null
+    const here =
+      key && currentSpaceId ? urlShare?.locations.find((l) => l.spaceId === currentSpaceId) : null
+    const staleStatus =
+      tab && key && here ? (stale[staleKey(tab.id, key, here.contentHash)] ?? null) : null
     return pageShareState({
       tab,
       session,
@@ -302,3 +313,73 @@ export function usePageShare(tabId?: string | null): PageShareState {
 }
 
 const EMPTY: ExtractedPage[] = []
+
+// ── Actions behind the capsule ──────────────────────────────────────────────
+
+/**
+ * What the capsule, the tab row and the ask panel's 「このページ」 row can do with a tab's page.
+ * Every action that could send the page goes through a sheet with the exact preview first.
+ */
+export interface PageShareActions {
+  /** Open the share sheet (local, stale: a new version, elsewhere: share here too). */
+  share(): Promise<boolean>
+  /** Open the attach sheet for the next question. */
+  attach(): Promise<boolean>
+  /** Take this page out of the next question's draft. */
+  detach(): void
+  /** Take back a share made moments ago (first shares only). */
+  undo(): Promise<boolean>
+  /** The item index failed to load: try again. */
+  retry(): Promise<void>
+  /** Compare the page with the shared version again, locally (sends nothing). */
+  checkStale(): Promise<StaleStatus | null>
+  /** The reason a page can never be shared, as a popover under the capsule (05). */
+  showBlockedReason(): Promise<void>
+}
+
+export function pageShareActions(s: AppServices, tabId: () => string | null): PageShareActions {
+  const tab = () => {
+    const id = tabId()
+    return s.engine.tabs.getState().value?.tabs.find((t) => t.id === id) ?? null
+  }
+  return {
+    share: () => shareActions(s.client, s.overlay, tabId).present(tabId()),
+    attach: () => attachActions(s.client, s.overlay, tabId).present(tabId()),
+    detach() {
+      const t = tab()
+      const key = t ? tabLookupKey(t) : null
+      const threads = s.client.threads.store.getState()
+      const tid = threads.privateThreadId
+      if (!key || !tid) return
+      const index = (threads.drafts[tid] ?? []).findIndex((p) => canonicalUrl(p.url) === key)
+      if (index !== -1) s.client.threads.removeAttachment(tid, index)
+    },
+    undo: () => s.pageShare.undo(),
+    retry: () => s.client.urlShare.refresh(),
+    async checkStale() {
+      const id = tabId()
+      return id ? s.pageShare.checkStale(id) : null
+    },
+    async showBlockedReason() {
+      const t = tab()
+      if (!t || t.capture.allowed) return
+      await s.overlay.open(
+        'blocked-reason',
+        { reason: t.capture.reason, rule: t.capture.rule, url: t.url },
+        popoverAt('page-state', 'popover'),
+      ).outcome
+    },
+  }
+}
+
+/** The capsule's actions for a tab's page (the active tab when no id is given). */
+export function usePageShareActions(tabId?: string | null): PageShareActions {
+  const services = useServices()
+  return useMemo(
+    () =>
+      pageShareActions(services, () =>
+        tabId === undefined ? (services.engine.tabs.getState().value?.activeTabId ?? null) : tabId,
+      ),
+    [services, tabId],
+  )
+}

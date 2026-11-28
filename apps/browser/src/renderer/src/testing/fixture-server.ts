@@ -39,6 +39,8 @@ export interface FixtureServer {
   clearFailures(): void
   /** Hold every response of a route until `release` (to observe loading states). */
   holdRoute(route: ApiRouteName): () => void
+  /** The server cannot be reached: requests fail at the network, sockets drop and cannot reconnect. */
+  setOffline(offline: boolean): void
   world: FixtureWorld
 }
 
@@ -74,6 +76,7 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
   const failures = new Map<ApiRouteName, { code: ApiErrorCode; status: number }>()
   const holds = new Map<ApiRouteName, Promise<void>>()
   const sockets = new Set<FakeSocket>()
+  let offline = false
   let seq = 9000
   const nextId = () => uid(++seq)
   const nowIso = () => new Date(NOW + (seq - 9000) * 1000).toISOString()
@@ -136,13 +139,21 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
       }
       world.spaces.push(s)
       world.members[s.id] = [
-        { user: { id: me.id, name: me.name, avatarUrl: null, email: me.email }, role: 'owner', joinedAt: s.createdAt },
+        {
+          user: { id: me.id, name: me.name, avatarUrl: null, email: me.email },
+          role: 'owner',
+          joinedAt: s.createdAt,
+        },
       ]
       return s
     },
     getSpace: (r) => {
       const s = space(r.params.spaceId as string)
-      return { space: s, members: world.members[s.id] ?? [], pendingInvites: world.invites[s.id] ?? [] }
+      return {
+        space: s,
+        members: world.members[s.id] ?? [],
+        pendingInvites: world.invites[s.id] ?? [],
+      }
     },
     updateSpace: (r) => {
       const s = space(r.params.spaceId as string)
@@ -162,7 +173,8 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
         expiresAt: new Date(NOW + 14 * 86_400_000).toISOString(),
         acceptedAt: null,
       }
-      ;(world.invites[s.id] ??= []).push(invite)
+      world.invites[s.id] ??= []
+      world.invites[s.id]?.push(invite)
       const token = `invite-token-${invite.id}`
       return { invite, token, url: `http://rig.tiger.invalid/invite#${token}` }
     },
@@ -188,9 +200,13 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
     listItemVersions: (r) => fixtureItem(r.params.itemId as string).versions,
     shareItem: async (r) => {
       const s = space(r.params.spaceId as string)
-      const { page } = r.body as { page: { url: string; title: string; sourceType: Item['sourceType']; markdown: string } }
+      const { page } = r.body as {
+        page: { url: string; title: string; sourceType: Item['sourceType']; markdown: string }
+      }
       const hash = await sha(page.markdown)
-      const existing = world.items.find((i) => i.item.spaceId === s.id && canonical(i.item.url) === canonical(page.url))
+      const existing = world.items.find(
+        (i) => i.item.spaceId === s.id && canonical(i.item.url) === canonical(page.url),
+      )
       if (existing && existing.item.currentVersion.contentHash === hash)
         return { outcome: 'unchanged', item: existing.item }
       const version = {
@@ -202,7 +218,13 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
         capturedBy: { id: me.id, name: me.name, avatarUrl: null },
       }
       const item: Item = existing
-        ? { ...existing.item, title: page.title, updatedAt: version.capturedAt, versionCount: version.number, currentVersion: version }
+        ? {
+            ...existing.item,
+            title: page.title,
+            updatedAt: version.capturedAt,
+            versionCount: version.number,
+            currentVersion: version,
+          }
         : {
             id: nextId(),
             spaceId: s.id,
@@ -227,7 +249,14 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
     unshareItem: (r) => {
       const it = fixtureItem(r.params.itemId as string)
       world.items = world.items.filter((i) => i !== it)
-      queueMicrotask(() => push({ type: 'item.deleted', spaceId: it.item.spaceId, itemId: it.item.id, url: it.item.url }))
+      queueMicrotask(() =>
+        push({
+          type: 'item.deleted',
+          spaceId: it.item.spaceId,
+          itemId: it.item.id,
+          url: it.item.url,
+        }),
+      )
       return { ok: true }
     },
     listAudit: (r) => world.audit[r.params.spaceId as string] ?? [],
@@ -267,28 +296,65 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
       const before = r.query.get('before')
       const limit = Number(r.query.get('limit') ?? 50)
       const end = before ? all.findIndex((m) => m.id === before) : all.length
-      return all.slice(Math.max(0, (end === -1 ? all.length : end) - limit), end === -1 ? all.length : end)
+      return all.slice(
+        Math.max(0, (end === -1 ? all.length : end) - limit),
+        end === -1 ? all.length : end,
+      )
     },
     postMessage: (r) => {
       const t = thread(r.params.threadId as string)
-      const b = r.body as { content: string; askAi: boolean; model?: Message['model']; attachments?: { url: string; title: string; sourceType: Item['sourceType']; markdown: string }[] }
-      if (t.visibility === 'space' && b.attachments?.length) throw new HttpError(400, 'attachments_not_allowed')
+      const b = r.body as {
+        content: string
+        askAi: boolean
+        model?: Message['model']
+        attachments?: {
+          url: string
+          title: string
+          sourceType: Item['sourceType']
+          markdown: string
+        }[]
+      }
+      if (t.visibility === 'space' && b.attachments?.length)
+        throw new HttpError(400, 'attachments_not_allowed')
       const author = { id: me.id, name: me.name, avatarUrl: null }
-      const base = { threadId: t.id, author, citations: [] as Message['citations'], errorCode: null, usage: null, streamSeq: null }
+      const base = {
+        threadId: t.id,
+        author,
+        citations: [] as Message['citations'],
+        errorCode: null,
+        usage: null,
+        streamSeq: null,
+      }
       const message: Message = {
         ...base,
         id: nextId(),
         role: 'user',
         model: null,
         content: b.content,
-        attachments: (b.attachments ?? []).map((a) => ({ url: a.url, title: a.title, sourceType: a.sourceType, charCount: a.markdown.length })),
+        attachments: (b.attachments ?? []).map((a) => ({
+          url: a.url,
+          title: a.title,
+          sourceType: a.sourceType,
+          charCount: a.markdown.length,
+        })),
         status: 'complete',
         createdAt: nowIso(),
       }
       const assistantMessage: Message | null = b.askAi
-        ? { ...base, id: nextId(), role: 'assistant', model: b.model ?? world.models.defaultModel, content: '', attachments: [], status: 'streaming', streamSeq: 0, createdAt: nowIso() }
+        ? {
+            ...base,
+            id: nextId(),
+            role: 'assistant',
+            model: b.model ?? world.models.defaultModel,
+            content: '',
+            attachments: [],
+            status: 'streaming',
+            streamSeq: 0,
+            createdAt: nowIso(),
+          }
         : null
-      const list = (world.messages[t.id] ??= [])
+      world.messages[t.id] ??= []
+      const list = world.messages[t.id] as NonNullable<(typeof world.messages)[string]>
       list.push(message)
       if (assistantMessage) list.push(assistantMessage)
       t.lastMessageAt = message.createdAt
@@ -319,7 +385,14 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
           m.streamSeq = null
           const t = thread(m.threadId)
           queueMicrotask(() =>
-            push({ type: 'message.failed', spaceId: t.spaceId, threadId: t.id, messageId: m.id, code: 'ai_aborted', message: 'stopped' }),
+            push({
+              type: 'message.failed',
+              spaceId: t.spaceId,
+              threadId: t.id,
+              messageId: m.id,
+              code: 'ai_aborted',
+              message: 'stopped',
+            }),
           )
         }
       }
@@ -329,12 +402,15 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
   }
 
   const fetchImpl: FetchLike = async (input, init) => {
+    if (offline) throw new TypeError('Failed to fetch')
     const url = new URL(input)
     const method = (init.method ?? 'GET').toUpperCase()
     const route = compiled.find((c) => c.method === method && c.re.test(url.pathname))
     if (!route) return json(404, { error: { code: 'not_found', message: 'no such route' } })
     const match = route.re.exec(url.pathname) as RegExpExecArray
-    const params: Params = Object.fromEntries(route.keys.map((k, i) => [k, decodeURIComponent(match[i + 1] as string)]))
+    const params: Params = Object.fromEntries(
+      route.keys.map((k, i) => [k, decodeURIComponent(match[i + 1] as string)]),
+    )
     const body = typeof init.body === 'string' && init.body ? JSON.parse(init.body) : undefined
     requests.push({ route: route.name, method, path: url.pathname, body })
     const hold = holds.get(route.name)
@@ -350,7 +426,8 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
     try {
       return json(200, await handler({ params, query: url.searchParams, body, token }))
     } catch (e) {
-      if (e instanceof HttpError) return json(e.status, { error: { code: e.code, message: e.code } })
+      if (e instanceof HttpError)
+        return json(e.status, { error: { code: e.code, message: e.code } })
       throw e
     }
   }
@@ -363,6 +440,10 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
       sockets.add(this)
       setTimeout(() => {
         if (this.readyState !== 0) return
+        if (offline) {
+          this.close(1006, 'offline')
+          return
+        }
         this.readyState = 1
         this.fire('open', {})
       }, 0)
@@ -376,7 +457,8 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
         }
         this.authed = true
         this.reply({ type: 'ready', userId: me.id })
-      } else if (frame.type === 'subscribe') this.reply({ type: 'subscribed', spaceIds: frame.spaceIds ?? [] })
+      } else if (frame.type === 'subscribe')
+        this.reply({ type: 'subscribed', spaceIds: frame.spaceIds ?? [] })
       else if (frame.type === 'ping') this.reply({ type: 'pong' })
     }
     close(code = 1000, reason = ''): void {
@@ -385,7 +467,10 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
       sockets.delete(this)
       setTimeout(() => this.fire('close', { code, reason }), 0)
     }
-    addEventListener(type: 'open' | 'message' | 'close' | 'error', listener: (event: unknown) => void): void {
+    addEventListener(
+      type: 'open' | 'message' | 'close' | 'error',
+      listener: (event: unknown) => void,
+    ): void {
       let set = this.listeners.get(type)
       if (!set) {
         set = new Set()
@@ -413,11 +498,18 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
       failures.set(route, { code, status })
     },
     clearFailures: () => failures.clear(),
+    setOffline(next) {
+      offline = next
+      if (next) for (const s of [...sockets]) s.close(1006, 'offline')
+    },
     holdRoute(route) {
       let release!: () => void
-      holds.set(route, new Promise<void>((r) => {
-        release = r
-      }))
+      holds.set(
+        route,
+        new Promise<void>((r) => {
+          release = r
+        }),
+      )
       return () => {
         holds.delete(route)
         release()
@@ -428,7 +520,10 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
 }
 
 function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
 }
 
 async function sha(text: string): Promise<string> {

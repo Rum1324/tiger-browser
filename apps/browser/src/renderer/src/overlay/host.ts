@@ -98,7 +98,10 @@ export function createOverlayHost(opts: OverlayHostOptions): OverlayHost {
   const finish = (p: Pending, outcome: OverlayOutcome<unknown>) => {
     if (current !== p) return
     current = null
-    if (outcome.status === 'dismissed' && (outcome.reason === 'outside' || outcome.reason === 'blur'))
+    if (
+      outcome.status === 'dismissed' &&
+      (outcome.reason === 'outside' || outcome.reason === 'blur')
+    )
       lastOutside = { surface: p.msg.surface, at: Date.now() }
     if (p.timer) clearTimeout(p.timer)
     store.setState({ open: null })
@@ -121,7 +124,12 @@ export function createOverlayHost(opts: OverlayHostOptions): OverlayHost {
         p.shown = true
         if (p.timer) clearTimeout(p.timer)
         p.timer = null
-        store.setState({ open: { ...(store.getState().open as NonNullable<OverlayHostState['open']>), shown: true } })
+        store.setState({
+          open: {
+            ...(store.getState().open as NonNullable<OverlayHostState['open']>),
+            shown: true,
+          },
+        })
         void setOpen(true, p.bounds)
         return
       case 'event':
@@ -160,7 +168,10 @@ export function createOverlayHost(opts: OverlayHostOptions): OverlayHost {
       }
       // Props must survive a structured clone; a surface that cannot cross fails here, not later.
       opts.transport.post(msg)
-      p.timer = setTimeout(() => finish(p, { status: 'dismissed', reason: 'unavailable' }), timeoutMs)
+      p.timer = setTimeout(
+        () => finish(p, { status: 'dismissed', reason: 'unavailable' }),
+        timeoutMs,
+      )
       current = p
       store.setState({ open: { id, surface, placement, shown: false } })
       return {
@@ -180,7 +191,9 @@ export function createOverlayHost(opts: OverlayHostOptions): OverlayHost {
       if (current) finish(current, { status: 'dismissed', reason })
     },
     justDismissed(surface, withinMs = 300) {
-      return !!lastOutside && lastOutside.surface === surface && Date.now() - lastOutside.at < withinMs
+      return (
+        !!lastOutside && lastOutside.surface === surface && Date.now() - lastOutside.at < withinMs
+      )
     },
     handleMainKey(key) {
       if (!current || key !== 'Escape') return false

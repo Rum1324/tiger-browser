@@ -43,15 +43,31 @@ describe('router', () => {
   const ctx = { activeTab: tab(), session: 'signedIn' as const, firstRunDone: true }
   it('resolves routes to surfaces in context', () => {
     expect(resolveSurface({ name: 'page' }, ctx)).toEqual({ name: 'page' })
-    expect(resolveSurface({ name: 'page' }, { ...ctx, activeTab: tab({ url: '' }) })).toEqual({ name: 'new-tab', tabId: 't1' })
+    expect(resolveSurface({ name: 'page' }, { ...ctx, activeTab: tab({ url: '' }) })).toEqual({
+      name: 'new-tab',
+      tabId: 't1',
+    })
     // A blank tab that is loading something is not the new-tab page.
-    expect(resolveSurface({ name: 'page' }, { ...ctx, activeTab: tab({ url: '', isLoading: true }) })).toEqual({ name: 'page' })
-    expect(resolveSurface({ name: 'page' }, { ...ctx, activeTab: null })).toEqual({ name: 'new-tab', tabId: null })
-    expect(resolveSurface({ name: 'item', itemId: 'x' }, { ...ctx, session: 'signedOut' })).toEqual({ name: 'sign-in' })
-    expect(resolveSurface({ name: 'space-home', section: 'items' }, { ...ctx, session: 'booting' })).toMatchObject({ name: 'space-home' })
+    expect(
+      resolveSurface({ name: 'page' }, { ...ctx, activeTab: tab({ url: '', isLoading: true }) }),
+    ).toEqual({ name: 'page' })
+    expect(resolveSurface({ name: 'page' }, { ...ctx, activeTab: null })).toEqual({
+      name: 'new-tab',
+      tabId: null,
+    })
+    expect(resolveSurface({ name: 'item', itemId: 'x' }, { ...ctx, session: 'signedOut' })).toEqual(
+      { name: 'sign-in' },
+    )
+    expect(
+      resolveSurface({ name: 'space-home', section: 'items' }, { ...ctx, session: 'booting' }),
+    ).toMatchObject({ name: 'space-home' })
     expect(resolveSurface({ name: 'sign-in' }, ctx)).toEqual({ name: 'page' })
-    expect(resolveSurface({ name: 'page' }, { ...ctx, firstRunDone: false })).toEqual({ name: 'first-run' })
-    expect(resolveSurface({ name: 'settings', section: 'general' }, { ...ctx, firstRunDone: false })).toMatchObject({ name: 'settings' })
+    expect(resolveSurface({ name: 'page' }, { ...ctx, firstRunDone: false })).toEqual({
+      name: 'first-run',
+    })
+    expect(
+      resolveSurface({ name: 'settings', section: 'general' }, { ...ctx, firstRunDone: false }),
+    ).toMatchObject({ name: 'settings' })
     expect(coversPage({ name: 'page' })).toBe(false)
     expect(coversPage({ name: 'new-tab', tabId: null })).toBe(true)
   })
@@ -74,15 +90,32 @@ describe('theme and frame attributes', () => {
     expect(resolveTheme('system', true)).toBe('dark')
     expect(resolveTheme('system', false)).toBe('light')
     expect(resolveTheme('light', true)).toBe('light')
-    expect(frameAttributes({ hue: 'amber', privateWindow: false })).toEqual({ 'data-space': 'amber', 'data-window': 'normal' })
-    expect(frameAttributes({ hue: 'amber', privateWindow: true })).toEqual({ 'data-space': 'none', 'data-window': 'private' })
+    expect(frameAttributes({ hue: 'amber', privateWindow: false })).toEqual({
+      'data-space': 'amber',
+      'data-window': 'normal',
+    })
+    expect(frameAttributes({ hue: 'amber', privateWindow: true })).toEqual({
+      'data-space': 'none',
+      'data-window': 'private',
+    })
     expect(frameAttributes({ hue: null, privateWindow: false })['data-space']).toBe('none')
   })
   it('tokens.css is the design file and defines what the plumbing reads', () => {
     const css = readFileSync(join(__dirname, '../../../src/renderer/src/theme/tokens.css'), 'utf8')
     for (const t of LAYOUT_TOKENS) expect(css).toMatch(new RegExp(`${t}\\s*:`))
     expect(css).toContain('[data-theme="dark"]')
-    for (const hue of ['amber', 'coral', 'rose', 'violet', 'indigo', 'sky', 'teal', 'green', 'graphite', 'none'])
+    for (const hue of [
+      'amber',
+      'coral',
+      'rose',
+      'violet',
+      'indigo',
+      'sky',
+      'teal',
+      'green',
+      'graphite',
+      'none',
+    ])
       expect(css).toContain(`[data-space="${hue}"]`)
     expect(css).toContain('[data-window="private"]')
   })
@@ -99,7 +132,9 @@ describe('i18n', () => {
     const client = Object.keys(clientDictionaries.ja)
     expect(UI_KEYS.filter((k) => client.includes(k))).toEqual([])
     expect(translate('ja', 'pageState.members', { count: 4 })).toBe('メンバー4人に見えます')
-    expect(translate('en', 'error.thread_not_found')).toBe(clientDictionaries.en['error.thread_not_found'])
+    expect(translate('en', 'error.thread_not_found')).toBe(
+      clientDictionaries.en['error.thread_not_found'],
+    )
     expect(translate('ja', 'share.title')).toBe('「{space}」に共有')
   })
 })
@@ -111,15 +146,28 @@ describe('palette rows and model', () => {
     group: 'commands',
     keywords: [label, ...keywords],
   })
-  const commands = [cmd('new-tab', '新しいタブ', ['new tab']), cmd('share', 'スペースに共有', ['share']), cmd('settings', '設定', ['settings'])]
+  const commands = [
+    cmd('new-tab', '新しいタブ', ['new tab']),
+    cmd('share', 'スペースに共有', ['share']),
+    cmd('settings', '設定', ['settings']),
+  ]
   const labelOf = (c: CommandDescriptor) => c.keywords[0] as string
 
   it('prefix matches first, then substring; suggestions grouped after commands', () => {
-    const rows = paletteRows('se', commands, [
-      { kind: 'search', title: 'se', url: 'https://www.google.com/search?q=se', tabId: null },
-      { kind: 'tab', title: 'Settings', url: 'https://x', tabId: 't1' },
-    ], labelOf)
-    expect(rows.map((r) => (r.kind === 'command' ? r.command.id : r.suggestion.kind))).toEqual(['settings', 'tab', 'search'])
+    const rows = paletteRows(
+      'se',
+      commands,
+      [
+        { kind: 'search', title: 'se', url: 'https://www.google.com/search?q=se', tabId: null },
+        { kind: 'tab', title: 'Settings', url: 'https://x', tabId: 't1' },
+      ],
+      labelOf,
+    )
+    expect(rows.map((r) => (r.kind === 'command' ? r.command.id : r.suggestion.kind))).toEqual([
+      'settings',
+      'tab',
+      'search',
+    ])
     expect(paletteRows('', commands, [], labelOf)).toHaveLength(3)
     expect(paletteRows('zzz', commands, [], labelOf)).toEqual([])
   })
@@ -127,7 +175,12 @@ describe('palette rows and model', () => {
   it('keyboard: arrows wrap, Enter returns the choice, typed text when nothing matches', async () => {
     const calls: unknown[] = []
     const model = createPaletteModel({
-      bridge: { invoke: (async (name: string, req: unknown) => (calls.push([name, req]), [])) as never },
+      bridge: {
+        invoke: (async (name: string, req: unknown) => {
+          calls.push([name, req])
+          return []
+        }) as never,
+      },
       props: { mode: 'commands', initialQuery: '', commands },
       labelOf,
       debounceMs: 0,
@@ -144,13 +197,29 @@ describe('palette rows and model', () => {
 
   it('history mode lists history at once', async () => {
     const model = createPaletteModel({
-      bridge: { invoke: (async () => [{ id: 'h', url: 'https://a.jp', title: 'A', visitedAt: '2026-11-26T00:00:00.000Z', visitCount: 1 }]) as never },
+      bridge: {
+        invoke: (async () => [
+          {
+            id: 'h',
+            url: 'https://a.jp',
+            title: 'A',
+            visitedAt: '2026-11-26T00:00:00.000Z',
+            visitCount: 1,
+          },
+        ]) as never,
+      },
       props: { mode: 'history', initialQuery: '', commands },
       labelOf,
       debounceMs: 0,
     })
     await new Promise((r) => setTimeout(r, 5))
-    expect(model.store.getState().rows).toEqual([{ kind: 'suggestion', group: 'history', suggestion: { kind: 'history', title: 'A', url: 'https://a.jp', tabId: null } }])
+    expect(model.store.getState().rows).toEqual([
+      {
+        kind: 'suggestion',
+        group: 'history',
+        suggestion: { kind: 'history', title: 'A', url: 'https://a.jp', tabId: null },
+      },
+    ])
   })
 })
 
@@ -185,10 +254,32 @@ describe('small pure helpers', () => {
       attachedKeys: [],
       justShared: null,
     }
-    expect(pageShareState({ ...base, tab: tab({ url: 'tiger://settings', capture: { allowed: false, reason: 'scheme', rule: null } }) }).state).toBe('none')
-    expect(pageShareState({ ...base, tab: tab({ capture: { allowed: false, reason: 'government-id', rule: 'e-tax' } }) })).toMatchObject({ state: 'blocked', reason: 'government-id', rule: 'e-tax' })
-    expect(pageShareState({ ...base, tab: tab({ isPrivate: true, capture: { allowed: false, reason: 'incognito', rule: null } }) }).state).toBe('private')
-    expect(pageShareState({ ...base, tab: tab() })).toMatchObject({ state: 'local', canShare: false, why: 'no-space' })
+    expect(
+      pageShareState({
+        ...base,
+        tab: tab({
+          url: 'tiger://settings',
+          capture: { allowed: false, reason: 'scheme', rule: null },
+        }),
+      }).state,
+    ).toBe('none')
+    expect(
+      pageShareState({
+        ...base,
+        tab: tab({ capture: { allowed: false, reason: 'government-id', rule: 'e-tax' } }),
+      }),
+    ).toMatchObject({ state: 'blocked', reason: 'government-id', rule: 'e-tax' })
+    expect(
+      pageShareState({
+        ...base,
+        tab: tab({ isPrivate: true, capture: { allowed: false, reason: 'incognito', rule: null } }),
+      }).state,
+    ).toBe('private')
+    expect(pageShareState({ ...base, tab: tab() })).toMatchObject({
+      state: 'local',
+      canShare: false,
+      why: 'no-space',
+    })
   })
 })
 
@@ -205,10 +296,23 @@ describe('stores, prefs, layout, shortcuts', () => {
     expect(shallow({ x: {} }, { x: {} })).toBe(false)
   })
   it('prefs survive bad storage; layout clamps widths and persists', () => {
-    const broken = { getItem: () => '{not json', setItem: () => { throw new Error('full') } } as unknown as Storage
+    const broken = {
+      getItem: () => '{not json',
+      setItem: () => {
+        throw new Error('full')
+      },
+    } as unknown as Storage
     const p = localPrefsStorage(broken)
     expect(p.load()).toEqual({})
-    expect(() => p.save({ firstRunDone: true, sidebarCollapsed: false, panelOpen: false, sidebarWidth: null, panelWidth: null })).not.toThrow()
+    expect(() =>
+      p.save({
+        firstRunDone: true,
+        sidebarCollapsed: false,
+        panelOpen: false,
+        sidebarWidth: null,
+        panelWidth: null,
+      }),
+    ).not.toThrow()
     const mem = memoryPrefsStorage({ panelOpen: true })
     const layout = createLayout(mem)
     expect(layout.store.getState().panelOpen).toBe(true)

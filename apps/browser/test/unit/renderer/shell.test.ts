@@ -8,7 +8,7 @@ import { createOverlayGuest } from '../../../src/renderer/src/overlay/guest'
 import { createOverlayHost } from '../../../src/renderer/src/overlay/host'
 import { OverlayRoot } from '../../../src/renderer/src/overlay/OverlayRoot'
 import { memoryTransportPair } from '../../../src/renderer/src/overlay/protocol'
-import { makeWorld, settle, waitFor, type World } from './world'
+import { makeWorld, settle, type World, waitFor } from './world'
 
 /**
  * jsdom has no layout: the page slot's rectangle is derived here from the frame's attributes the
@@ -22,7 +22,17 @@ function fakeLayout() {
     const sidebar = frame?.dataset.sidebar === 'collapsed' ? 52 : 248
     const panel = frame?.dataset.panel === 'open' ? 400 : 0
     const left = sidebar + 8
-    return { left, top: 48, width: 1440 - left - 8 - panel, height: 900 - 48 - 8, x: left, y: 48, right: 0, bottom: 0, toJSON() {} } as DOMRect
+    return {
+      left,
+      top: 48,
+      width: 1440 - left - 8 - panel,
+      height: 900 - 48 - 8,
+      x: left,
+      y: 48,
+      right: 0,
+      bottom: 0,
+      toJSON() {},
+    } as DOMRect
   }
   return () => {
     HTMLElement.prototype.getBoundingClientRect = original
@@ -82,7 +92,12 @@ describe('shell: surfaces and the page slot', () => {
     await settle()
     expect(el.querySelector('[data-testid="surface-new-tab"]')).not.toBeNull()
     expect(bounds() ?? null).toBeNull()
-    await settle(() => w.engine.invoke('tabs.navigate', { tabId: w.engine.state.activeTabId as string, input: 'news' }))
+    await settle(() =>
+      w.engine.invoke('tabs.navigate', {
+        tabId: w.engine.state.activeTabId as string,
+        input: 'news',
+      }),
+    )
     await waitFor(() => bounds(), 'page shown')
   })
 
@@ -92,7 +107,9 @@ describe('shell: surfaces and the page slot', () => {
     const { el } = await mount()
     await settle()
     expect(el.querySelector('[data-testid="surface-first-run"]')).not.toBeNull()
-    await settle(() => (el.querySelector('[data-testid="first-run-skip"]') as HTMLButtonElement).click())
+    await settle(() =>
+      (el.querySelector('[data-testid="first-run-skip"]') as HTMLButtonElement).click(),
+    )
     await waitFor(() => bounds(), 'page after first run')
   })
 
@@ -116,7 +133,9 @@ describe('shell: surfaces and the page slot', () => {
     try {
       w.services.layout.setPanelOpen(true)
       const { el } = await mount()
-      expect(el.querySelector('[data-region="ask-panel"] [data-testid="region-error"]')).not.toBeNull()
+      expect(
+        el.querySelector('[data-region="ask-panel"] [data-testid="region-error"]'),
+      ).not.toBeNull()
       expect(el.querySelector('[data-testid="toolbar"]')).not.toBeNull()
     } finally {
       regionContent.askPanel = original
@@ -148,14 +167,23 @@ describe('OverlayRoot: focus, Escape, click outside, blur', () => {
       root.render(
         createElement(OverlayRoot, {
           guest,
-          fallback: (name) => createElement(Placeholder, { name, t: translator('ja'), bridge: { invoke: (async () => []) as never } }),
+          fallback: (name) =>
+            createElement(Placeholder, {
+              name,
+              t: translator('ja'),
+              bridge: { invoke: (async () => []) as never },
+            }),
         }),
       )
     })
     return { host, guest, el, raised }
   }
 
-  const confirmProps = { title: { key: 'ledger.unshareTitle' as const }, body: { key: 'ledger.unshareBody' as const }, confirm: { key: 'ledger.unshareConfirm' as const } }
+  const confirmProps = {
+    title: { key: 'ledger.unshareTitle' as const },
+    body: { key: 'ledger.unshareBody' as const },
+    confirm: { key: 'ledger.unshareConfirm' as const },
+  }
 
   it('moves focus into the surface, then reports it shown (the host raises the view)', async () => {
     const { host, el, raised } = await setup()
@@ -189,7 +217,15 @@ describe('OverlayRoot: focus, Escape, click outside, blur', () => {
 
   it('popover: losing focus (a click on the page or the main view) dismisses', async () => {
     const { host } = await setup()
-    const h = host.open('downloads', {}, { mode: 'popover', anchor: { x: 0, y: 0, width: 10, height: 10 }, size: { width: 100, height: 100 } })
+    const h = host.open(
+      'downloads',
+      {},
+      {
+        mode: 'popover',
+        anchor: { x: 0, y: 0, width: 10, height: 10 },
+        size: { width: 100, height: 100 },
+      },
+    )
     await settle()
     await settle(() => window.dispatchEvent(new Event('focus')))
     await settle(() => window.dispatchEvent(new Event('blur')))
@@ -200,7 +236,9 @@ describe('OverlayRoot: focus, Escape, click outside, blur', () => {
     const { host, el } = await setup()
     const h = host.open('confirm', confirmProps, { mode: 'modal' })
     await settle()
-    await settle(() => (el.querySelector('[data-testid="confirm-ok"]') as HTMLButtonElement).click())
+    await settle(() =>
+      (el.querySelector('[data-testid="confirm-ok"]') as HTMLButtonElement).click(),
+    )
     expect(await h.outcome).toEqual({ status: 'result', value: true })
   })
 })

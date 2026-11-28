@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react'
+import { useEngineSettings } from '../engine/hooks'
 import {
   AskPanelRegion,
   PageCoverage,
@@ -13,7 +14,6 @@ import { regionContent, surfaceScreens } from '../screens'
 import { useLocale, useT } from './context'
 import { ErrorBoundary, type FallbackProps } from './ErrorBoundary'
 import { useSurface } from './surface'
-import { useEngineSettings } from '../engine/hooks'
 import { useThemeEffect } from './useTheme'
 
 /** Keep <html lang> in step with the UI locale (screen readers, fonts, line breaking). */

@@ -14,10 +14,10 @@ export function resolveTheme(setting: ThemeSetting, systemDark: boolean): Theme 
  * window frame `data-space` (a SpaceHue, or `none` before there is a Space) and
  * `data-window="private"` for a private window, which has no hue.
  */
-export function frameAttributes(input: {
-  hue: SpaceHue | null
-  privateWindow: boolean
-}): { 'data-space': SpaceHue | 'none'; 'data-window': 'private' | 'normal' } {
+export function frameAttributes(input: { hue: SpaceHue | null; privateWindow: boolean }): {
+  'data-space': SpaceHue | 'none'
+  'data-window': 'private' | 'normal'
+} {
   return {
     'data-space': input.privateWindow ? 'none' : (input.hue ?? 'none'),
     'data-window': input.privateWindow ? 'private' : 'normal',

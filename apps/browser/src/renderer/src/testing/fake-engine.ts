@@ -50,7 +50,9 @@ export interface RecordedCall {
   request: unknown
 }
 
-type Handler<K extends EngineCommandName> = (req: EngineRequest<K>) => EngineResponse<K> | Promise<EngineResponse<K>>
+type Handler<K extends EngineCommandName> = (
+  req: EngineRequest<K>,
+) => EngineResponse<K> | Promise<EngineResponse<K>>
 
 /**
  * An in-memory engine that implements every command and event of the contract, for unit tests and
@@ -117,7 +119,10 @@ export class FakeEngine implements EngineBridge {
     }
   }
 
-  on<E extends EngineEventName>(event: E, listener: (payload: EngineEventPayload<E>) => void): () => void {
+  on<E extends EngineEventName>(
+    event: E,
+    listener: (payload: EngineEventPayload<E>) => void,
+  ): () => void {
     let set = this.listeners.get(event)
     if (!set) {
       set = new Set()
@@ -227,9 +232,11 @@ export class FakeEngine implements EngineBridge {
       if (t.url && (hit(t.title) || hit(t.url)))
         out.push({ kind: 'tab', title: t.title, url: t.url, tabId: t.id })
     for (const b of this.world.bookmarks)
-      if (hit(b.title) || hit(b.url)) out.push({ kind: 'bookmark', title: b.title, url: b.url, tabId: null })
+      if (hit(b.title) || hit(b.url))
+        out.push({ kind: 'bookmark', title: b.title, url: b.url, tabId: null })
     for (const h of this.world.history)
-      if (hit(h.title) || hit(h.url)) out.push({ kind: 'history', title: h.title, url: h.url, tabId: null })
+      if (hit(h.title) || hit(h.url))
+        out.push({ kind: 'history', title: h.title, url: h.url, tabId: null })
     const resolved = this.resolveInput(input)
     out.push(
       resolved.includes('/search?q=')
@@ -257,7 +264,10 @@ export class FakeEngine implements EngineBridge {
       'tabs.get': () => this.state,
       'tabs.create': (req) => {
         const url = req.input ? this.resolveInput(req.input) : ''
-        const t = this.makeTab({ page: url, spaceId: req.spaceId ?? null }, this.state.privateWindow)
+        const t = this.makeTab(
+          { page: url, spaceId: req.spaceId ?? null },
+          this.state.privateWindow,
+        )
         const active = req.active ?? true
         this.setState({
           tabs: [...this.state.tabs, t],
@@ -363,7 +373,7 @@ export class FakeEngine implements EngineBridge {
         const override = this.captures[t.url]
         if (override) return override
         const p = this.pageFor(t.url)
-        if (!p || !p.markdown) return { ok: false, error: 'empty', reason: null, detail: null }
+        if (!p?.markdown) return { ok: false, error: 'empty', reason: null, detail: null }
         return { ok: true, page: extractedPage(p) }
       },
       'overlay.setOpen': ({ open, bounds }) => {
@@ -382,13 +392,22 @@ export class FakeEngine implements EngineBridge {
       'downloads.open': () => undefined,
       'downloads.showInFolder': () => undefined,
       'downloads.clear': () => {
-        this.downloads = this.downloads.filter((d) => d.state === 'progressing' || d.state === 'paused')
+        this.downloads = this.downloads.filter(
+          (d) => d.state === 'progressing' || d.state === 'paused',
+        )
         this.emit('downloads.changed', this.downloads)
         return undefined
       },
       'bookmarks.list': () => this.world.bookmarks,
       'bookmarks.add': ({ url, title, spaceId }) => {
-        const b = { id: `b${this.world.bookmarks.length + 1}`, url, title, faviconUrl: null, spaceId: spaceId ?? null, createdAt: new Date().toISOString() }
+        const b = {
+          id: `b${this.world.bookmarks.length + 1}`,
+          url,
+          title,
+          faviconUrl: null,
+          spaceId: spaceId ?? null,
+          createdAt: new Date().toISOString(),
+        }
         this.world.bookmarks.push(b)
         this.emit('bookmarks.changed', this.world.bookmarks)
         return b
@@ -421,7 +440,11 @@ export class FakeEngine implements EngineBridge {
       },
       'google.exportDoc': () =>
         this.google.connected
-          ? { ok: true, url: 'https://docs.google.com/document/d/1Exported/edit', docId: '1Exported' }
+          ? {
+              ok: true,
+              url: 'https://docs.google.com/document/d/1Exported/edit',
+              docId: '1Exported',
+            }
           : { ok: false, error: 'not-connected', detail: null },
       'export.saveFile': ({ suggestedName, extension }) => ({
         path: `/Users/saeki/Downloads/${suggestedName}.${extension}`,

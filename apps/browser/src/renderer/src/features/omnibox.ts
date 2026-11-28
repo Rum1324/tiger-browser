@@ -78,7 +78,8 @@ export function createOmniboxModel(deps: {
         .invoke('suggest.query', { input: text.slice(0, 2000) })
         .then((suggestions) => {
           // A late answer for older text is dropped.
-          if (my === query && store.getState().editing) store.setState({ suggestions, selected: -1 })
+          if (my === query && store.getState().editing)
+            store.setState({ suggestions, selected: -1 })
         })
         .catch(() => {
           if (my === query) store.setState({ suggestions: [] })
@@ -89,7 +90,8 @@ export function createOmniboxModel(deps: {
   const model: OmniboxModel = {
     store,
     begin() {
-      if (!store.getState().editing) store.setState({ editing: true, text: activeUrl(), selected: -1 })
+      if (!store.getState().editing)
+        store.setState({ editing: true, text: activeUrl(), selected: -1 })
     },
     setText(text) {
       store.setState({ editing: true, text })
@@ -148,7 +150,11 @@ export function createOmniboxModel(deps: {
       store.setState({ editing: false, suggestions: [], selected: -1, text: activeUrl() })
     },
     requestFocus() {
-      store.setState((s) => ({ focusRequest: s.focusRequest + 1, editing: true, text: activeUrl() }))
+      store.setState((s) => ({
+        focusRequest: s.focusRequest + 1,
+        editing: true,
+        text: activeUrl(),
+      }))
     },
     handleKey(key, mods = {}) {
       switch (key) {

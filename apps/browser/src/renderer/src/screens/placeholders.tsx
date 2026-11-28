@@ -1,13 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useT } from '../app/context'
 import { useSurface } from '../app/surface'
-import { useAskPanel } from '../features/threads'
+import { useOmnibox } from '../features/omnibox'
 import { usePageShare } from '../features/page-share'
 import { useSignIn } from '../features/session'
 import { useSpaces } from '../features/spaces'
 import { useTabs } from '../features/tabs'
-import { useOmnibox } from '../features/omnibox'
-import { useEffect, useRef } from 'react'
+import { useAskPanel } from '../features/threads'
 
 /**
  * Plain stand-ins for the designed region contents and screens: enough to see that the plumbing
@@ -20,7 +19,12 @@ export function SidebarPlaceholder() {
   const tabs = useTabs()
   const spaces = useSpaces()
   const row = (r: (typeof tabs.local)[number]) => (
-    <li key={r.tab.id} data-testid="tab-row" data-tab-id={r.tab.id} aria-current={r.active ? 'page' : undefined}>
+    <li
+      key={r.tab.id}
+      data-testid="tab-row"
+      data-tab-id={r.tab.id}
+      aria-current={r.active ? 'page' : undefined}
+    >
       <button type="button" onClick={() => tabs.activate(r.tab.id)}>
         {r.tab.title || r.tab.url || t('tab.new')}
       </button>
@@ -64,10 +68,11 @@ export function ToolbarPlaceholder() {
         onBlur={omnibox.end}
         onChange={(e) => omnibox.setText(e.target.value)}
         onKeyDown={(e) => {
-          if (omnibox.handleKey(e.key, { alt: e.altKey, meta: e.metaKey, ctrl: e.ctrlKey })) e.preventDefault()
+          if (omnibox.handleKey(e.key, { alt: e.altKey, meta: e.metaKey, ctrl: e.ctrlKey }))
+            e.preventDefault()
         }}
       />
-      <span data-testid="page-state" data-state={share.state}>
+      <span data-testid="page-state" data-overlay-anchor="page-state" data-state={share.state}>
         {share.state}
       </span>
       <button type="button" data-overlay-anchor="ask" aria-pressed={ask.open} onClick={ask.toggle}>
@@ -96,7 +101,11 @@ export function AskPanelPlaceholder() {
           void ask.ask(text).then((ok) => ok && setText(''))
         }}
       >
-        <input aria-label={t('ask.placeholder')} value={text} onChange={(e) => setText(e.target.value)} />
+        <input
+          aria-label={t('ask.placeholder')}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
         <button type="submit">{t('ask.send')}</button>
       </form>
     </div>
@@ -119,7 +128,11 @@ export function SurfacePlaceholder() {
         </>
       ) : null}
       {surface.name === 'sign-in' ? (
-        <button type="button" disabled={signIn.working} onClick={() => void signIn.signInWithGoogle()}>
+        <button
+          type="button"
+          disabled={signIn.working}
+          onClick={() => void signIn.signInWithGoogle()}
+        >
           {t('signIn.google')}
         </button>
       ) : null}

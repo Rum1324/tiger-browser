@@ -23,12 +23,18 @@ const boot: AppBoot = {
   bridge,
   createClient: (serverUrl) => createTigerClient({ serverUrl, bridge }),
   hostTransport: (windowId) =>
-    broadcastTransport<HostMessage, GuestMessage>('host', new BroadcastChannel(channelName(windowId))),
+    broadcastTransport<HostMessage, GuestMessage>(
+      'host',
+      new BroadcastChannel(channelName(windowId)),
+    ),
   prefs: localPrefsStorage(),
 }
 
 const guestTransport = (windowId: string) =>
-  broadcastTransport<GuestMessage, HostMessage>('guest', new BroadcastChannel(channelName(windowId)))
+  broadcastTransport<GuestMessage, HostMessage>(
+    'guest',
+    new BroadcastChannel(channelName(windowId)),
+  )
 
 const root = document.getElementById('root')
 if (root) {

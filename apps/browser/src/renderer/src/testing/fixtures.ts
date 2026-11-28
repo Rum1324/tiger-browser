@@ -32,7 +32,8 @@ import type {
  */
 
 /** Deterministic UUIDv7-shaped ids, so screenshots and assertions are stable. */
-export const uid = (n: number): string => `0190f0a0-0000-7000-8000-${n.toString(16).padStart(12, '0')}`
+export const uid = (n: number): string =>
+  `0190f0a0-0000-7000-8000-${n.toString(16).padStart(12, '0')}`
 
 /** 2026-11-26 12:14 JST is "now" in the fixture world. */
 export const NOW = Date.parse('2026-11-26T03:14:00.000Z')
@@ -130,13 +131,7 @@ export const pages = {
     '# 介護テックのシード調達、3年ぶりに増加\n\n2026年の介護テック分野のシード調達は前年比で増加した。',
     '介護経済新聞',
   ),
-  gmail: page(
-    'gmail',
-    'https://mail.google.com/mail/u/0/#inbox',
-    '受信トレイ (3)',
-    'web',
-    '',
-  ),
+  gmail: page('gmail', 'https://mail.google.com/mail/u/0/#inbox', '受信トレイ (3)', 'web', ''),
   // A host on the built-in banking list (the prototype's bank is fictional, so no rule matches it).
   bank: page(
     'bank',
@@ -317,7 +312,10 @@ async function buildItem(spec: ItemSpec): Promise<FixtureItem> {
 
 // ── Threads and messages ────────────────────────────────────────────────────
 
-const message = (m: Partial<Message> & Pick<Message, 'id' | 'threadId' | 'role' | 'author' | 'content' | 'createdAt'>): Message => ({
+const message = (
+  m: Partial<Message> &
+    Pick<Message, 'id' | 'threadId' | 'role' | 'author' | 'content' | 'createdAt'>,
+): Message => ({
   model: null,
   citations: [],
   attachments: [],
@@ -377,7 +375,14 @@ export async function buildWorld(): Promise<FixtureWorld> {
   const items = await Promise.all(ITEM_SPECS.map(buildItem))
   const byPage = (k: PageKey) => items.find((i) => i.item.url === pages[k].url) as FixtureItem
 
-  const space = (key: SpaceKey, name: string, hue: Space['hue'], by: PersonKey, memberCount: number, daysAgo: number): Space => ({
+  const space = (
+    key: SpaceKey,
+    name: string,
+    hue: Space['hue'],
+    by: PersonKey,
+    memberCount: number,
+    daysAgo: number,
+  ): Space => ({
     id: spaceIds[key],
     name,
     hue,
@@ -500,10 +505,20 @@ export async function buildWorld(): Promise<FixtureWorld> {
         role: 'assistant',
         author: ref('mori'),
         model: sonnet,
-        content: '記録の電子化に対する加算が新設されます[1]。以前共有されていた試算は共有が解除されています[2]。',
+        content:
+          '記録の電子化に対する加算が新設されます[1]。以前共有されていた試算は共有が解除されています[2]。',
         citations: [
           citation(1, mhlw, '記録の電子化に対する加算が新設される'),
-          { ...citation(2, pitch, ''), itemId: uid(299), itemVersionId: uid(29901), title: '希薄化シミュレーション（個人メモ）', url: pages.dilution.url, sourceType: 'google-sheet', quote: '', available: false },
+          {
+            ...citation(2, pitch, ''),
+            itemId: uid(299),
+            itemVersionId: uid(29901),
+            title: '希薄化シミュレーション（個人メモ）',
+            url: pages.dilution.url,
+            sourceType: 'google-sheet',
+            quote: '',
+            available: false,
+          },
         ],
         createdAt: at(50),
       }),
@@ -549,7 +564,8 @@ export async function buildWorld(): Promise<FixtureWorld> {
         role: 'assistant',
         author: ref('saeki'),
         model: sonnet,
-        content: '矛盾はありません。記事はシード調達の件数の増加を伝えており、ピッチの数字とは別の指標です。',
+        content:
+          '矛盾はありません。記事はシード調達の件数の増加を伝えており、ピッチの数字とは別の指標です。',
         createdAt: at(19),
       }),
       message({
@@ -576,11 +592,45 @@ export async function buildWorld(): Promise<FixtureWorld> {
 
   const models: FixtureWorld['models'] = {
     models: [
-      { provider: 'anthropic', id: 'claude-opus-4-5', label: 'Claude Opus 4.5', tier: 'best', contextWindow: 200_000, available: true },
-      { ...sonnet, label: 'Claude Sonnet 4.5', tier: 'balanced', contextWindow: 200_000, available: true },
-      { provider: 'anthropic', id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', tier: 'fast', contextWindow: 200_000, available: true },
-      { provider: 'openai', id: 'gpt-5.1', label: 'GPT-5.1', tier: 'best', contextWindow: 400_000, available: false },
-      { provider: 'google', id: 'gemini-3-pro', label: 'Gemini 3 Pro', tier: 'best', contextWindow: 1_000_000, available: false },
+      {
+        provider: 'anthropic',
+        id: 'claude-opus-4-5',
+        label: 'Claude Opus 4.5',
+        tier: 'best',
+        contextWindow: 200_000,
+        available: true,
+      },
+      {
+        ...sonnet,
+        label: 'Claude Sonnet 4.5',
+        tier: 'balanced',
+        contextWindow: 200_000,
+        available: true,
+      },
+      {
+        provider: 'anthropic',
+        id: 'claude-haiku-4-5',
+        label: 'Claude Haiku 4.5',
+        tier: 'fast',
+        contextWindow: 200_000,
+        available: true,
+      },
+      {
+        provider: 'openai',
+        id: 'gpt-5.1',
+        label: 'GPT-5.1',
+        tier: 'best',
+        contextWindow: 400_000,
+        available: false,
+      },
+      {
+        provider: 'google',
+        id: 'gemini-3-pro',
+        label: 'Gemini 3 Pro',
+        tier: 'best',
+        contextWindow: 1_000_000,
+        available: false,
+      },
     ],
     defaultModel: sonnet,
   }
@@ -600,10 +650,53 @@ export async function buildWorld(): Promise<FixtureWorld> {
 
   const audit: Record<string, AuditEvent[]> = {
     [spaceIds.fund]: [
-      { id: uid(601), spaceId: spaceIds.fund, actor: ref('saeki'), action: 'item.reshared', target: { type: 'item', id: pitch.item.id, title: pitch.item.title, url: pitch.item.url }, at: at(0) },
-      { id: uid(602), spaceId: spaceIds.fund, actor: ref('saeki'), action: 'item.unshared', target: { type: 'item', id: uid(299), title: '希薄化シミュレーション（個人メモ）', url: pages.dilution.url }, at: at(5 * DAY - 40) },
-      { id: uid(603), spaceId: spaceIds.fund, actor: ref('ono'), action: 'thread.shared', target: { type: 'thread', id: spaceThread, title: 'ミズナラ・キャピタル面談の準備', url: null }, at: at(DAY) },
-      { id: uid(604), spaceId: spaceIds.fund, actor: ref('kashiwagi'), action: 'member.joined', target: { type: 'member', id: people.kashiwagi.id, title: people.kashiwagi.name, url: null }, at: at(40 * DAY) },
+      {
+        id: uid(601),
+        spaceId: spaceIds.fund,
+        actor: ref('saeki'),
+        action: 'item.reshared',
+        target: { type: 'item', id: pitch.item.id, title: pitch.item.title, url: pitch.item.url },
+        at: at(0),
+      },
+      {
+        id: uid(602),
+        spaceId: spaceIds.fund,
+        actor: ref('saeki'),
+        action: 'item.unshared',
+        target: {
+          type: 'item',
+          id: uid(299),
+          title: '希薄化シミュレーション（個人メモ）',
+          url: pages.dilution.url,
+        },
+        at: at(5 * DAY - 40),
+      },
+      {
+        id: uid(603),
+        spaceId: spaceIds.fund,
+        actor: ref('ono'),
+        action: 'thread.shared',
+        target: {
+          type: 'thread',
+          id: spaceThread,
+          title: 'ミズナラ・キャピタル面談の準備',
+          url: null,
+        },
+        at: at(DAY),
+      },
+      {
+        id: uid(604),
+        spaceId: spaceIds.fund,
+        actor: ref('kashiwagi'),
+        action: 'member.joined',
+        target: {
+          type: 'member',
+          id: people.kashiwagi.id,
+          title: people.kashiwagi.name,
+          url: null,
+        },
+        at: at(40 * DAY),
+      },
     ],
   }
 
@@ -619,16 +712,60 @@ export async function buildWorld(): Promise<FixtureWorld> {
 
   const history: HistoryEntry[] = [
     { id: 'h1', url: pages.news.url, title: pages.news.title, visitedAt: at(15), visitCount: 3 },
-    { id: 'h2', url: 'https://startup-houmu.jp/guide/j-kiss', title: 'J-KISS 型新株予約権の手引き', visitedAt: at(2 * DAY), visitCount: 5 },
-    { id: 'h3', url: 'https://mizunara-capital.jp/policy', title: 'ミズナラ・キャピタル｜投資方針', visitedAt: at(3 * DAY), visitCount: 2 },
+    {
+      id: 'h2',
+      url: 'https://startup-houmu.jp/guide/j-kiss',
+      title: 'J-KISS 型新株予約権の手引き',
+      visitedAt: at(2 * DAY),
+      visitCount: 5,
+    },
+    {
+      id: 'h3',
+      url: 'https://mizunara-capital.jp/policy',
+      title: 'ミズナラ・キャピタル｜投資方針',
+      visitedAt: at(3 * DAY),
+      visitCount: 2,
+    },
   ]
   const bookmarks: Bookmark[] = [
-    { id: 'b1', url: 'https://kotonoha.slack.com/', title: 'コトノハ — チャット', faviconUrl: null, spaceId: null, createdAt: at(80 * DAY) },
-    { id: 'b2', url: 'https://github.com/kotonoha/app', title: 'kotonoha/app', faviconUrl: null, spaceId: spaceIds.product, createdAt: at(70 * DAY) },
+    {
+      id: 'b1',
+      url: 'https://kotonoha.slack.com/',
+      title: 'コトノハ — チャット',
+      faviconUrl: null,
+      spaceId: null,
+      createdAt: at(80 * DAY),
+    },
+    {
+      id: 'b2',
+      url: 'https://github.com/kotonoha/app',
+      title: 'kotonoha/app',
+      faviconUrl: null,
+      spaceId: spaceIds.product,
+      createdAt: at(70 * DAY),
+    },
   ]
   const downloads: Download[] = [
-    { id: 'd1', url: 'https://www.mhlw.go.jp/content/12300000/001234567.pdf', filename: '介護報酬改定の概要.pdf', savePath: '/Users/saeki/Downloads/介護報酬改定の概要.pdf', state: 'completed', receivedBytes: 2_412_000, totalBytes: 2_412_000, startedAt: at(14 * DAY) },
-    { id: 'd2', url: 'https://kaikei-cloud.jp/invoices/2026-11.pdf', filename: '請求書_2026-11.pdf', savePath: null, state: 'progressing', receivedBytes: 310_000, totalBytes: 820_000, startedAt: at(1) },
+    {
+      id: 'd1',
+      url: 'https://www.mhlw.go.jp/content/12300000/001234567.pdf',
+      filename: '介護報酬改定の概要.pdf',
+      savePath: '/Users/saeki/Downloads/介護報酬改定の概要.pdf',
+      state: 'completed',
+      receivedBytes: 2_412_000,
+      totalBytes: 2_412_000,
+      startedAt: at(14 * DAY),
+    },
+    {
+      id: 'd2',
+      url: 'https://kaikei-cloud.jp/invoices/2026-11.pdf',
+      filename: '請求書_2026-11.pdf',
+      savePath: null,
+      state: 'progressing',
+      receivedBytes: 310_000,
+      totalBytes: 820_000,
+      startedAt: at(1),
+    },
   ]
 
   return {

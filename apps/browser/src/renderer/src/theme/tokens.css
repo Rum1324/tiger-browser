@@ -15,8 +15,9 @@
 :root {
   /* Type. The mock renders with webfonts; the macOS production faces follow them in each stack.
      Gothic = people and chrome. Mincho = the Space's own voice (AI answers, seals). */
-  --font-ui: "Inter", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+  --font-ui:
+    "Inter", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", sans-serif;
   --font-voice: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --font-mono: "Geist Mono", "SF Mono", ui-monospace, "Noto Sans JP", "Hiragino Sans", monospace;
 
@@ -145,7 +146,8 @@
 
   --scrim: oklch(0.2 0.01 80 / 0.3); /* flat alpha behind a sheet or the palette; never blurred */
 
-  --shadow-sheet: 0 0 0 1px oklch(0.2 0.01 80 / 0.22), 0 24px 56px -12px oklch(0.2 0.02 80 / 0.42),
+  --shadow-sheet:
+    0 0 0 1px oklch(0.2 0.01 80 / 0.22), 0 24px 56px -12px oklch(0.2 0.02 80 / 0.42),
     0 6px 16px oklch(0.2 0.02 80 / 0.12);
   --shadow-menu: 0 0 0 1px oklch(0.2 0.01 80 / 0.16), 0 10px 24px -6px oklch(0.2 0.02 80 / 0.28);
   --shadow-lift: 0 0 0 1px oklch(0.2 0.01 80 / 0.12), 0 6px 14px -4px oklch(0.2 0.02 80 / 0.3);
@@ -180,7 +182,8 @@
 
   --scrim: oklch(0.08 0.005 80 / 0.5);
 
-  --shadow-sheet: 0 0 0 1px oklch(1 0 0 / 0.14), 0 24px 56px -12px oklch(0 0 0 / 0.75),
+  --shadow-sheet:
+    0 0 0 1px oklch(1 0 0 / 0.14), 0 24px 56px -12px oklch(0 0 0 / 0.75),
     0 6px 16px oklch(0 0 0 / 0.4);
   --shadow-menu: 0 0 0 1px oklch(1 0 0 / 0.12), 0 10px 24px -6px oklch(0 0 0 / 0.65);
   --shadow-lift: 0 0 0 1px oklch(1 0 0 / 0.12), 0 6px 14px -4px oklch(0 0 0 / 0.6);
@@ -193,14 +196,24 @@
    The roles are declared on the element that carries data-space, so a nested element
    (a seal of another Space, a second window) resolves its own. */
 [data-space] {
-  --space-frame: oklch(0.916 var(--space-ct) var(--space-ht)); /* window frame: sidebar, toolbar, gutter */
-  --space-frame-2: oklch(0.89 calc(var(--space-ct) * 1.15) var(--space-ht)); /* hover on the frame */
-  --space-frame-3: oklch(0.862 calc(var(--space-ct) * 1.3) var(--space-ht)); /* pressed, current item */
+  --space-frame: oklch(
+    0.916 var(--space-ct) var(--space-ht)
+  ); /* window frame: sidebar, toolbar, gutter */
+  --space-frame-2: oklch(
+    0.89 calc(var(--space-ct) * 1.15) var(--space-ht)
+  ); /* hover on the frame */
+  --space-frame-3: oklch(
+    0.862 calc(var(--space-ct) * 1.3) var(--space-ht)
+  ); /* pressed, current item */
   --space-field: oklch(0.957 calc(var(--space-ct) * 0.55) var(--space-ht)); /* address field */
-  --space-line: oklch(0.82 calc(var(--space-ct) * 1.5) var(--space-ht)); /* hairlines on the frame */
+  --space-line: oklch(
+    0.82 calc(var(--space-ct) * 1.5) var(--space-ht)
+  ); /* hairlines on the frame */
   --space-ink: oklch(0.31 calc(var(--space-cs) * 0.5) var(--space-h)); /* Space name, state label */
   --space-ink-2: oklch(0.4 calc(var(--space-cs) * 0.42) var(--space-h)); /* bylines on the frame */
-  --space-ink-off: oklch(0.7 calc(var(--space-ct) * 1.5) var(--space-ht)); /* disabled glyphs on the frame */
+  --space-ink-off: oklch(
+    0.7 calc(var(--space-ct) * 1.5) var(--space-ht)
+  ); /* disabled glyphs on the frame */
   --space-accent: oklch(0.57 var(--space-cs) var(--space-h)); /* the ring: 3:1 on frame and paper */
   --space-solid: oklch(0.52 var(--space-cs) var(--space-h)); /* seal, confirm button */
   --space-solid-2: oklch(0.47 var(--space-cs) var(--space-h)); /* hover, pressed */

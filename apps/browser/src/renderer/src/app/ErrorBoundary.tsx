@@ -11,7 +11,12 @@ export interface FallbackProps {
  * must not take the address field with it). `name` labels the region in the log line.
  */
 export class ErrorBoundary extends Component<
-  { name: string; fallback: (p: FallbackProps) => ReactNode; children: ReactNode; onError?: (e: Error, region: string) => void },
+  {
+    name: string
+    fallback: (p: FallbackProps) => ReactNode
+    children: ReactNode
+    onError?: (e: Error, region: string) => void
+  },
   { error: Error | null }
 > {
   override state: { error: Error | null } = { error: null }

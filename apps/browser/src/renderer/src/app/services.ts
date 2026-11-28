@@ -1,7 +1,8 @@
 import type { TigerClient } from '@tiger/client'
 import type { EngineBridge } from '@tiger/shared'
-import { createEngineState, type EngineState } from '../engine/engine-state'
+import type { EngineState } from '../engine/engine-state'
 import { createFindModel, type FindModel } from '../features/find'
+import { createNoticeModel, type NoticeModel } from '../features/notice'
 import { createOmniboxModel, type OmniboxModel } from '../features/omnibox'
 import { createPageShareModel, type PageShareModel } from '../features/page-share'
 import { createPermissionsModel, type PermissionsModel } from '../features/permissions'
@@ -32,6 +33,8 @@ export interface AppServices {
   find: FindModel
   permissions: PermissionsModel
   pageShare: PageShareModel
+  /** The one transient message (15d). */
+  notices: NoticeModel
   dispose(): void
 }
 
@@ -80,6 +83,7 @@ export function createAppServices(o: ServicesOptions): AppServices {
     autoStaleCheck: o.autoStaleCheck ?? true,
   })
 
+  const notices = createNoticeModel({ engine: o.engine })
   const offs = [
     shortcuts.attach(o.bridge),
     doc ? overlay.attachToDocument(doc) : () => {},
@@ -101,6 +105,7 @@ export function createAppServices(o: ServicesOptions): AppServices {
     find,
     permissions,
     pageShare,
+    notices,
     dispose() {
       for (const off of offs) off()
       pageSlot.dispose()
@@ -109,6 +114,7 @@ export function createAppServices(o: ServicesOptions): AppServices {
       find.dispose()
       permissions.dispose()
       pageShare.dispose()
+      notices.dispose()
     },
   }
 }

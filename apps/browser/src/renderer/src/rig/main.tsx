@@ -14,7 +14,7 @@ import { FakeEngine } from '../testing/fake-engine'
 import { createFixtureServer, type FixtureServer } from '../testing/fixture-server'
 import { buildWorld, type FixtureWorld } from '../testing/fixtures'
 import '../theme'
-import { RIG_SCREENS, type RigContext, type RigScreen, rigScreen } from './screens'
+import { RIG_SCREENS_ALL, type RigContext, type RigScreen, rigScreen } from './screens'
 
 /**
  * The visual test rig: the renderer in plain Chromium, no Electron. A fake engine and the real
@@ -27,13 +27,24 @@ import { RIG_SCREENS, type RigContext, type RigScreen, rigScreen } from './scree
 
 declare global {
   interface Window {
-    __rig?: { screens: string[]; ctx: RigContext | null; error: string | null }
+    __rig?: {
+      screens: string[]
+      /** Screen name → the design shot it is compared with. */
+      shots: Record<string, string>
+      ctx: RigContext | null
+      error: string | null
+    }
   }
 }
 
 const params = new URLSearchParams(location.search)
-const theme = params.get('theme') === 'dark' ? 'dark' : 'light'
-window.__rig = { screens: RIG_SCREENS.map((s) => s.name), ctx: null, error: null }
+const themeParam = params.get('theme') === 'dark' ? 'dark' : 'light'
+window.__rig = {
+  screens: RIG_SCREENS_ALL.map((s) => s.name),
+  shots: Object.fromEntries(RIG_SCREENS_ALL.flatMap((s) => (s.shot ? [[s.name, s.shot]] : []))),
+  ctx: null,
+  error: null,
+}
 
 function fail(message: string) {
   if (window.__rig) window.__rig.error = message
@@ -103,7 +114,15 @@ function PageStandIn({ engine, world }: { engine: FakeEngine; world: FixtureWorl
   )
 }
 
-function OverlayLayer({ engine, guest, locale }: { engine: FakeEngine; guest: OverlayGuest; locale: 'ja' | 'en' }) {
+function OverlayLayer({
+  engine,
+  guest,
+  locale,
+}: {
+  engine: FakeEngine
+  guest: OverlayGuest
+  locale: 'ja' | 'en'
+}) {
   const [, setN] = useState(0)
   useEffect(() => engine.observe(() => setN((n) => n + 1)), [engine])
   const t = useMemo(() => translator(locale), [locale])
@@ -121,12 +140,20 @@ function OverlayLayer({ engine, guest, locale }: { engine: FakeEngine; guest: Ov
   }
   return (
     <div data-rig-overlay="" style={style}>
-      <OverlayRoot guest={guest} fallback={(name) => <Placeholder name={name} t={t} bridge={engine} />} />
+      <OverlayRoot
+        guest={guest}
+        fallback={(name) => <Placeholder name={name} t={t} bridge={engine} />}
+      />
     </div>
   )
 }
 
-async function mountApp(screen: RigScreen, world: FixtureWorld, engine: FakeEngine, server: FixtureServer) {
+async function mountApp(
+  screen: RigScreen,
+  world: FixtureWorld,
+  engine: FakeEngine,
+  server: FixtureServer,
+) {
   const pair = memoryTransportPair()
   const guest = createOverlayGuest(pair.guest)
   let client: TigerClient | null = null
@@ -135,11 +162,20 @@ async function mountApp(screen: RigScreen, world: FixtureWorld, engine: FakeEngi
   const boot: AppBoot = {
     bridge: engine,
     createClient: () => {
-      client = createTigerClient({ serverUrl: world.settings.serverUrl, bridge: engine, fetch: server.fetch, WebSocket: server.WebSocket })
+      client = createTigerClient({
+        serverUrl: world.settings.serverUrl,
+        bridge: engine,
+        fetch: server.fetch,
+        WebSocket: server.WebSocket,
+      })
       return client
     },
     hostTransport: () => pair.host,
-    prefs: memoryPrefsStorage({ firstRunDone: screen.firstRunDone ?? true, panelOpen: screen.panelOpen ?? false }),
+    prefs: memoryPrefsStorage({
+      firstRunDone: screen.firstRunDone ?? true,
+      panelOpen: screen.panelOpen ?? false,
+      ...screen.prefs,
+    }),
     autoStaleCheck: false,
     startClient: (c) => startClient(c, signedIn),
     onServices: (s) => {
@@ -164,14 +200,32 @@ async function mountApp(screen: RigScreen, world: FixtureWorld, engine: FakeEngi
   await screen.setup?.(ctx)
 }
 
-async function mountHarness(screen: RigScreen, world: FixtureWorld, engine: FakeEngine, server: FixtureServer) {
+async function mountHarness(
+  screen: RigScreen,
+  world: FixtureWorld,
+  engine: FakeEngine,
+  server: FixtureServer,
+) {
   // The harness reads window.tiger when its modules load.
   window.tiger = engine
   document.documentElement.dataset.view = 'main'
-  const [{ Harness }] = await Promise.all([import('../dev/harness/Harness'), import('../dev/harness/styles.css')])
-  const client = createTigerClient({ serverUrl: world.settings.serverUrl, bridge: engine, fetch: server.fetch, WebSocket: server.WebSocket })
+  const [{ Harness }] = await Promise.all([
+    import('../dev/harness/Harness'),
+    import('../dev/harness/styles.css'),
+  ])
+  const client = createTigerClient({
+    serverUrl: world.settings.serverUrl,
+    bridge: engine,
+    fetch: server.fetch,
+    WebSocket: server.WebSocket,
+  })
   await startClient(client, screen.signedIn !== false)
-  createRoot(document.getElementById('root') as HTMLElement).render(<Harness client={client} />)
+  createRoot(document.getElementById('root') as HTMLElement).render(
+    <>
+      <Harness client={client} />
+      <PageStandIn engine={engine} world={world} />
+    </>,
+  )
   const ctx: RigContext = { world, engine, server, client, services: null }
   if (window.__rig) window.__rig.ctx = ctx
   await screen.setup?.(ctx)
@@ -181,13 +235,16 @@ async function main() {
   const name = params.get('screen') ?? ''
   const screen = rigScreen(name)
   if (!screen) {
-    document.body.textContent = `Unknown screen "${name}". Screens: ${RIG_SCREENS.map((s) => s.name).join(', ')}`
+    document.body.textContent = `Unknown screen "${name}". Screens: ${RIG_SCREENS_ALL.map((s) => s.name).join(', ')}`
     fail(`unknown screen ${name}`)
     return
   }
   document.documentElement.dataset.view = 'main'
   const world = await buildWorld()
+  screen.edit?.(world)
+  const theme = screen.theme ?? themeParam
   world.settings.theme = theme
+  document.documentElement.dataset.rigTheme = theme
   const engine = new FakeEngine({
     world,
     tabs: screen.tabs ?? [{ page: '', active: true }],

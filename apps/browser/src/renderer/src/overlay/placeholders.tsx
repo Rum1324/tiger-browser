@@ -89,7 +89,9 @@ function PalettePlaceholder({ t, bridge }: { t: Translate; bridge: Pick<EngineBr
         data-autofocus=""
         data-testid="palette-input"
         aria-label={t('palette.label')}
-        placeholder={t(api.props.mode === 'history' ? 'palette.historyPlaceholder' : 'palette.placeholder')}
+        placeholder={t(
+          api.props.mode === 'history' ? 'palette.historyPlaceholder' : 'palette.placeholder',
+        )}
         value={state.query}
         onChange={(e) => model.setQuery(e.target.value)}
         onKeyDown={(e) => {
@@ -99,9 +101,10 @@ function PalettePlaceholder({ t, bridge }: { t: Translate; bridge: Pick<EngineBr
           if (r.choice) api.resolve(r.choice)
         }}
       />
-      <ul role="listbox">
+      <div role="listbox">
         {state.rows.map((row, i) => (
-          <li
+          <div
+            tabIndex={-1}
             key={row.kind === 'command' ? row.command.id : `${row.group}:${row.suggestion.url}`}
             role="option"
             aria-selected={i === state.selected}
@@ -114,9 +117,9 @@ function PalettePlaceholder({ t, bridge }: { t: Translate; bridge: Pick<EngineBr
             }}
           >
             {label(row)}
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
       {state.rows.length === 0 ? <p>{t('palette.empty')}</p> : null}
     </div>
   )
