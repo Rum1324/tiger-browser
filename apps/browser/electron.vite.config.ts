@@ -28,7 +28,14 @@ export default defineConfig({
   renderer: {
     root: resolve('src/renderer'),
     build: {
-      rollupOptions: { input: { index: resolve('src/renderer/index.html') } },
+      // harness.html is the developer harness (TIGER_UI=harness, unpackaged runs only). rig.html is not
+      // built here: the visual test rig serves it from Vite in plain Chromium (rig.vite.config.ts).
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          harness: resolve('src/renderer/harness.html'),
+        },
+      },
     },
     plugins: [react()],
   },

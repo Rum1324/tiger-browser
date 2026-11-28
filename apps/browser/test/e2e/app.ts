@@ -79,6 +79,8 @@ export async function launch(opts: LaunchOptions): Promise<TigerApp> {
       TIGER_USER_DATA_DIR: opts.userDataDir,
       TIGER_DOWNLOADS_DIR: opts.downloadsDir ?? join(opts.userDataDir, 'Downloads'),
       ELECTRON_RENDERER_URL: '',
+      // The suite drives the developer harness; shell.e2e.ts overrides this to test the product UI.
+      TIGER_UI: 'harness',
       ...opts.env,
     },
     timeout: 30_000,

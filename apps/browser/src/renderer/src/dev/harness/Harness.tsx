@@ -1,3 +1,4 @@
+import type { TigerClient } from '@tiger/client'
 import type {
   CaptureResult,
   Download,
@@ -17,7 +18,7 @@ const tiger = window.tiger
  * Developer harness for the engine: just enough UI to drive every engine feature by hand. The
  * designed product UI replaces it and talks to the engine through the same window.tiger bridge.
  */
-export function Harness() {
+export function Harness({ client }: { client?: TigerClient } = {}) {
   const [tabs, setTabs] = useState<TabsState | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
   const [address, setAddress] = useState('')
@@ -219,7 +220,12 @@ export function Harness() {
               </pre>
             )
           ) : null}
-          {settings ? <TeamPanel t={t} serverUrl={settings.serverUrl} activeTab={active} /> : null}
+          {settings ? <TeamPanel
+              t={t}
+              serverUrl={settings.serverUrl}
+              activeTab={active}
+              {...(client ? { client } : {})}
+            /> : null}
           <GooglePanel t={t} markdown={capture?.ok ? capture.page.markdown : null} />
           {downloads.length ? (
             <div>

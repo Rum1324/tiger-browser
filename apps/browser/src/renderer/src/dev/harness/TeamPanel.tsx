@@ -25,15 +25,19 @@ export function TeamPanel({
   t,
   serverUrl,
   activeTab,
+  client: injected,
 }: {
   t: Strings
   serverUrl: string
   activeTab: Tab | null
+  /** A client built elsewhere (the visual test rig's fixture client); its owner starts it. */
+  client?: TigerClient
 }) {
-  const [client, setClient] = useState<TigerClient | null>(null)
+  const [own, setClient] = useState<TigerClient | null>(null)
+  const client = injected ?? own
 
   useEffect(() => {
-    if (!serverUrl) return
+    if (injected || !serverUrl) return
     const c = createTigerClient({ serverUrl, bridge: tiger })
     setClient(c)
     void c.start()
@@ -41,7 +45,7 @@ export function TeamPanel({
       c.dispose()
       setClient(null)
     }
-  }, [serverUrl])
+  }, [serverUrl, injected])
 
   if (!client) return null
   return <Team client={client} t={t} activeTab={activeTab} />

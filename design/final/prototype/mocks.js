@@ -17,18 +17,18 @@ const PITCH = {
   raise: ["調達額：1.5億円（シード）", "使途：開発60%、導入支援25%、営業15%", "ランウェイ：18か月"],
 };
 
-/* edited = the state two hours after sharing: two edits that are not in 第1版 */
-function mockDoc({ edited = true } = {}) {
+/* edited = the page after two edits that are not in the shared 第2版 */
+function mockDoc({ edited = false } = {}) {
   const market = PITCH.market.map((r) => r.slice());
-  if (edited) market[1][2] = "1,150億円";
-  const growth = edited ? "年成長率は18%と見込んでいます（自社パイプラインの実績から推計）。" : PITCH.growth;
+  if (edited) market[1][2] = `<span class="m-edit">1,150億円</span>`;
+  const growth = edited ? `年成長率は18%と見込んでいます<span class="m-edit">（自社パイプラインの実績から推計）</span>。` : PITCH.growth;
   const tools = ["100%", "標準テキスト", "Noto Sans JP", "11"]
     .map((t) => `<span class="m-tool m-tool--text">${t}${icon("chevDown", 12)}</span>`)
     .join('<span class="m-tool-sep"></span>');
   return `
   <div class="m-doc">
     <div class="m-doc-head">
-      <span class="m-doc-ico">${icon("doc", 22)}</span>
+      <span class="m-doc-ico">${favicon("gdoc", 26)}</span>
       <div class="m-doc-id">
         <div class="m-doc-title">${PITCH.title}</div>
         <div class="m-doc-menu"><span>ファイル</span><span>編集</span><span>表示</span><span>挿入</span><span>表示形式</span><span>ツール</span><span>ヘルプ</span></div>
@@ -69,9 +69,12 @@ function mockDoc({ edited = true } = {}) {
   </div>`;
 }
 
-/* the exact Markdown produced by packages/extract for 第1版 (before the two edits) */
-function pitchMarkdown() {
-  const m = PITCH.market;
+/* the exact Markdown produced by packages/extract (extractor google-docs-export@1).
+   edited = the page as it is now; otherwise the shared 第2版. */
+function pitchMarkdown({ edited = false } = {}) {
+  const m = PITCH.market.map((r) => r.slice());
+  if (edited) m[1][2] = "1,150億円";
+  const growth = edited ? "年成長率は18%と見込んでいます（自社パイプラインの実績から推計）。" : PITCH.growth;
   return [
     `# ${PITCH.title}`,
     ``,
@@ -91,13 +94,13 @@ function pitchMarkdown() {
     `| --- | --- | --- |`,
     ...m.map((r) => `| ${r[0]} | ${r[1]} | ${r[2]} |`),
     ``,
-    PITCH.growth,
+    growth,
     ``,
     `## 4. 調達の概要`,
     ``,
     ...PITCH.raise.map((r) => `- ${r}`),
     ``,
-    `![図1：記録業務にかかる時間の内訳]()`,
+    `![図1：記録業務にかかる時間の内訳]`,
   ];
 }
 
@@ -137,11 +140,12 @@ function mockBank() {
   return `
   <div class="m-bank">
     <header class="m-bank-bar">
-      <span class="m-bank-brand">${icon("bank", 18)}つばめ銀行<small>ビジネスダイレクト</small></span>
+      <span class="m-bank-brand">${favicon("bank", 20)}つばめ銀行<small>ビジネスダイレクト</small></span>
       <nav><span class="is-on">口座照会</span><span>振込・振替</span><span>総合振込</span><span>各種手続き</span></nav>
       <span class="m-bank-user">株式会社コトノハ 佐伯 遥 様｜ログアウト</span>
     </header>
     <div class="m-bank-body">
+      <p class="m-bank-warn">つばめ銀行を装ったメールやSMSにご注意ください。当行がメールで暗証番号をおたずねすることはありません。</p>
       <h1>入出金明細</h1>
       <div class="m-bank-acct">
         <div><span>口座</span><b>本店営業部 普通 1048273</b></div>
@@ -180,5 +184,68 @@ function mockNote() {
       <h2>決めていないこと</h2>
       <ul><li>リモート勤務の比率</li><li>ストックオプションの配分</li></ul>
     </article>
+  </div>`;
+}
+
+
+function mockGrid() {
+  const rows = [
+    ["", "調達前", "シード後", "シリーズA後（想定）"],
+    ["創業者 4名", "100.0%", "83.3%", "66.7%"],
+    ["シード投資家", "—", "16.7%", "13.3%"],
+    ["シリーズA投資家", "—", "—", "20.0%"],
+    ["発行済株式数", "1,000,000", "1,200,000", "1,500,000"],
+    ["調達額", "—", "1.5億円", "6.0億円"],
+    ["プレマネー評価額", "—", "7.5億円", "24.0億円"],
+    ["ポストマネー評価額", "—", "9.0億円", "30.0億円"],
+  ];
+  const cols = ["A", "B", "C", "D", "E", "F", "G"];
+  return `
+  <div class="m-grid">
+    <div class="m-doc-head">
+      <span class="m-doc-ico">${favicon("gsheet", 26)}</span>
+      <div class="m-doc-id">
+        <div class="m-doc-title">希薄化シミュレーション</div>
+        <div class="m-doc-menu"><span>ファイル</span><span>編集</span><span>表示</span><span>挿入</span><span>表示形式</span><span>データ</span><span>ツール</span></div>
+      </div>
+      <div class="m-doc-right"><span class="m-doc-saved">ドライブに保存しました</span><span class="m-doc-share">${icon("lock", 14)}共有</span><span class="m-doc-av">佐</span></div>
+    </div>
+    <div class="m-grid-fx"><b>C3</b><span>=C6/(C6+B6*0+1000000)</span></div>
+    <table>
+      <thead><tr><th style="width:44px"></th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead>
+      <tbody>${rows
+        .map(
+          (r, i) =>
+            `<tr><th>${i + 1}</th>${r.map((c, j) => `<td class="${j ? "num" : ""}${i === 0 || j === 0 ? " is-head" : ""}${i === 2 && j === 2 ? " is-sel" : ""}">${c}</td>`).join("")}<td></td><td></td><td></td></tr>`,
+        )
+        .join("")}${[9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+        .map((n) => `<tr><th>${n}</th>${cols.map(() => "<td></td>").join("")}</tr>`)
+        .join("")}</tbody>
+    </table>
+    <div class="m-grid-tabs"><span class="is-on">希薄化</span><span>前提</span><span>オプションプール</span></div>
+  </div>`;
+}
+
+function mockChat() {
+  return `
+  <div class="m-chat">
+    <aside class="m-chat-side">
+      <div class="m-chat-team">コトノハ</div>
+      <h3>チャンネル</h3>
+      <ul><li># general</li><li class="is-on"># fundraising</li><li># product</li><li># hiring</li><li># sales-care</li></ul>
+      <h3>ダイレクトメッセージ</h3>
+      <ul><li>森 拓海</li><li>小野 美咲</li><li>柏木 蓮</li></ul>
+    </aside>
+    <section class="m-chat-main">
+      <header class="m-chat-bar"># fundraising <small>メンバー4人・シードラウンドの連絡</small></header>
+      <div class="m-chat-log">
+        <div class="m-chat-msg">${avatar("ono", 28)}<div><b>小野 美咲</b><time>昨日 18:32</time><p>ミズナラ・キャピタルの面談は12/3（木）15:00で確定です。先方は2名、オンラインです。</p></div></div>
+        <div class="m-chat-msg">${avatar("mori", 28)}<div><b>森 拓海</b><time>昨日 18:40</time><p>了解です。デモ環境は前日までに請求ソフト連携を入れておきます。</p></div></div>
+        <div class="m-chat-new">新着</div>
+        <div class="m-chat-msg">${avatar("kashiwagi", 28)}<div><b>柏木 蓮</b><time>今日 13:52</time><p>導入先の継続率、10月末で14事業所中13です。ピッチの数字はこれで更新してください。</p></div></div>
+        <div class="m-chat-msg">${avatar("ono", 28)}<div><b>小野 美咲</b><time>今日 14:05</time><p>青葉会さんから参考コメントをもらえました。スレッドに貼ります。</p></div></div>
+      </div>
+      <div class="m-chat-box">#fundraising へのメッセージ</div>
+    </section>
   </div>`;
 }

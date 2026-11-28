@@ -25,7 +25,7 @@ import { type CaptureDeps, captureTab, DomReply, type FetchedResource } from './
 import { TAB_CAPTURE_REQUEST, TAB_CAPTURE_RESULT, TAB_NOTIFICATION_STATE } from './channels'
 import { createHandlers, type Handlers } from './commands'
 import { DownloadManager, type DownloadScope } from './downloads'
-import { devServerUrl, env } from './env'
+import { devServerUrl, env, uiEntryPage } from './env'
 import { fetchingOpener, googleConfigFromEnv, wantsFetchOpener } from './google/config'
 import { GoogleService } from './google/service'
 import { checkEvent, checkResponse, isTrustedSender, parseInvoke } from './ipc-validate'
@@ -189,7 +189,8 @@ export class Engine {
 
   loadUi(wc: WebContents, route: 'main' | 'overlay'): void {
     const dev = devServerUrl()
-    const base = dev ?? `${UI_ORIGIN}/index.html`
+    const page = uiEntryPage()
+    const base = dev ? new URL(page, dev.endsWith('/') ? dev : `${dev}/`).toString() : `${UI_ORIGIN}/${page}`
     const url = route === 'overlay' ? `${base}#overlay` : base
     wc.loadURL(url).catch(() => {})
   }

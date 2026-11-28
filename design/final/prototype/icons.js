@@ -1,4 +1,4 @@
-/* Tiger "Rooms" icon set. Own drawings: 16 px grid, 1.5 px stroke at every size, round caps and joins.
+/* Tiger icon set. Own drawings: 16 px grid, 1.5 px stroke at every size, round caps and joins.
    One set for everything, including modifier keys, so no glyph depends on font coverage. */
 const ICONS = {
   sidebar: '<rect x="2" y="3" width="12" height="10" rx="2.5"/><path d="M6 3v10"/>',
@@ -24,7 +24,7 @@ const ICONS = {
   globe:
     '<circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c1.6 1.5 2.4 3.4 2.4 5.5S9.6 12 8 13.5C6.4 12 5.6 10.1 5.6 8S6.4 4 8 2.5Z"/>',
   doc: '<path d="M4.75 2.25h4.5l3 3v7.5a1 1 0 0 1-1 1h-6.5a1 1 0 0 1-1-1v-9.5a1 1 0 0 1 1-1Z"/><path d="M9.25 2.25v3h3M6 8.5h4M6 11h4"/>',
-  pdf: '<path d="M6 4.5h4.25l2.5 2.5v5.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z"/><path d="M10.25 4.5V7h2.5M3 11V3.5a1 1 0 0 1 1-1h4.5"/>',
+  pdf: '<path d="M4.75 2.25h4.5l3 3v7.5a1 1 0 0 1-1 1h-6.5a1 1 0 0 1-1-1v-9.5a1 1 0 0 1 1-1Z"/><path d="M9.25 2.25v3h3"/><path d="M3.75 9h8.5v2.75H3.75z" fill="currentColor" stroke="none"/>',
   hash: '<path d="M6.25 2.75 5 13.25M11 2.75 9.75 13.25M3 6h10.5M2.5 10H13"/>',
   note: '<rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3"/>',
   news: '<rect x="2.5" y="3" width="11" height="10" rx="1.75"/><path d="M5 6h3v3H5zM10.25 6h1M10.25 8.75h1M5 11h6.25"/>',
@@ -52,8 +52,31 @@ const ICONS = {
   arrowRight: '<path d="M3 8h9.5M9 4.5 12.5 8 9 11.5"/>',
   info: '<circle cx="8" cy="8" r="5.5"/><path d="M8 7.25v3.5"/><circle cx="8" cy="5.2" r=".6" fill="currentColor" stroke="none"/>',
   stop: '<rect x="4.5" y="4.5" width="7" height="7" rx="1.5"/>',
+  /* this Mac */
+  laptop: '<rect x="3.25" y="3.5" width="9.5" height="6.75" rx="1.5"/><path d="M1.75 12.5h12.5"/>',
+  /* attached to the next question only: a miniature of the dashed page frame */
+  frame: '<rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2.5" stroke-dasharray="2.6 2.2" stroke-dashoffset="1.3"/>',
+  slides: '<rect x="2.25" y="3.25" width="11.5" height="8" rx="1.75"/><path d="M8 11.25v2.25M5.75 13.5h4.5"/>',
+  pin: '<path d="M9.5 2.5 13.5 6.5 11.25 7.25 9 9.5 8.75 12.25 3.75 7.25 6.5 7 8.75 4.75 9.5 2.5ZM6.25 9.75 2.75 13.25"/>',
+  sound: '<path d="M2.75 6.5h2L8 3.75v8.5L4.75 9.5h-2v-3ZM10.5 6a2.8 2.8 0 0 1 0 4M12.25 4.25a5.3 5.3 0 0 1 0 7.5"/>',
+  history: '<path d="M2.75 8a5.25 5.25 0 1 0 1.6-3.77L2.75 5.8"/><path d="M2.75 2.75V5.8H5.8M8 5.25V8l2 1.25"/>',
+  bookmark: '<path d="M4.25 2.75h7.5v10.5L8 10.5l-3.75 2.75V2.75Z"/>',
+  reader: '<path d="M2.75 3.5h3.5A1.75 1.75 0 0 1 8 5.25v7.5a1.5 1.5 0 0 0-1.5-1.5H2.75V3.5ZM13.25 3.5h-3.5A1.75 1.75 0 0 0 8 5.25v7.5a1.5 1.5 0 0 1 1.5-1.5h3.75V3.5Z"/>',
+  retry: '<path d="M2.75 8a5.25 5.25 0 1 1 1.54 3.71L2.75 10.2"/><path d="M2.75 13.25V10.2H5.8"/>',
+  filter: '<path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"/>',
+  thread: '<path d="M3 4.25h10M3 8h10M3 11.75h6"/>',
+  invite: '<circle cx="6.5" cy="5.5" r="2.5"/><path d="M1.75 13.25c.5-2.3 2.4-3.75 4.75-3.75 1 0 1.95.27 2.75.75M12 9.25v4.5M9.75 11.5h4.5"/>',
+  trash: '<path d="M3 4.5h10M6.25 4.5V3a.5.5 0 0 1 .5-.5h2.5a.5.5 0 0 1 .5.5v1.5M4.25 4.5l.5 8a1 1 0 0 0 1 1h4.5a1 1 0 0 0 1-1l.5-8M6.75 7v4M9.25 7v4"/>',
+  keep: '<path d="M3.25 2.75h9.5v10.5h-9.5zM5.5 6h5M5.5 8.5h5M5.5 11h2.5"/>',
+  dot: '<circle cx="8" cy="8" r="2" fill="currentColor" stroke="none"/>',
+  warn: '<path d="M8 2.75 14 13H2L8 2.75Z"/><path d="M8 6.75v3"/><circle cx="8" cy="11.4" r=".6" fill="currentColor" stroke="none"/>',
+  offline: '<path d="M2 6.25c1.7-1.6 3.8-2.4 6-2.4s4.3.8 6 2.4M4.25 8.75c1-.95 2.3-1.5 3.75-1.5s2.75.55 3.75 1.5M6.5 11.25c.4-.4.9-.6 1.5-.6s1.1.2 1.5.6M2.75 2.75l10.5 10.5"/>',
+  key: '<circle cx="5.5" cy="10.5" r="2.75"/><path d="m7.5 8.5 5.75-5.75M10.75 5.25l1.75 1.75M9 7l1.25 1.25"/>',
+  at: '<circle cx="8" cy="8" r="2.5"/><path d="M10.5 5.5v3.25a1.5 1.5 0 0 0 3 0V8A5.5 5.5 0 1 0 11 12.6"/>',
+  kOpt: '<path d="M2.75 4.25h3.5l3.5 7.5h3.5M9.75 4.25h3.5"/>',
+  kEsc: '<path d="M4 4h8M4 8h5M4 12h8M4 4v8"/>',
   /* modifier keys */
-  kCmd: '<path d="M5.5 5.5h5v5h-5zM5.5 5.5H4A1.5 1.5 0 1 1 5.5 4v1.5ZM10.5 5.5V4A1.5 1.5 0 1 1 12 5.5h-1.5ZM10.5 10.5H12a1.5 1.5 0 1 1-1.5 1.5v-1.5ZM5.5 10.5V12A1.5 1.5 0 1 1 4 10.5h1.5Z"/>',
+  kCmd: '<path d="M6 6h4v4H6zM6 6H4.25A1.75 1.75 0 1 1 6 4.25V6ZM10 6V4.25A1.75 1.75 0 1 1 11.75 6H10ZM10 10h1.75A1.75 1.75 0 1 1 10 11.75V10ZM6 10v1.75A1.75 1.75 0 1 1 4.25 10H6Z"/>',
   kShift: '<path d="M8 2.75 2.75 8.5H5.5v4.25h5V8.5h2.75L8 2.75Z"/>',
   kCtrl: '<path d="m4 8 4-4 4 4"/>',
   kReturn: '<path d="M12.5 3.5v4.25a1.5 1.5 0 0 1-1.5 1.5H4M6.5 6.5 3.75 9.25 6.5 12"/>',
@@ -61,10 +84,10 @@ const ICONS = {
   kDown: '<path d="M8 3.5v9M4.5 9 8 12.5 11.5 9"/>',
 };
 
-function icon(name, size = 16, cls = "") {
+function icon(name, size = 16, cls = "", weight = 1.5) {
   const body = ICONS[name];
   if (!body) throw new Error("unknown icon: " + name);
-  /* the stroke stays 1.5 CSS px at every rendered size */
-  const stroke = Math.round((1.5 * 16 * 100) / size) / 100;
+  /* the stroke stays 1.5 CSS px at every rendered size (1.25 inside key caps) */
+  const stroke = Math.round((weight * 16 * 100) / size) / 100;
   return `<svg class="i ${cls}" width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 }
