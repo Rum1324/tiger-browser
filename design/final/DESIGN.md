@@ -1561,3 +1561,88 @@ warning, sheets under 760 px, the find field and notice under 1100 px, bookmarks
 own page (it is the palette), printing and zoom (native), English renderings of any screen.
 Motion for the second pass is the vocabulary of section 6 (fade 90 to 160 ms, no travel); nothing
 new moves.
+
+## 15. Review resolutions (binding for implementation)
+
+Two reviewers examined the complete set (use, privacy and buildability; craft). Neither found a
+blocker. The decisions below resolve every major issue and override any earlier section they
+contradict. They were made by the orchestrator in place of a further design pass, so they are stated
+as rules and values; the screenshots do not show them yet. The implemented screens are reviewed for
+craft against this section.
+
+### 15.1 Consent and recipients
+1. **Every path that sends text to a model names the company.** The send control reads
+   `<会社名> に送信` in the ask panel, in the Space-thread composer (which gets the same model control as
+   the panel), and nowhere else: the command palette never sends. Choosing 「AIに質問」 in the palette
+   opens the ask panel with the typed text in the composer.
+2. **A confirmed attachment is bound to the company it was confirmed for.** If the member changes to a
+   model of another company while an attachment is pending, the attachment returns to the unconfirmed
+   state and the sheet must be confirmed again with the new company named.
+3. **The share sheet states two further consequences**, as plain lines under the reader list:
+   「あとから参加したメンバーも読めます」 and 「質問のたびに、そのとき選ばれた AI 提供元に送られます」.
+4. **The reader list scrolls inside itself** once it exceeds four rows; its heading carries the count
+   (「読める人 6人」). The footer sentence and the buttons never move.
+5. **Long pages in the sheet:** the preview is the whole text in a scrolling column, rendered in
+   windows of 200 lines; the header shows line count and `charCount`; when `truncated` is true the
+   header adds 「長いため 600,000 字で切り詰めました」.
+6. **The ledger row for the current page** uses the outline document glyph. The dashed square appears
+   only when the page is attached to the next question.
+7. **Activity (16d) never lists an export made from a private thread.** The server already withholds it.
+
+### 15.2 State
+8. **The current Space belongs to the window** (`spaces.current` in the client). `Tab.spaceId` is not
+   used by this design.
+9. **Staleness is checked** when a tab becomes active, when the share or ask surface opens, and from
+   the menu behind the state (「更新を確認」); at most once per 60 seconds per tab, never on a timer.
+   Google Docs, Sheets and Slides are checked only on the member's request, because the check is a
+   fetch from Google. The capsule may therefore lag; its menu shows 「最終確認 n分前」.
+10. **Citations show 第n版** from `Citation.versionNumber`. An unavailable citation reads 「共有解除済み」
+    with no name or date.
+11. **Answer failures:** the halt block renders the client's message for each of the ten
+    `MESSAGE_ERROR_CODES`. 「もう一度」 is offered for `ai_failed`, `ai_busy`, `ai_timeout`,
+    `ai_interrupted`, `ai_unavailable`; 「モデルを変える」 for `model_unavailable` and
+    `ai_context_too_long`; no action for `ai_refused` and `budget_exceeded`; `ai_aborted` reads
+    「停止しました」 and keeps the partial text.
+12. **A send that fails with a network error** is not shown as failed until the thread has been
+    refetched: if the message is there, it is shown as sent; if not, the composer keeps the text and
+    says 「送信できませんでした。もう一度送れます」.
+
+### 15.3 Layers and input
+13. **One overlay surface at a time.** Opening a second replaces the first. Notices are drawn in the
+    toolbar capsule, never in the overlay.
+14. **Menus and popovers use the overlay at full-window bounds** with a transparent ground, so a click
+    anywhere outside closes them (the click is consumed). Tight bounds are for non-interactive hover
+    cards only.
+15. **The ask panel is always docked.** Window minimum is 960 x 600. At 1280 and wider: sidebar 248,
+    panel 408. From 1100 to 1279: the sidebar becomes the 52 px rail while the panel is open. From 960
+    to 1099: rail, and the panel is 360. The page is never narrower than 532.
+16. **Keyboard:** `focus-next-region` (F6, and ⌃⌘→ / ⌃⌘← on macOS) moves focus sidebar, toolbar, page,
+    ask panel, because Tab cannot leave a web page. ⌘L, ⌘K, ⌘G, ⇧⌘G, ⌘R, ⇧⌘R and ⌘↵ (confirm the open
+    sheet) arrive as engine shortcut events.
+17. **Remembered site permissions** are listed in Settings with 「取り消す」 for each
+    (`permissions.list`, `permissions.revoke`). The checkbox 「次回からも同じにする」 stays.
+18. **Invites** open from `tiger://invite/<token>` anywhere on the Mac, and from the server's invite
+    page, which offers 「Tiger で開く」 and shows the token to paste. The accept dialog shows the invite
+    preview (Space name, hue, member and item counts, who invited, expiry) before anything is joined.
+
+### 15.4 Craft
+19. **Answers are not justified.** Mincho answers are set ragged-right with `line-break: strict` and
+    `word-break: auto-phrase`; a citation chip is kept with the two characters before it by a
+    no-wrap span.
+20. **Seals at 1x:** a seal smaller than 20 px shows no character, only the Space colour in a rounded
+    square; from 20 px up it shows the character. Tab rows use the 16 px square, the Space header and
+    the switcher use 24 px with the character.
+21. **墨 (graphite) is not offered as a Space colour.** It is reserved for the private window. The
+    picker offers the other eight.
+22. **Spacing between Japanese and Latin** is never typed. Strings contain no ASCII space next to a
+    Japanese character; `text-autospace: normal` supplies the gap. A test enforces this on the
+    Japanese dictionary.
+23. **Text the member must read is never set in `--ink-off`.** Reasons (why a provider is unavailable,
+    why sending is disabled) use `--ink-3`. `--ink-off` is for inactive control labels only.
+
+### Needs from engineering (built alongside the UI)
+`Citation.versionNumber`; the invite preview route; `tiger://invite` protocol handling and the server's
+invite page; `permissions.list` / `permissions.revoke`; the shortcut actions `find-next`,
+`find-previous`, `reload`, `reload-hard`, `confirm-sheet`, `focus-next-region`; attachment confirmation
+bound to the provider; network-error reconciliation on send; the staleness policy in 15.2.
+

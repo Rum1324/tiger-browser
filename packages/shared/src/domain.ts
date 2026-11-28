@@ -75,6 +75,19 @@ export const Invite = z.object({
 })
 export type Invite = z.infer<typeof Invite>
 
+/** What an invited member sees before accepting: enough to recognise the Space, nothing of its content. */
+export const InvitePreview = z.object({
+  spaceName: z.string(),
+  hue: SpaceHue,
+  memberCount: z.number().int().nonnegative(),
+  itemCount: z.number().int().nonnegative(),
+  invitedBy: UserRef,
+  expiresAt: IsoDate,
+  /** True when the invite is bound to one email address. */
+  emailRestricted: z.boolean(),
+})
+export type InvitePreview = z.infer<typeof InvitePreview>
+
 // ── Captured content ────────────────────────────────────────────────────────
 
 export const SourceType = z.enum([
@@ -209,6 +222,8 @@ export const Citation = z.object({
   n: z.number().int().positive(),
   itemId: Id,
   itemVersionId: Id,
+  /** The version of the item the answer read, as members know it: 第n版. */
+  versionNumber: z.number().int().positive(),
   title: z.string(),
   url: z.string(),
   sourceType: SourceType,

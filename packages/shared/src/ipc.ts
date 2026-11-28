@@ -173,6 +173,15 @@ export const PermissionRequest = z.object({
 })
 export type PermissionRequest = z.infer<typeof PermissionRequest>
 
+/** A decision the member asked Tiger to remember for a site. */
+export const RememberedPermission = z.object({
+  origin: z.string(),
+  permission: SitePermission,
+  allow: z.boolean(),
+  decidedAt: IsoDate,
+})
+export type RememberedPermission = z.infer<typeof RememberedPermission>
+
 export const ShortcutAction = z.enum([
   'new-tab',
   'new-window',
@@ -191,6 +200,13 @@ export const ShortcutAction = z.enum([
   'open-history',
   'open-downloads',
   'open-settings',
+  'find-next',
+  'find-previous',
+  'reload',
+  'reload-hard',
+  'confirm-sheet',
+  /** Move keyboard focus to the next region: sidebar, toolbar, page, ask panel. */
+  'focus-next-region',
 ])
 export type ShortcutAction = z.infer<typeof ShortcutAction>
 
@@ -327,6 +343,10 @@ export const engineCommands = {
   ),
   'clipboard.writeText': cmd(z.object({ text: z.string() }), Void),
 
+  /** Remembered site-permission decisions, so the member can see and undo them in Settings. */
+  'permissions.list': cmd(Void, z.array(RememberedPermission)),
+  'permissions.revoke': cmd(z.object({ origin: z.string(), permission: SitePermission }), Void),
+
   /** Open another window. A private window uses a fresh in-memory session that dies with it. */
   'window.create': cmd(z.object({ private: z.boolean().optional() }), Void),
   'window.action': cmd(
@@ -361,7 +381,10 @@ export const engineEvents = {
   'google.changed': GoogleConnection,
   /** A site asked for a permission; the UI shows the prompt and answers with `permission.respond`. */
   'permission.request': PermissionRequest,
-  /** The member opened a Tiger invite link; the UI offers to accept it. */
+  /**
+   * The member opened a Tiger invite link; the UI offers to accept it. Fired for the OS-level link
+   * `tiger://invite/<token>` (from any app) and for a tab navigating to `<serverUrl>/invite#<token>`.
+   */
   'invite.open': z.object({ token: z.string() }),
 } as const
 

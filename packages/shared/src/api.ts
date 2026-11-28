@@ -4,6 +4,7 @@ import {
   ExtractedPage,
   Id,
   Invite,
+  InvitePreview,
   Item,
   ItemDetail,
   ItemIndexEntry,
@@ -194,6 +195,13 @@ export const api = {
     path: '/v1/spaces/:spaceId/invites/:inviteId',
     params: z.object({ spaceId: Id, inviteId: Id }),
     response: Ok,
+  }),
+  /** Look at an invite before accepting it. Fails like acceptInvite for a bad, expired or revoked token. */
+  previewInvite: route({
+    method: 'POST',
+    path: '/v1/invites/preview',
+    body: z.object({ token: z.string().min(10) }),
+    response: InvitePreview,
   }),
   acceptInvite: route({
     method: 'POST',
