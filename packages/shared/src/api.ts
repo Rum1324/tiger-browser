@@ -314,13 +314,20 @@ export const api = {
     }),
   }),
   /**
-   * Promote a private thread to the Space. Refused with `thread_has_private_attachments` when any of
-   * its messages has a page attachment.
+   * Share a private thread with the Space as a NEW Space thread; the private thread stays as it is.
+   * Page attachments are never carried over. Every question that had a page attached must be decided
+   * explicitly: listed in `includeAttachedMessageIds` (its text and its answers become visible to the
+   * Space) or in `excludeMessageIds` (it and its answers are left out). An undecided one fails with
+   * `thread_has_private_attachments` and nothing is shared. Other messages may be excluded too.
    */
   shareThread: route({
     method: 'POST',
     path: '/v1/threads/:threadId/share',
     params: ThreadParams,
+    body: z.object({
+      includeAttachedMessageIds: z.array(Id).max(500),
+      excludeMessageIds: z.array(Id).max(500),
+    }),
     response: Thread,
   }),
   deleteThread: route({
