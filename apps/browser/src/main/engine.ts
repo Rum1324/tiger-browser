@@ -37,7 +37,7 @@ import { BookmarkStore } from './store/bookmarks'
 import { KvStore, openDatabase } from './store/db'
 import { HistoryStore, isNewVisit } from './store/history'
 import {
-  MemoryPermissionStore,
+  ForgetfulPermissionStore,
   type PermissionDecisions,
   PermissionStore,
 } from './store/permissions'
@@ -190,7 +190,9 @@ export class Engine {
   loadUi(wc: WebContents, route: 'main' | 'overlay'): void {
     const dev = devServerUrl()
     const page = uiEntryPage()
-    const base = dev ? new URL(page, dev.endsWith('/') ? dev : `${dev}/`).toString() : `${UI_ORIGIN}/${page}`
+    const base = dev
+      ? new URL(page, dev.endsWith('/') ? dev : `${dev}/`).toString()
+      : `${UI_ORIGIN}/${page}`
     const url = route === 'overlay' ? `${base}#overlay` : base
     wc.loadURL(url).catch(() => {})
   }
@@ -296,7 +298,7 @@ export class Engine {
       // No "persist:" prefix: an in-memory partition that dies with the window.
       scope = `private-${randomUUID()}`
       ses = session.fromPartition(scope)
-      decisions = new MemoryPermissionStore()
+      decisions = new ForgetfulPermissionStore()
       this.hardenTabSession(ses, decisions, scope)
     }
     const win = new EngineWindow(this, isPrivate, ses, decisions)
@@ -313,6 +315,14 @@ export class Engine {
 
   windowFocused(win: EngineWindow): void {
     if (!win.isPrivate) this.lastNormalWindow = win
+    this.menuStateChanged()
+  }
+
+  /** Set by the app: refreshes the application menu's state from the focused window. */
+  onMenuStateChange: (() => void) | null = null
+
+  menuStateChanged(): void {
+    this.onMenuStateChange?.()
   }
 
   /** Session restore covers every open normal window; changes are saved after a short pause. */

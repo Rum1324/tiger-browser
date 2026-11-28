@@ -41,6 +41,15 @@ export function Harness({ client }: { client?: TigerClient } = {}) {
       tiger.on('shortcut', ({ action }) => {
         if (action === 'new-tab') tiger.invoke('tabs.create', {})
         if (action === 'focus-address') document.getElementById('address')?.focus()
+        if (action === 'reload' || action === 'reload-hard') {
+          tiger.invoke('tabs.get').then((s) => {
+            if (s.activeTabId)
+              tiger.invoke('tabs.reload', {
+                tabId: s.activeTabId,
+                ...(action === 'reload-hard' ? { ignoreCache: true } : {}),
+              })
+          })
+        }
       }),
     ]
     return () => {

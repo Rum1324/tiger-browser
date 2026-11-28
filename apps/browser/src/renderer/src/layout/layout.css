@@ -10,8 +10,9 @@ body,
 }
 
 [data-region="window"] {
+  /* WindowFrame sets both from the window-width rules (layout-state.ts effectiveLayout). */
   --sidebar-current: var(--sidebar-width, var(--w-sidebar, 248px));
-  --panel-current: var(--panel-width, var(--w-panel, 400px));
+  --panel-current: var(--panel-width, var(--w-panel, 408px));
   display: grid;
   box-sizing: border-box;
   height: 100%;
@@ -23,10 +24,6 @@ body,
     "sidebar stage panel";
   background: var(--space-frame, Canvas);
   color: var(--ink, CanvasText);
-}
-
-[data-region="window"][data-sidebar="collapsed"] {
-  --sidebar-current: var(--w-rail, 52px);
 }
 
 [data-region="window"][data-panel="open"] {
@@ -93,9 +90,17 @@ html[data-view="overlay"] body {
   inset: 0;
 }
 
+/* A popover is placed at its rectangle (inline style) on the full-window transparent ground. */
 [data-overlay-root][data-mode="popover"] [data-overlay-surface] {
   position: absolute;
+  outline: none;
+}
+
+/* A hover card's view is exactly its rectangle. */
+[data-overlay-root][data-mode="hovercard"] [data-overlay-surface] {
+  position: absolute;
   inset: 0;
+  outline: none;
 }
 
 [data-overlay-root][data-mode="modal"] [data-overlay-surface] {

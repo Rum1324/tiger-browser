@@ -26,6 +26,7 @@ function source(n: number, text: string, title = `Doc ${n}`): ContextSource {
     n,
     itemId: `00000000-0000-7000-8000-0000000001${String(n).padStart(2, '0')}`,
     itemVersionId: `00000000-0000-7000-8000-0000000002${String(n).padStart(2, '0')}`,
+    versionNumber: 1,
     title,
     url: `https://example.com/${n}`,
     sourceType: 'web',

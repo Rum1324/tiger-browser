@@ -135,7 +135,14 @@ export interface AttachmentContent {
  * Citations given to `sources` or returned in the result may omit `available`; the server computes it.
  * Citations to items outside the thread's Space are dropped by the server.
  */
-export type CitationInput = Omit<Citation, 'available'> & { available?: boolean }
+/**
+ * A citation as an Answerer reports it. `versionNumber` is filled by the server from `itemVersionId`
+ * (an Answerer may omit it); `available` is computed by the server.
+ */
+export type CitationInput = Omit<Citation, 'available' | 'versionNumber'> & {
+  available?: boolean
+  versionNumber?: number
+}
 
 export type AnswerEvent =
   /** Appended text, forwarded to clients as `message.delta` in order. */

@@ -8,6 +8,7 @@ function source(n: number, title: string, text: string, sharer = 'Aki'): Context
     n,
     itemId: `0190f000-0000-7000-8000-00000000000${n}`,
     itemVersionId: `0190f000-0000-7000-8000-00000000010${n}`,
+    versionNumber: 1,
     title,
     url: `https://example.com/${n}`,
     sourceType: 'web',

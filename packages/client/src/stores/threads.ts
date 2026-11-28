@@ -6,6 +6,7 @@ import {
   type Message,
   type MessageErrorCode,
   type ModelRef,
+  type Provider,
   type ServerEvent,
   type Thread,
 } from '@tiger/shared'
@@ -37,6 +38,26 @@ export interface ViewMessage {
    */
   citations: Citation[]
   failure: { code: string; message: string } | null
+}
+
+/**
+ * A citation as the UI draws it. `versionNumber` is the 第n版 the answer read. An unavailable
+ * citation (its item was unshared) carries no name or date: `title`, `url`, `quote`, the sharer's
+ * name and `sharedAt` are empty strings, so a view cannot show them by mistake.
+ */
+export type ViewCitation = Citation
+
+/** Strip what an unavailable citation must not show. */
+export function viewCitation(c: Citation): ViewCitation {
+  if (c.available) return c
+  return {
+    ...c,
+    title: '',
+    url: '',
+    quote: '',
+    sharedBy: { id: c.sharedBy.id, name: '', avatarUrl: null },
+    sharedAt: '',
+  }
 }
 
 export interface ThreadMessages {
@@ -72,6 +93,12 @@ export interface ThreadsState {
   messages: Record<string, ThreadMessages>
   /** Confirmed attachments waiting for the next message, per thread. */
   drafts: Record<string, ExtractedPage[]>
+  /**
+   * Per thread, index for index with `drafts`: the provider each attachment was confirmed for, or
+   * null when it is unconfirmed (the selected model changed to another provider since). An
+   * unconfirmed attachment is not sent until `reconfirmAttachments()` names the new provider.
+   */
+  draftConsent: Record<string, (Provider | null)[]>
   attach: AttachFlowState
   mutation: Load
 }
@@ -103,7 +130,20 @@ export interface ThreadsController {
     opts: PostOptions,
   ): Promise<{ message: Message; assistantMessage: Message | null } | null>
   beginAttach(threadId: string, tabId: string): Promise<void>
+  /** Add the previewed page to the draft, confirmed for the provider of the model now selected. */
   confirmAttach(): boolean
+  /**
+   * The selected model changed: attachments confirmed for another provider become unconfirmed.
+   * Called by the client whenever the models store's selection changes provider.
+   */
+  modelChanged(model: ModelRef | null): void
+  /** Draft attachments of this thread that must be confirmed again before they can be sent. */
+  unconfirmedAttachments(threadId: string): ExtractedPage[]
+  /**
+   * The member confirmed again, with the current provider named: every attachment of this thread's
+   * draft is now confirmed for it. False when no model is known (nothing to name).
+   */
+  reconfirmAttachments(threadId: string): boolean
   cancelAttach(): void
   removeAttachment(threadId: string, index: number): void
   remove(threadId: string): Promise<boolean>
@@ -222,6 +262,7 @@ export function createThreads(
     privateThreadId: null,
     messages: {},
     drafts: {},
+    draftConsent: {},
     attach: { phase: 'idle' },
     mutation: IDLE,
   })
@@ -282,7 +323,7 @@ export function createThreads(
         ...base,
         phase: 'streaming',
         text: buf ? shown(buf) : message.content,
-        citations: buf?.sources ?? [],
+        citations: (buf?.sources ?? []).map(viewCitation),
         failure: null,
       }
     }
@@ -295,7 +336,7 @@ export function createThreads(
         ...base,
         phase: failure.code === 'ai_aborted' ? 'aborted' : 'failed',
         text: message.content,
-        citations: message.citations,
+        citations: message.citations.map(viewCitation),
         failure,
       }
     }
@@ -303,7 +344,7 @@ export function createThreads(
       ...base,
       phase: 'complete',
       text: message.content,
-      citations: message.citations,
+      citations: message.citations.map(viewCitation),
       failure: null,
     }
   }
@@ -380,11 +421,13 @@ export function createThreads(
     const s = store.getState()
     const { [threadId]: _m, ...messages } = s.messages
     const { [threadId]: _d, ...drafts } = s.drafts
+    const { [threadId]: _c, ...draftConsent } = s.draftConsent
     for (const [id, b] of streams) if (b.threadId === threadId) dropStream(id)
     store.setState({
       threads: s.threads.filter((t) => t.id !== threadId),
       messages,
       drafts,
+      draftConsent,
       privateThreadId: s.privateThreadId === threadId ? null : s.privateThreadId,
     })
   }
@@ -442,6 +485,42 @@ export function createThreads(
           ? current
           : pickPrivate(sorted),
     })
+  }
+
+  const sendFailed = () =>
+    new ApiClientError('network', 'send_failed', 'the message did not reach the server')
+
+  /**
+   * After a send that got no response: read the thread and look for the message. It counts as sent
+   * when a message from this member with exactly this text is there that this client did not know
+   * before the send (the newest such one). Null when it is not there or the thread cannot be read.
+   */
+  async function reconcile(
+    threadId: string,
+    content: string,
+    askAi: boolean,
+    known: Set<string>,
+  ): Promise<{ message: Message; assistantMessage: Message | null } | null> {
+    let fetched: Message[]
+    try {
+      fetched = await ctx.api.call(api.listMessages, {
+        params: { threadId },
+        query: { limit: PAGE },
+      })
+    } catch {
+      return null
+    }
+    const me = ctx.userId()
+    let at = -1
+    fetched.forEach((m, i) => {
+      if (m.role === 'user' && m.author.id === me)
+        at = m.content === content && !known.has(m.id) ? i : -1
+    })
+    const message = fetched[at]
+    if (!message) return null
+    const next = fetched[at + 1]
+    const assistantMessage = askAi && next?.role === 'assistant' ? next : null
+    return { message, assistantMessage }
   }
 
   const controller: ThreadsController = {
@@ -563,6 +642,7 @@ export function createThreads(
     async post(threadId, content, opts) {
       const thread = controller.thread(threadId)
       const attachments = store.getState().drafts[threadId] ?? []
+      const consent = store.getState().draftConsent[threadId] ?? []
       if (!thread) {
         store.setState({
           mutation: failed(new ApiClientError('client', 'thread_not_found', 'unknown thread')),
@@ -580,30 +660,60 @@ export function createThreads(
       }
       if (posting.has(threadId)) return null
       const model = opts.askAi ? (opts.model ?? deps.modelForMessage()) : null
+      // A page goes only to the company the member confirmed it for (invariant 1).
+      if (
+        opts.askAi &&
+        attachments.some((_, i) => !model || (consent[i] ?? null) !== model.provider)
+      ) {
+        store.setState({
+          mutation: failed(
+            new ApiClientError(
+              'client',
+              'attachment_unconfirmed',
+              'an attachment was not confirmed for this provider',
+            ),
+          ),
+        })
+        return null
+      }
       posting.add(threadId)
-      let r: Awaited<ReturnType<ThreadsController['post']>>
+      store.setState({ mutation: LOADING })
+      const known = new Set(store.getState().messages[threadId]?.list.map((m) => m.id) ?? [])
+      let r: { message: Message; assistantMessage: Message | null } | null = null
       try {
-        r = await mutate(() =>
-          ctx.api.call(api.postMessage, {
-            params: { threadId },
-            body: {
-              content,
-              askAi: opts.askAi,
-              ...(model ? { model } : {}),
-              ...(attachments.length ? { attachments } : {}),
-            },
-          }),
-        )
+        r = await ctx.api.call(api.postMessage, {
+          params: { threadId },
+          body: {
+            content,
+            askAi: opts.askAi,
+            ...(model ? { model } : {}),
+            ...(attachments.length ? { attachments } : {}),
+          },
+        })
+      } catch (e) {
+        const error = toClientError(e)
+        // No response does not mean the message did not arrive: ask the thread before saying so.
+        r = error.isNetwork ? await reconcile(threadId, content, opts.askAi, known) : null
+        if (!r) {
+          store.setState({ mutation: failed(error.isNetwork ? sendFailed() : error) })
+        }
       } finally {
         posting.delete(threadId)
       }
       if (!r) return null
+      store.setState({ mutation: READY })
       // Only the pages that went out leave the draft; one attached while sending stays for the next.
       const sent = new Set(attachments)
-      const all = store.getState().drafts
-      const left = (all[threadId] ?? []).filter((p) => !sent.has(p))
-      const { [threadId]: _sent, ...rest } = all
-      store.setState({ drafts: left.length ? { ...rest, [threadId]: left } : rest })
+      const s = store.getState()
+      const keep = (s.drafts[threadId] ?? []).map((p) => !sent.has(p))
+      const left = (s.drafts[threadId] ?? []).filter((_, i) => keep[i])
+      const leftConsent = (s.draftConsent[threadId] ?? []).filter((_, i) => keep[i])
+      const { [threadId]: _sent, ...rest } = s.drafts
+      const { [threadId]: _sentConsent, ...restConsent } = s.draftConsent
+      store.setState({
+        drafts: left.length ? { ...rest, [threadId]: left } : rest,
+        draftConsent: left.length ? { ...restConsent, [threadId]: leftConsent } : restConsent,
+      })
       if (!store.getState().messages[threadId]) {
         setMessages(threadId, { list: [], load: IDLE, hasMore: false })
       }
@@ -645,12 +755,53 @@ export function createThreads(
       const a = store.getState().attach
       if (a.phase !== 'preview') return false
       attachRun++
-      const drafts = store.getState().drafts
+      const { drafts, draftConsent } = store.getState()
       const list = drafts[a.threadId] ?? []
+      if (list.length >= MAX_ATTACHMENTS) {
+        store.setState({ attach: { phase: 'idle' } })
+        return false
+      }
+      const provider = deps.modelForMessage()?.provider ?? null
       store.setState({
-        drafts: { ...drafts, [a.threadId]: [...list, a.page].slice(0, MAX_ATTACHMENTS) },
+        drafts: { ...drafts, [a.threadId]: [...list, a.page] },
+        draftConsent: {
+          ...draftConsent,
+          [a.threadId]: [...(draftConsent[a.threadId] ?? list.map(() => null)), provider],
+        },
         attach: { phase: 'idle' },
       })
+      return true
+    },
+
+    modelChanged(model) {
+      const provider = model?.provider ?? null
+      const consent = store.getState().draftConsent
+      let changed = false
+      const next: Record<string, (Provider | null)[]> = {}
+      for (const [threadId, list] of Object.entries(consent)) {
+        next[threadId] = list.map((p) => {
+          if (p === null || p === provider) return p
+          changed = true
+          return null
+        })
+      }
+      if (changed) store.setState({ draftConsent: next })
+    },
+
+    unconfirmedAttachments(threadId) {
+      const provider = deps.modelForMessage()?.provider ?? null
+      const consent = store.getState().draftConsent[threadId] ?? []
+      return (store.getState().drafts[threadId] ?? []).filter(
+        (_, i) => provider === null || (consent[i] ?? null) !== provider,
+      )
+    },
+
+    reconfirmAttachments(threadId) {
+      const provider = deps.modelForMessage()?.provider ?? null
+      if (provider === null) return false
+      const { drafts, draftConsent } = store.getState()
+      const list = drafts[threadId] ?? []
+      store.setState({ draftConsent: { ...draftConsent, [threadId]: list.map(() => provider) } })
       return true
     },
 
@@ -660,9 +811,13 @@ export function createThreads(
     },
 
     removeAttachment(threadId, index) {
-      const drafts = store.getState().drafts
+      const { drafts, draftConsent } = store.getState()
       const list = (drafts[threadId] ?? []).filter((_, i) => i !== index)
-      store.setState({ drafts: { ...drafts, [threadId]: list } })
+      const consent = (draftConsent[threadId] ?? []).filter((_, i) => i !== index)
+      store.setState({
+        drafts: { ...drafts, [threadId]: list },
+        draftConsent: { ...draftConsent, [threadId]: consent },
+      })
     },
 
     async remove(threadId) {

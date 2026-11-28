@@ -72,7 +72,6 @@ describe('menus', () => {
     const noop = () => {}
     const template = appMenuTemplate('linux', {
       shortcut: (a) => fired.push(a),
-      reload: noop,
       back: noop,
       forward: noop,
       zoom: noop,

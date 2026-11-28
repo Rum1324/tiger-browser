@@ -1,7 +1,7 @@
-import type { Invite, Space, SpaceHue, SpaceMember, User } from '@tiger/shared'
+import type { Invite, InvitePreview, Space, SpaceHue, SpaceMember, User } from '@tiger/shared'
 import { generateToken, hashToken } from '../auth/tokens'
 import type { AppContext } from '../context'
-import type { Fragment, Sql } from '../db/sql'
+import type { Fragment, Sql, TxSql } from '../db/sql'
 import { AppError, notFound } from '../errors'
 import { newId } from '../ids'
 import { requireMember, requireOwner } from './access'
@@ -180,56 +180,118 @@ export async function revokeInvite(
   if (rows.length === 0) throw notFound('invite_not_found', 'Invite')
 }
 
+interface InviteCheck {
+  id: string
+  spaceId: string
+  /** The caller already belongs to the Space: accepting is a no-op that returns it. */
+  alreadyMember: boolean
+}
+
+/**
+ * The checks acceptInvite and previewInvite share, in the same order, so a preview fails exactly when
+ * accepting would. Pass `forUpdate` inside the accepting transaction.
+ */
+async function checkInvite(
+  sql: Sql | TxSql,
+  user: User,
+  token: string,
+  forUpdate: boolean,
+): Promise<InviteCheck> {
+  const rows = await sql<
+    {
+      id: string
+      space_id: string
+      email: string | null
+      expired: boolean
+      accepted_at: Date | null
+      revoked_at: Date | null
+    }[]
+  >`
+    select id, space_id, email, expires_at <= now() as expired, accepted_at, revoked_at
+    from invites where token_hash = ${hashToken(token)}::bytea
+    ${forUpdate ? sql`for update` : sql``}
+  `
+  const inv = rows[0]
+  if (!inv) throw notFound('invite_not_found', 'Invite')
+  if (inv.revoked_at) throw new AppError(410, 'invite_revoked', 'This invite was revoked')
+  const already = await sql`
+    select 1 from space_members where space_id = ${inv.space_id} and user_id = ${user.id}
+  `
+  // A member opening a link to their own Space must not burn the invite meant for someone else,
+  // and the second request of a double-click finds the first one's membership: both get the Space.
+  if (already.length > 0) return { id: inv.id, spaceId: inv.space_id, alreadyMember: true }
+  if (inv.accepted_at) throw new AppError(410, 'invite_used', 'This invite was already used')
+  if (inv.expired) throw new AppError(410, 'invite_expired', 'This invite has expired')
+  if (inv.email && inv.email.toLowerCase() !== user.email.toLowerCase()) {
+    throw new AppError(403, 'invite_email_mismatch', 'This invite is for a different email address')
+  }
+  return { id: inv.id, spaceId: inv.space_id, alreadyMember: false }
+}
+
+/**
+ * What the invited member sees before joining: the Space's name, colour and size, who invited them
+ * and until when. Nothing of the Space's content, and nothing at all for a token accepting would refuse.
+ */
+export async function previewInvite(
+  ctx: AppContext,
+  user: User,
+  token: string,
+): Promise<InvitePreview> {
+  const check = await checkInvite(ctx.sql, user, token, false)
+  const [row] = await ctx.sql<
+    {
+      name: string
+      hue: SpaceHue
+      members: number
+      items: number
+      expires_at: Date
+      email: string | null
+      cb_id: string
+      cb_name: string
+      cb_avatar: string | null
+    }[]
+  >`
+    select s.name, s.hue,
+           (select count(*)::int from space_members m where m.space_id = s.id) as members,
+           (select count(*)::int from items i where i.space_id = s.id) as items,
+           inv.expires_at, inv.email, u.id as cb_id, u.name as cb_name, u.avatar_url as cb_avatar
+    from invites inv
+    join spaces s on s.id = inv.space_id
+    join users u on u.id = inv.created_by
+    where inv.id = ${check.id}
+  `
+  if (!row) throw notFound('invite_not_found', 'Invite')
+  return {
+    spaceName: row.name,
+    hue: row.hue,
+    memberCount: row.members,
+    itemCount: row.items,
+    invitedBy: userRef(row.cb_id, row.cb_name, row.cb_avatar),
+    expiresAt: iso(row.expires_at),
+    emailRestricted: row.email !== null,
+  }
+}
+
 export async function acceptInvite(ctx: AppContext, user: User, token: string): Promise<Space> {
   const result = await ctx.sql.begin(async (tx) => {
-    const rows = await tx<
-      {
-        id: string
-        space_id: string
-        email: string | null
-        expired: boolean
-        accepted_at: Date | null
-        revoked_at: Date | null
-      }[]
-    >`
-      select id, space_id, email, expires_at <= now() as expired, accepted_at, revoked_at
-      from invites where token_hash = ${hashToken(token)}::bytea
-      for update
-    `
-    const inv = rows[0]
-    if (!inv) throw notFound('invite_not_found', 'Invite')
-    if (inv.revoked_at) throw new AppError(410, 'invite_revoked', 'This invite was revoked')
-    const already = await tx`
-      select 1 from space_members where space_id = ${inv.space_id} and user_id = ${user.id}
-    `
-    // A member opening a link to their own Space must not burn the invite meant for someone else,
-    // and the second request of a double-click finds the first one's membership: both get the Space.
-    if (already.length > 0) return { spaceId: inv.space_id, event: null }
-    if (inv.accepted_at) throw new AppError(410, 'invite_used', 'This invite was already used')
-    if (inv.expired) throw new AppError(410, 'invite_expired', 'This invite has expired')
-    if (inv.email && inv.email.toLowerCase() !== user.email.toLowerCase()) {
-      throw new AppError(
-        403,
-        'invite_email_mismatch',
-        'This invite is for a different email address',
-      )
-    }
+    const check = await checkInvite(tx, user, token, true)
+    if (check.alreadyMember) return { spaceId: check.spaceId, event: null }
     // Two different invites to this Space accepted at once: the second insert finds the first
     // one's row (after it commits) and inserts nothing; that invite is left unused.
     const joined = await tx`
-      insert into space_members (space_id, user_id, role) values (${inv.space_id}, ${user.id}, 'member')
+      insert into space_members (space_id, user_id, role) values (${check.spaceId}, ${user.id}, 'member')
       on conflict do nothing
       returning user_id
     `
-    if (joined.length === 0) return { spaceId: inv.space_id, event: null }
-    await tx`update invites set accepted_at = now(), accepted_by = ${user.id} where id = ${inv.id}`
+    if (joined.length === 0) return { spaceId: check.spaceId, event: null }
+    await tx`update invites set accepted_at = now(), accepted_by = ${user.id} where id = ${check.id}`
     const event = await appendAudit(tx, {
-      spaceId: inv.space_id,
+      spaceId: check.spaceId,
       actor: userRef(user.id, user.name, user.avatarUrl),
       action: 'member.joined',
       target: { type: 'member', id: user.id, title: user.name, url: null },
     })
-    return { spaceId: inv.space_id, event }
+    return { spaceId: check.spaceId, event }
   })
   if (result.event) {
     const ref = userRef(user.id, user.name, user.avatarUrl)

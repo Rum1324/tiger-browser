@@ -89,10 +89,20 @@ export {
 } from './stores/share-thread'
 export type {
   CreatedInvite,
+  PendingInvite,
   SpaceDetail,
   SpacesController,
   SpacesState,
 } from './stores/spaces'
+export {
+  createStaleness,
+  STALE_CHECK_INTERVAL_MS,
+  type StalenessController,
+  type StalenessDeps,
+  type StalenessState,
+  type StaleTrigger,
+  type TabStaleness,
+} from './stores/staleness'
 export {
   type AttachFailure,
   type AttachFlowState,
@@ -102,5 +112,7 @@ export {
   type ThreadMessages,
   type ThreadsController,
   type ThreadsState,
+  type ViewCitation,
   type ViewMessage,
+  viewCitation,
 } from './stores/threads'

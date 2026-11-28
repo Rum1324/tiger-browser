@@ -106,7 +106,7 @@ describe('content hash and Markdown export', () => {
       '77710aedc74ecfa33685e33a6c7df5cc83004da1bdcef7fb280f5c2b2e97e0a5',
     )
   })
-  it('lists sources so [n] markers still resolve, and marks unshared ones', () => {
+  it('lists sources so [n] markers still resolve, and marks unshared ones without their name', () => {
     const md = answerToMarkdown(
       'Answer [1] [2]',
       [
@@ -114,6 +114,7 @@ describe('content hash and Markdown export', () => {
           n: 2,
           itemId: 'i2',
           itemVersionId: 'v2',
+          versionNumber: 3,
           title: 'Two',
           url: 'https://two',
           sourceType: 'web',
@@ -126,6 +127,7 @@ describe('content hash and Markdown export', () => {
           n: 1,
           itemId: 'i1',
           itemVersionId: 'v1',
+          versionNumber: 1,
           title: 'One',
           url: 'https://one',
           sourceType: 'web',
@@ -137,8 +139,6 @@ describe('content hash and Markdown export', () => {
       ],
       '出典',
     )
-    expect(md).toBe(
-      'Answer [1] [2]\n\n## 出典\n\n[1] One <https://one>\n[2] Two <https://two> (unshared)\n',
-    )
+    expect(md).toBe('Answer [1] [2]\n\n## 出典\n\n[1] One <https://one>\n[2] (unshared)\n')
   })
 })

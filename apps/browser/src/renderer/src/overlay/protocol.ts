@@ -38,27 +38,37 @@ export type DismissReason =
 export type Side = 'below' | 'above' | 'start' | 'end'
 export type Align = 'start' | 'center' | 'end'
 
+interface Anchored {
+  anchor: Rect
+  size: { width: number; height: number }
+  side?: Side
+  align?: Align
+  /** Gap between anchor and surface, CSS px. */
+  offset?: number
+}
+
 /**
- * Where a surface goes. `modal`: the overlay covers the whole window (bounds null) and takes every
- * click; a click outside the surface dismisses it. `popover`: a tight rectangle next to an anchor;
- * the page and the main view stay clickable around it.
+ * Where a surface goes (DESIGN.md 15.3, items 13 and 14). Every surface the member acts in raises
+ * the overlay over the whole window, so a click anywhere outside the surface lands on its
+ * transparent ground, closes it and goes no further:
+ * - `modal`: a dialog or sheet, centred (or by `anchor`).
+ * - `popover`: a menu or popover drawn next to an anchor.
+ * - `hovercard`: a card the member only reads (no focus, no controls). Only this one raises the
+ *   overlay at tight bounds, so the page and the main view stay usable around it.
  */
 export type Placement =
   | { mode: 'modal'; anchor?: Rect }
-  | {
-      mode: 'popover'
-      anchor: Rect
-      size: { width: number; height: number }
-      side?: Side
-      align?: Align
-      /** Gap between anchor and popover, CSS px. */
-      offset?: number
-    }
+  | ({ mode: 'popover' } & Anchored)
+  | ({ mode: 'hovercard' } & Anchored)
 
-/** What the guest receives: the placement plus the overlay view's bounds in window coordinates. */
+/**
+ * What the guest receives. `bounds` is where the surface is drawn, in window coordinates: inside
+ * the full-window overlay for a popover, and the overlay view's own rectangle for a hover card.
+ */
 export type ResolvedPlacement =
   | { mode: 'modal'; anchor: Rect | null }
   | { mode: 'popover'; bounds: Rect; side: Side }
+  | { mode: 'hovercard'; bounds: Rect; side: Side }
 
 export interface OpenMessage {
   t: 'open'
@@ -187,7 +197,7 @@ const MARGIN = 8
  * the other side when it does not fit, then kept inside the window with a small margin. Pure.
  */
 export function popoverBounds(
-  p: Extract<Placement, { mode: 'popover' }>,
+  p: Anchored & { mode?: 'popover' | 'hovercard' },
   viewport: { width: number; height: number },
 ): { bounds: Rect; side: Side } {
   const offset = p.offset ?? 4
@@ -240,6 +250,10 @@ export function popoverBounds(
   }
 }
 
+/**
+ * The guest's placement and the overlay view's bounds for `overlay.setOpen` (null = the whole
+ * window). Only a hover card gets tight bounds.
+ */
 export function resolvePlacement(
   p: Placement,
   viewport: { width: number; height: number },
@@ -247,5 +261,6 @@ export function resolvePlacement(
   if (p.mode === 'modal')
     return { resolved: { mode: 'modal', anchor: p.anchor ?? null }, bounds: null }
   const { bounds, side } = popoverBounds(p, viewport)
-  return { resolved: { mode: 'popover', bounds, side }, bounds }
+  if (p.mode === 'hovercard') return { resolved: { mode: 'hovercard', bounds, side }, bounds }
+  return { resolved: { mode: 'popover', bounds, side }, bounds: null }
 }

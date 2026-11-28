@@ -44,6 +44,12 @@ export interface OverlayHost {
   /** Close whatever is open. */
   closeAll(reason?: DismissReason): void
   /**
+   * The `confirm-sheet` shortcut (⌘↵): the open share, attach or share-thread sheet receives the
+   * same `confirm` event as its own button sends, so the flow's rules decide whether it goes ahead.
+   * False when no sheet is showing.
+   */
+  confirmSheet(): boolean
+  /**
    * True when this surface was dismissed by a click outside it moments ago. A toggle button checks
    * it: its pointerdown already closed the surface, so the click that follows must not reopen it.
    */
@@ -67,6 +73,9 @@ export interface OverlayHostOptions {
   newId?: () => string
 }
 
+/** Surfaces whose confirm button sends what the member previewed; ⌘↵ presses it. */
+const SHEETS: ReadonlySet<OverlaySurfaceName> = new Set(['share', 'attach', 'share-thread'])
+
 interface Pending {
   msg: OpenMessage
   placement: Placement
@@ -81,9 +90,9 @@ interface Pending {
 /**
  * The main view's side of the overlay protocol. One surface is open at a time; opening another
  * dismisses the first with `replaced`. The overlay view is raised (`overlay.setOpen`) only once the
- * guest reports the surface is rendered, with `bounds: null` for a modal surface (full window) and
- * the popover's rectangle otherwise; it is lowered before the result is handed back, and focus goes
- * back to where it was.
+ * guest reports the surface is rendered, with `bounds: null` (the whole window) for everything but
+ * a hover card, which gets its own rectangle; it is lowered before the result is handed back, and
+ * focus goes back to where it was.
  */
 export function createOverlayHost(opts: OverlayHostOptions): OverlayHost {
   const store = createStore<OverlayHostState>({ open: null })
@@ -189,6 +198,12 @@ export function createOverlayHost(opts: OverlayHostOptions): OverlayHost {
     },
     closeAll(reason = 'closed') {
       if (current) finish(current, { status: 'dismissed', reason })
+    },
+    confirmSheet() {
+      const p = current
+      if (!p?.shown || !SHEETS.has(p.msg.surface) || !p.onEvent) return false
+      p.onEvent({ type: 'confirm' })
+      return true
     },
     justDismissed(surface, withinMs = 300) {
       return (

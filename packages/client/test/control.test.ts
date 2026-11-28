@@ -176,11 +176,22 @@ describe('the local item index', () => {
     expect(B.client.urlShare.forTab('b1')).toMatchObject({ status: 'ready', locations: [] })
 
     const invite = await C.client.spaces.createInvite()
-    // The link is opened in a tab: the engine reports it, and nothing is sent until B accepts.
+    // The link is opened in a tab: the engine reports it, B's client only previews it (DESIGN.md
+    // 15.3 item 18), and nothing is joined until B accepts.
     const before = B.requests.length
     B.bridge.emit('invite.open', { token: invite?.token as string })
-    expect(B.client.spaces.store.getState().pendingInvite).toEqual({ token: invite?.token })
-    expect(B.requests.length).toBe(before)
+    await waitFor(
+      () => B.client.spaces.store.getState().pendingInvite?.previewLoad.status === 'ready',
+      5000,
+      'invite preview',
+    )
+    expect(B.client.spaces.store.getState().pendingInvite).toMatchObject({
+      token: invite?.token,
+      preview: { spaceName: 'C only', memberCount: 1, itemCount: 1 },
+    })
+    expect(B.requests.slice(before).map((r) => `${r.method} ${r.path}`)).toEqual([
+      'POST /v1/invites/preview',
+    ])
     expect(await B.client.spaces.acceptPendingInvite()).not.toBeNull()
     expect(B.client.spaces.store.getState().pendingInvite).toBeNull()
     await waitFor(

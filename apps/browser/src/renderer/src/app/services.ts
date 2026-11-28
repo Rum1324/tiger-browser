@@ -2,6 +2,7 @@ import type { TigerClient } from '@tiger/client'
 import type { EngineBridge } from '@tiger/shared'
 import type { EngineState } from '../engine/engine-state'
 import { createFindModel, type FindModel } from '../features/find'
+import { createFocusRegions, type FocusRegions } from '../features/focus-regions'
 import { createNoticeModel, type NoticeModel } from '../features/notice'
 import { createOmniboxModel, type OmniboxModel } from '../features/omnibox'
 import { createPageShareModel, type PageShareModel } from '../features/page-share'
@@ -35,6 +36,8 @@ export interface AppServices {
   pageShare: PageShareModel
   /** The one transient message (15d). */
   notices: NoticeModel
+  /** `focus-next-region` across sidebar, toolbar, page and ask panel (null without a document). */
+  focusRegions: FocusRegions | null
   dispose(): void
 }
 
@@ -84,6 +87,14 @@ export function createAppServices(o: ServicesOptions): AppServices {
   })
 
   const notices = createNoticeModel({ engine: o.engine })
+  const focusRegions = doc
+    ? createFocusRegions({
+        doc,
+        bridge: o.bridge,
+        engine: o.engine,
+        overlayOpen: () => overlay.store.getState().open !== null,
+      })
+    : null
   const offs = [
     shortcuts.attach(o.bridge),
     doc ? overlay.attachToDocument(doc) : () => {},
@@ -106,6 +117,7 @@ export function createAppServices(o: ServicesOptions): AppServices {
     permissions,
     pageShare,
     notices,
+    focusRegions,
     dispose() {
       for (const off of offs) off()
       pageSlot.dispose()
@@ -115,6 +127,7 @@ export function createAppServices(o: ServicesOptions): AppServices {
       permissions.dispose()
       pageShare.dispose()
       notices.dispose()
+      focusRegions?.dispose()
     },
   }
 }

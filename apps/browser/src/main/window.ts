@@ -1,4 +1,10 @@
-import type { EngineEventName, EngineEventPayload, Rect, TabsState } from '@tiger/shared'
+import type {
+  EngineEventName,
+  EngineEventPayload,
+  Rect,
+  ShortcutAction,
+  TabsState,
+} from '@tiger/shared'
 import {
   BaseWindow,
   type BrowserWindowConstructorOptions,
@@ -22,6 +28,7 @@ interface ClosedTab {
 }
 
 const MAX_CLOSED = 25
+export const MIN_WINDOW = { width: 960, height: 600 } as const
 let nextWindowId = 1
 
 /**
@@ -52,6 +59,8 @@ export class EngineWindow {
    */
   private memberFullscreen = false
   private emitScheduled = false
+  private uiLoaded = false
+  private readonly uiLoadWaiters: (() => void)[] = []
   closed = false
 
   constructor(
@@ -63,8 +72,9 @@ export class EngineWindow {
     this.base = new BaseWindow({
       width: 1280,
       height: 820,
-      minWidth: 480,
-      minHeight: 360,
+      // DESIGN.md 15.3: below this the page card would be narrower than 532 px with the panel open.
+      minWidth: MIN_WINDOW.width,
+      minHeight: MIN_WINDOW.height,
       title: isPrivate ? 'Tiger (Private)' : 'Tiger',
       backgroundColor: '#ffffff',
       autoHideMenuBar: true,
@@ -109,6 +119,12 @@ export class EngineWindow {
 
     // The UI views hold the bridge: they must never show anything but our own UI. Links and
     // window.open from the UI are refused; the UI opens pages through tabs.create instead.
+    // Events sent before the UI's preload runs are lost; whoever must reach it waits for this.
+    this.uiWc.on('did-finish-load', () => {
+      this.uiLoaded = true
+      for (const fn of this.uiLoadWaiters.splice(0)) fn()
+    })
+
     for (const wc of [this.uiWc, this.overlayWc]) {
       wc.on('will-navigate', (e) => e.preventDefault())
       wc.on('will-frame-navigate', (e) => {
@@ -122,6 +138,26 @@ export class EngineWindow {
 
   emit<E extends EngineEventName>(event: E, payload: EngineEventPayload<E>): void {
     this.engine.sendEvent([this.uiWc, this.overlayWc], event, payload)
+  }
+
+  /** Run `fn` once this window's UI document has loaded (now, if it has). */
+  whenUiLoaded(fn: () => void): void {
+    if (this.closed) return
+    if (this.uiLoaded) fn()
+    else this.uiLoadWaiters.push(fn)
+  }
+
+  /**
+   * An application-menu shortcut for this window. `focus-next-region` pressed while the page has the
+   * keyboard first gives it to the UI view: Tab cannot leave a web page, and the UI, which decides
+   * the next region, can only move focus inside a view that has it.
+   */
+  shortcut(action: ShortcutAction): void {
+    if (action === 'focus-next-region') {
+      const tab = this.activeTab()
+      if (tab && !tab.destroyed && !tab.wc.isDestroyed() && tab.wc.isFocused()) this.uiWc.focus()
+    }
+    this.emit('shortcut', { action })
   }
 
   windowState(): EngineEventPayload<'window.state'> {
@@ -351,12 +387,24 @@ export class EngineWindow {
     this.layout()
   }
 
+  /**
+   * Raise or lower the overlay view. Full window (bounds null) is for every surface the member acts
+   * in, menus and popovers included: it takes the keyboard, and its transparent ground takes the
+   * clicks around the surface. Tight bounds are for hover cards, which never take focus.
+   */
   setOverlay(open: boolean, bounds: Rect | null): void {
+    const hadKeyboard = this.modalOverlayOpen()
     this.overlayOpen = open
     this.overlayBounds = open ? bounds : null
     this.layout()
-    if (open) this.overlayWc.focus()
-    else this.focusActive()
+    if (this.modalOverlayOpen()) this.overlayWc.focus()
+    else if (hadKeyboard) this.focusActive()
+    this.engine.menuStateChanged()
+  }
+
+  /** The overlay covers the whole window (a surface the member acts in is open). */
+  modalOverlayOpen(): boolean {
+    return this.overlayOpen && this.overlayBounds === null
   }
 
   /** The member's own fullscreen toggle. During HTML fullscreen it leaves fullscreen altogether. */

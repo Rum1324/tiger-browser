@@ -333,6 +333,7 @@ function citation(n: number, it: FixtureItem, quote: string, available = true): 
     n,
     itemId: it.item.id,
     itemVersionId: it.item.currentVersion.id,
+    versionNumber: it.item.currentVersion.number,
     title: it.item.title,
     url: it.item.url,
     sourceType: it.item.sourceType,

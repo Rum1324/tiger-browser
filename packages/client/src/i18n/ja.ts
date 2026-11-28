@@ -43,6 +43,9 @@ export const ja: Dictionary = {
   'error.internal': 'サーバーでエラーが起きました。しばらくしてからお試しください。',
   'error.network': 'サーバーに接続できません。ネットワークを確認してください。',
   'error.aborted': '中止しました。',
+  'error.send_failed': '送信できませんでした。もう一度送れます。',
+  'error.attachment_unconfirmed':
+    'AIの提供元が変わりました。添付したページを新しい提供元に送ってよいか、もう一度確認してください。',
 
   'capture.reason.incognito': 'プライベートウィンドウのページは共有できません。',
   'capture.reason.scheme': 'このページは共有できません。',

@@ -191,7 +191,7 @@ describe('Spaces, members, invites, activity', () => {
     const h = renderHook(w.services, () => useInvite())
     expect(h.result.current.pending).toBeNull()
     await settle(() => w.engine.emit('invite.open', { token: 'invite-token-abcdefghij' }))
-    expect(h.result.current.pending).toEqual({ token: 'invite-token-abcdefghij' })
+    expect(h.result.current.pending).toMatchObject({ token: 'invite-token-abcdefghij' })
     await settle(() => h.result.current.accept())
     expect(w.server.requests.find((r) => r.route === 'acceptInvite')?.body).toEqual({
       token: 'invite-token-abcdefghij',

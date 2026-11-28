@@ -103,6 +103,13 @@ export function createHandlers(engine: Engine): Handlers {
     'permission.respond': (req, win) =>
       engine.broker.respond(req.requestId, req.allow, req.remember, win.id),
 
+    // Each window lists and revokes the decisions its own sites use: a private window remembers none.
+    'permissions.list': (_req, win) => win.decisions.list(),
+    'permissions.revoke': (req, win) => {
+      win.decisions.revoke(req.origin, req.permission)
+      engine.broker.forget(req.origin, req.permission)
+    },
+
     'suggest.query': (req, win) => {
       const q = req.input.trim()
       return mergeSuggestions(req.input, {

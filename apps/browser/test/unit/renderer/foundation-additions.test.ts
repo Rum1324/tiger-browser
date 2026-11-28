@@ -125,18 +125,62 @@ describe('usePageShareActions: what the capsule can do', () => {
   })
 })
 
-describe('effectiveLayout: the window-width rules', () => {
+describe('effectiveLayout: the window-width rules (DESIGN.md 15.3 item 15)', () => {
   const prefs = { sidebarCollapsed: false, panelOpen: false }
-  it('wide as drawn; medium rails the sidebar only while the panel is open; narrow too', () => {
-    expect(effectiveLayout(prefs, 1440)).toEqual({ mode: 'wide', sidebar: 'open', panel: 'closed' })
-    expect(effectiveLayout({ ...prefs, panelOpen: true }, 1440).sidebar).toBe('open')
-    expect(effectiveLayout(prefs, 1000).sidebar).toBe('open')
-    expect(effectiveLayout({ ...prefs, panelOpen: true }, 1000)).toEqual({
+  const open = { ...prefs, panelOpen: true }
+  const page = (l: ReturnType<typeof effectiveLayout>, width: number) =>
+    width - l.sidebarWidth - (l.panel === 'open' ? l.panelWidth : 0) - 16
+
+  it('1280 and wider: sidebar 248 and panel 408 side by side', () => {
+    expect(effectiveLayout(prefs, 1440)).toEqual({
+      mode: 'wide',
+      sidebar: 'open',
+      panel: 'closed',
+      sidebarWidth: 248,
+      panelWidth: 408,
+    })
+    expect(effectiveLayout(open, 1280)).toMatchObject({
+      mode: 'wide',
+      sidebar: 'open',
+      sidebarWidth: 248,
+      panelWidth: 408,
+    })
+  })
+
+  it('1100 to 1279: the 52 px rail while the panel is open, panel 408', () => {
+    expect(effectiveLayout(prefs, 1200)).toMatchObject({ mode: 'medium', sidebar: 'open' })
+    expect(effectiveLayout(open, 1279)).toMatchObject({
       mode: 'medium',
       sidebar: 'rail',
-      panel: 'open',
+      sidebarWidth: 52,
+      panelWidth: 408,
     })
-    expect(effectiveLayout({ ...prefs, panelOpen: true }, 800).mode).toBe('narrow')
+    expect(effectiveLayout(open, 1100).mode).toBe('medium')
+  })
+
+  it('960 to 1099: rail and a 360 panel; the panel is always docked', () => {
+    expect(effectiveLayout(open, 1099)).toMatchObject({
+      mode: 'compact',
+      sidebar: 'rail',
+      sidebarWidth: 52,
+      panelWidth: 360,
+    })
+    expect(effectiveLayout(prefs, 960)).toMatchObject({ mode: 'compact', sidebar: 'open' })
     expect(effectiveLayout({ sidebarCollapsed: true, panelOpen: false }, 1440).sidebar).toBe('rail')
+  })
+
+  it('the page card is never narrower than 532, whatever the member dragged', () => {
+    for (const width of [960, 1000, 1099, 1100, 1180, 1279, 1280, 1300, 1440]) {
+      for (const p of [prefs, open]) {
+        const l = effectiveLayout({ ...p, sidebarWidth: 320, panelWidth: 520 }, width)
+        expect(page(l, width), `${width} ${p.panelOpen}`).toBeGreaterThanOrEqual(532)
+        expect(page(effectiveLayout(p, width), width)).toBeGreaterThanOrEqual(532)
+      }
+    }
+    // Dragged widths are kept where they fit.
+    expect(effectiveLayout({ ...open, sidebarWidth: 300, panelWidth: 480 }, 1600)).toMatchObject({
+      sidebarWidth: 300,
+      panelWidth: 480,
+    })
   })
 })

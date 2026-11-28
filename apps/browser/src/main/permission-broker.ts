@@ -104,6 +104,15 @@ export class PermissionBroker {
     for (const key of this.recent.keys()) if (key.startsWith(`${tabId} `)) this.recent.delete(key)
   }
 
+  /**
+   * A remembered decision was revoked: drop the short-lived answers for that origin and permission
+   * too, so the very next request asks the member again.
+   */
+  forget(origin: string, permission: SitePermission): void {
+    for (const key of this.recent.keys())
+      if (key.endsWith(` ${origin} ${permission}`)) this.recent.delete(key)
+  }
+
   pendingCount(): number {
     return this.pending.size
   }

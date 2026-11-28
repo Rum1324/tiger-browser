@@ -45,6 +45,23 @@ export function bindDefaultShortcuts(s: AppServices): () => void {
       if (id) void shareActions(s.client, s.overlay, activeId).present(id)
     }),
     s.shortcuts.on('find', () => s.find.open()),
+    // ⌘G with the find bar closed opens it on the last search, as browsers do.
+    s.shortcuts.on('find-next', () =>
+      s.find.store.getState().open ? s.find.next() : s.find.open(),
+    ),
+    s.shortcuts.on('find-previous', () =>
+      s.find.store.getState().open ? s.find.previous() : s.find.open(),
+    ),
+    s.shortcuts.on('reload', () => {
+      const id = activeId()
+      if (id) tabs.reload(id)
+    }),
+    s.shortcuts.on('reload-hard', () => {
+      const id = activeId()
+      if (id) tabs.reload(id, true)
+    }),
+    s.shortcuts.on('confirm-sheet', () => s.overlay.confirmSheet()),
+    s.shortcuts.on('focus-next-region', () => s.focusRegions?.next()),
     s.shortcuts.on('next-tab', () => tabs.cycle(1)),
     s.shortcuts.on('previous-tab', () => tabs.cycle(-1)),
     s.shortcuts.on('bookmark-tab', () => runCommand(s, 'bookmark')),

@@ -29,6 +29,7 @@ function citation(n: number, itemId = ITEM): Citation {
     n,
     itemId,
     itemVersionId: randomUUID(),
+    versionNumber: 1,
     title: `Source ${n}`,
     url: `https://example.com/${n}`,
     sourceType: 'web',

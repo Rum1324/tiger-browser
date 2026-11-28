@@ -154,8 +154,13 @@ describe('askAi pipeline', () => {
       status: 'complete',
       content: 'Revenue rose 12% [1].',
     })
+    // The Answerer gave no version number; the server filled it from the cited version.
     expect(completed.message.citations).toEqual([
-      { ...citationOf(1, item, 'Q3 revenue rose 12%'), available: true },
+      {
+        ...citationOf(1, item, 'Q3 revenue rose 12%'),
+        versionNumber: item.currentVersion.number,
+        available: true,
+      },
     ])
     expect(completed.usage).toEqual({
       inputTokens: 120,

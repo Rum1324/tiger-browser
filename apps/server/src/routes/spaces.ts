@@ -9,6 +9,7 @@ import {
   createSpace,
   getSpaceDetail,
   listSpaces,
+  previewInvite,
   removeMember,
   revokeInvite,
   updateSpace,
@@ -34,6 +35,13 @@ export function spaceRoutes(app: FastifyInstance): void {
     await revokeInvite(ctx, user, params.spaceId, params.inviteId)
     return ok
   })
+  registerRoute(
+    app,
+    api.previewInvite,
+    async ({ body }, { user }) => previewInvite(ctx, user, body.token),
+    // Same limit as accepting: a preview answers the same guess.
+    { rateLimitPerMinute: ctx.config.authRateLimitPerMinute },
+  )
   registerRoute(
     app,
     api.acceptInvite,

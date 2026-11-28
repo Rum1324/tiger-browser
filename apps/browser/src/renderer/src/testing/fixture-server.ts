@@ -183,6 +183,21 @@ export function createFixtureServer(world: FixtureWorld): FixtureServer {
       world.invites[r.params.spaceId as string] = list.filter((i) => i.id !== r.params.inviteId)
       return { ok: true }
     },
+    previewInvite: () => {
+      const s = world.spaces[2] as Space
+      const owner = world.members[s.id]?.[0]?.user
+      return {
+        spaceName: s.name,
+        hue: s.hue,
+        memberCount: (world.members[s.id] ?? []).length,
+        itemCount: world.items.filter((i) => i.item.spaceId === s.id).length,
+        invitedBy: owner
+          ? { id: owner.id, name: owner.name, avatarUrl: owner.avatarUrl }
+          : { id: me.id, name: me.name, avatarUrl: null },
+        expiresAt: new Date(NOW + 14 * 86_400_000).toISOString(),
+        emailRestricted: false,
+      }
+    },
     acceptInvite: () => world.spaces[2] as Space,
     removeMember: (r) => {
       const id = r.params.spaceId as string

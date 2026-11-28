@@ -3,7 +3,6 @@ import type { ContextMenuParams, MenuItemConstructorOptions } from 'electron'
 
 export interface AppMenuActions {
   shortcut(action: ShortcutAction): void
-  reload(ignoreCache: boolean): void
   back(): void
   forward(): void
   zoom(direction: 'in' | 'out' | 'reset'): void
@@ -15,7 +14,12 @@ interface ShortcutItem {
   action: ShortcutAction
   label: string
   accelerator: string
+  /** A second key for the same action, as a hidden menu item (a menu item holds one accelerator). */
+  alternate?: string
 }
+
+/** Enabled only while a full-window surface is open, so ⌘↵ in a page's own text field reaches the page. */
+export const SHEET_ONLY_ACTIONS: readonly ShortcutAction[] = ['confirm-sheet']
 
 /** Accelerators for the contract's shortcut actions; the UI decides what each one does. */
 export function shortcutItems(platform: NodeJS.Platform): ShortcutItem[] {
@@ -46,7 +50,31 @@ export function shortcutItems(platform: NodeJS.Platform): ShortcutItem[] {
     { action: 'open-history', label: 'History', accelerator: mac ? 'Cmd+Y' : 'Ctrl+H' },
     { action: 'open-downloads', label: 'Downloads', accelerator: mac ? 'Cmd+Shift+J' : 'Ctrl+J' },
     { action: 'open-settings', label: 'Settings', accelerator: 'CmdOrCtrl+,' },
+    { action: 'find-next', label: 'Find Next', accelerator: 'CmdOrCtrl+G' },
+    { action: 'find-previous', label: 'Find Previous', accelerator: 'CmdOrCtrl+Shift+G' },
+    { action: 'reload', label: 'Reload', accelerator: 'CmdOrCtrl+R' },
+    { action: 'reload-hard', label: 'Force Reload', accelerator: 'CmdOrCtrl+Shift+R' },
+    { action: 'confirm-sheet', label: 'Confirm', accelerator: 'CmdOrCtrl+Enter' },
+    {
+      action: 'focus-next-region',
+      label: 'Next Region',
+      accelerator: 'F6',
+      ...(mac ? { alternate: 'Ctrl+Cmd+Right' } : {}),
+    },
   ]
+}
+
+/** The parts of an Electron Menu that `syncMenuState` touches. */
+export interface MenuLike {
+  getMenuItemById(id: string): { enabled: boolean } | null
+}
+
+/** Follow the focused window: the sheet-only accelerators work while its overlay covers the window. */
+export function syncMenuState(menu: MenuLike | null, state: { modalOverlayOpen: boolean }): void {
+  for (const action of SHEET_ONLY_ACTIONS) {
+    const item = menu?.getMenuItemById(`shortcut:${action}`)
+    if (item) item.enabled = state.modalOverlayOpen
+  }
 }
 
 export function appMenuTemplate(
@@ -61,8 +89,24 @@ export function appMenuTemplate(
       id: `shortcut:${action}`,
       label: s.label,
       accelerator: s.accelerator,
+      ...(SHEET_ONLY_ACTIONS.includes(action) ? { enabled: false } : {}),
       click: () => actions.shortcut(action),
     }
+  }
+  /** The hidden twin carrying an action's second accelerator. */
+  const alt = (action: ShortcutAction): MenuItemConstructorOptions[] => {
+    const s = items.get(action) as ShortcutItem
+    if (!s.alternate) return []
+    return [
+      {
+        id: `shortcut:${action}:alternate`,
+        label: s.label,
+        accelerator: s.alternate,
+        visible: false,
+        acceleratorWorksWhenHidden: true,
+        click: () => actions.shortcut(action),
+      },
+    ]
   }
   const sep: MenuItemConstructorOptions = { type: 'separator' }
   return [
@@ -91,19 +135,15 @@ export function appMenuTemplate(
         sc('toggle-side-panel'),
         sc('toggle-space-home'),
         sc('find'),
+        sc('find-next'),
+        sc('find-previous'),
         sep,
-        {
-          id: 'reload',
-          label: 'Reload',
-          accelerator: 'CmdOrCtrl+R',
-          click: () => actions.reload(false),
-        },
-        {
-          id: 'force-reload',
-          label: 'Force Reload',
-          accelerator: 'CmdOrCtrl+Shift+R',
-          click: () => actions.reload(true),
-        },
+        sc('reload'),
+        sc('reload-hard'),
+        sep,
+        sc('focus-next-region'),
+        ...alt('focus-next-region'),
+        sc('confirm-sheet'),
         sep,
         {
           id: 'zoom-in',

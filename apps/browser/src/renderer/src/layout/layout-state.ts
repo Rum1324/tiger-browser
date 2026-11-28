@@ -52,34 +52,61 @@ export function createLayout(storage: PrefsStorage): Layout {
 }
 
 /**
- * Window-width rules of DESIGN.md section 4: from 1100 px everything is as drawn; from 960 to 1099
- * the sidebar becomes the rail while the ask panel is open and comes back when it closes; under
- * 960 the design floats the panel over the stage (`narrow`). Pure, from the member's choices and
- * the window's CSS width.
+ * Window-width rules of DESIGN.md 15.3 item 15. The window is never narrower than 960 (the engine's
+ * minimum) and the ask panel is always docked:
+ * - `wide`, 1280 and up: sidebar 248, panel 408 (or the widths the member dragged to).
+ * - `medium`, 1100 to 1279: the sidebar becomes the 52 px rail while the panel is open; panel 408.
+ * - `compact`, under 1100: the same rail while the panel is open, and the panel is 360.
+ * The page card never gets narrower than 532: a dragged width gives way first, panel before sidebar.
+ * Pure, from the member's choices and the window's CSS width.
  */
-export type LayoutMode = 'wide' | 'medium' | 'narrow'
-export const BREAKPOINTS = { medium: 960, wide: 1100 } as const
+export type LayoutMode = 'wide' | 'medium' | 'compact'
+export const BREAKPOINTS = { medium: 1100, wide: 1280 } as const
+export const LAYOUT_WIDTHS = {
+  sidebar: 248,
+  rail: 52,
+  panel: 408,
+  compactPanel: 360,
+  minPage: 532,
+  /** The stage's gutters around the page card (8 px each side). */
+  gutters: 16,
+} as const
 
 export interface EffectiveLayout {
   mode: LayoutMode
   sidebar: 'open' | 'rail'
   panel: 'open' | 'closed'
+  /** CSS px the sidebar column takes (the rail's width when railed). */
+  sidebarWidth: number
+  /** CSS px the panel column takes while open. */
+  panelWidth: number
 }
 
 export function effectiveLayout(
-  prefs: Pick<UiPrefs, 'sidebarCollapsed' | 'panelOpen'>,
+  prefs: Pick<UiPrefs, 'sidebarCollapsed' | 'panelOpen'> &
+    Partial<Pick<UiPrefs, 'sidebarWidth' | 'panelWidth'>>,
   windowWidth: number,
 ): EffectiveLayout {
+  const W = LAYOUT_WIDTHS
   const mode: LayoutMode =
     windowWidth >= BREAKPOINTS.wide
       ? 'wide'
       : windowWidth >= BREAKPOINTS.medium
         ? 'medium'
-        : 'narrow'
-  const railForPanel = mode !== 'wide' && prefs.panelOpen
+        : 'compact'
+  const rail = prefs.sidebarCollapsed || (mode !== 'wide' && prefs.panelOpen)
+  let sidebarWidth = rail ? W.rail : (prefs.sidebarWidth ?? W.sidebar)
+  let panelWidth = mode === 'compact' ? W.compactPanel : (prefs.panelWidth ?? W.panel)
+  const page = () => windowWidth - sidebarWidth - (prefs.panelOpen ? panelWidth : 0) - W.gutters
+  if (prefs.panelOpen && page() < W.minPage)
+    panelWidth = Math.max(PANEL_WIDTH.min, panelWidth - (W.minPage - page()))
+  if (!rail && page() < W.minPage)
+    sidebarWidth = Math.max(SIDEBAR_WIDTH.min, sidebarWidth - (W.minPage - page()))
   return {
     mode,
-    sidebar: prefs.sidebarCollapsed || railForPanel ? 'rail' : 'open',
+    sidebar: rail ? 'rail' : 'open',
     panel: prefs.panelOpen ? 'open' : 'closed',
+    sidebarWidth,
+    panelWidth,
   }
 }

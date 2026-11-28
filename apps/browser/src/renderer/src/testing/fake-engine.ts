@@ -12,6 +12,7 @@ import {
   engineEvents,
   type GoogleConnection,
   type Rect,
+  type RememberedPermission,
   type Settings,
   type Suggestion,
   type Tab,
@@ -43,6 +44,8 @@ export interface FakeEngineOptions {
   google?: GoogleConnection
   /** Validate every request and response against the contract (on by default). */
   validate?: boolean
+  /** Site-permission decisions the engine remembers (Settings lists them). */
+  permissions?: RememberedPermission[]
 }
 
 export interface RecordedCall {
@@ -70,6 +73,7 @@ export class FakeEngine implements EngineBridge {
   pageBounds: { bounds: Rect | null; cornerRadius: number } | null = null
   overlay: { open: boolean; bounds: Rect | null } = { open: false, bounds: null }
   findText = ''
+  permissions: RememberedPermission[]
   private listeners = new Map<EngineEventName, Set<(p: unknown) => void>>()
   private observers = new Set<() => void>()
   private nextTab = 1
@@ -86,6 +90,7 @@ export class FakeEngine implements EngineBridge {
     this.token = opts.token === undefined ? opts.world.token : opts.token
     this.downloads = structuredClone(opts.world.downloads)
     this.google = opts.google ?? { connected: false, email: null, configured: true }
+    this.permissions = (opts.permissions ?? []).map((p) => ({ ...p }))
     const privateWindow = opts.privateWindow ?? false
     const specs = opts.tabs ?? [{ page: '', active: true }]
     const tabs = specs.map((s) => this.makeTab(s, privateWindow))
@@ -382,6 +387,13 @@ export class FakeEngine implements EngineBridge {
         return undefined
       },
       'permission.respond': () => undefined,
+      'permissions.list': () => this.permissions.map((p) => ({ ...p })),
+      'permissions.revoke': ({ origin, permission }) => {
+        this.permissions = this.permissions.filter(
+          (p) => !(p.origin === origin && p.permission === permission),
+        )
+        return undefined
+      },
       'suggest.query': ({ input }) => this.suggestions(input),
       'downloads.list': () => this.downloads,
       'downloads.cancel': ({ id }) => {

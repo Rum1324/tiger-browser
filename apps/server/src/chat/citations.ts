@@ -217,6 +217,7 @@ export function sourceToCitation(s: ContextSource, quote: string): CitationInput
     n: s.n,
     itemId: s.itemId,
     itemVersionId: s.itemVersionId,
+    versionNumber: s.versionNumber,
     title: s.title,
     url: s.url,
     sourceType: s.sourceType,

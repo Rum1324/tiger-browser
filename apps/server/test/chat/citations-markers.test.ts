@@ -8,6 +8,7 @@ function source(n: number, text: string): ContextSource {
     n,
     itemId: `0190f000-0000-7000-8000-00000000000${n}`,
     itemVersionId: `0190f000-0000-7000-8000-00000000010${n}`,
+    versionNumber: 1,
     title: `Source ${n}`,
     url: `https://example.com/${n}`,
     sourceType: 'web',

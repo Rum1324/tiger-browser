@@ -11,6 +11,8 @@ export interface ContextSource {
   n: number
   itemId: string
   itemVersionId: string
+  /** The version's number as members know it (第n版). */
+  versionNumber: number
   title: string
   url: string
   sourceType: SourceType
@@ -65,6 +67,7 @@ const SOURCE_OVERHEAD_TOKENS = 60
 interface ItemRow {
   item_id: string
   version_id: string
+  version_number: number
   title: string
   url: string
   source_type: SourceType
@@ -85,16 +88,19 @@ export function createContextBuilder(deps: {
   const { sql } = deps
 
   const baseSelect = (spaceId: string) => sql`
-    select i.id as item_id, i.current_version_id as version_id, i.title, i.url, i.source_type,
-           i.shared_at, u.id as user_id, u.name as user_name, u.avatar_url
+    select i.id as item_id, i.current_version_id as version_id, cv.number as version_number,
+           i.title, i.url, i.source_type, i.shared_at, u.id as user_id, u.name as user_name,
+           u.avatar_url
     from items i
     join users u on u.id = i.shared_by
+    join item_versions cv on cv.id = i.current_version_id
     where i.space_id = ${spaceId} and i.current_version_id is not null
   `
   const toSource = (r: ItemRow, n: number, passages: ContextSource['passages']): ContextSource => ({
     n,
     itemId: r.item_id,
     itemVersionId: r.version_id,
+    versionNumber: r.version_number,
     title: r.title,
     url: r.url,
     sourceType: r.source_type,

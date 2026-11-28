@@ -39,10 +39,11 @@ const FOCUSABLE =
 
 /**
  * The overlay view's root. It draws the surface the host asked for and handles what every surface
- * shares: focus moves into the surface when it appears; Escape dismisses; in a full-window (modal)
- * surface a pointerdown outside the surface dismisses; a popover is dismissed when the overlay view
- * loses focus (the member clicked the page or the main view around it). Only then does it tell the
- * host the surface is shown, so the view is raised with the surface already painted.
+ * shares: focus moves into the surface when it appears; Escape dismisses. A dialog, sheet, menu or
+ * popover covers the window with a transparent ground: a pointerdown anywhere outside the surface
+ * dismisses it and is consumed, so the click does nothing else. A menu or popover also closes when
+ * the window loses focus. A hover card is only read: it takes no focus and is closed by the host.
+ * Only then does it tell the host the surface is shown, so the view is raised already painted.
  */
 export function OverlayRoot({
   guest,
@@ -74,7 +75,7 @@ export function OverlayRoot({
     if (!current || shownId.current === current.id) return
     shownId.current = current.id
     const root = surfaceRef.current
-    if (root) {
+    if (root && current.placement.mode !== 'hovercard') {
       const target =
         root.querySelector<HTMLElement>('[data-autofocus]') ??
         root.querySelector<HTMLElement>(FOCUSABLE) ??
@@ -94,12 +95,15 @@ export function OverlayRoot({
       }
     }
     const onPointer = (e: PointerEvent) => {
-      if (current.placement.mode !== 'modal') return
+      if (current.placement.mode === 'hovercard') return
       const root = surfaceRef.current
       if (root && e.target instanceof Node && root.contains(e.target)) return
+      // The ground takes the click: closing the menu is all it does.
+      e.preventDefault()
+      e.stopPropagation()
       guest.dismiss(id, 'outside')
     }
-    // A popover lives in a tight view: a click anywhere else moves focus away from this view.
+    // Switching to another app closes a menu or popover, as native menus do.
     let focused = document.hasFocus()
     const onFocus = () => {
       focused = true
@@ -121,20 +125,28 @@ export function OverlayRoot({
 
   if (!current || !api) return null
   const Component = surfaceComponent(current.surface)
-  const popover = current.placement.mode === 'popover'
+  const placement = current.placement
+  // A popover is drawn at its rectangle inside the full-window view; a hover card fills its view.
+  const at =
+    placement.mode === 'popover'
+      ? {
+          left: placement.bounds.x,
+          top: placement.bounds.y,
+          width: placement.bounds.width,
+          height: placement.bounds.height,
+        }
+      : undefined
   return (
-    <div
-      data-overlay-root=""
-      data-mode={current.placement.mode}
-      data-surface-name={current.surface}
-    >
-      {popover ? null : <div data-overlay-backdrop="" />}
+    <div data-overlay-root="" data-mode={placement.mode} data-surface-name={current.surface}>
+      {placement.mode === 'hovercard' ? null : <div data-overlay-backdrop="" />}
       <div
         ref={surfaceRef}
         data-overlay-surface=""
-        role="dialog"
-        aria-modal={popover ? undefined : true}
+        {...(placement.mode === 'hovercard'
+          ? { role: 'tooltip' }
+          : { role: 'dialog', 'aria-modal': placement.mode === 'modal' ? true : undefined })}
         tabIndex={-1}
+        style={at}
       >
         <SurfaceContext.Provider value={api}>
           {Component ? <Component key={current.id} /> : (fallback?.(current.surface) ?? null)}

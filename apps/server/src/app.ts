@@ -13,6 +13,7 @@ import { SlidingWindowLimiter } from './http/limiter'
 import { RealtimeHub } from './realtime/hub'
 import { websocketRoute } from './realtime/ws'
 import { authRoutes } from './routes/auth'
+import { invitePageRoute } from './routes/invite-page'
 import { itemRoutes } from './routes/items'
 import { metaRoutes } from './routes/meta'
 import { spaceRoutes } from './routes/spaces'
@@ -120,6 +121,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
 
   await app.register(async (scope) => {
     metaRoutes(scope)
+    invitePageRoute(scope)
     authRoutes(scope)
     spaceRoutes(scope)
     itemRoutes(scope)

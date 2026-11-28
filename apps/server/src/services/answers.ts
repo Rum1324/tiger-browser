@@ -9,10 +9,13 @@ import {
 import type { AppContext, RunningAnswer } from '../context'
 import type { Sql, TxSql } from '../db/sql'
 import { AnswerError, type AttachmentContent, type CitationInput } from '../seams'
-import { getMessage, type StoredCitation } from './rows'
+import { getMessage, type StoredCitation, UNKNOWN_VERSION_NUMBER, versionNumbers } from './rows'
 import { recordUsage, releaseReservation } from './usage'
 
-const StoredCitationSchema = Citation.omit({ available: true })
+/** versionNumber is optional here: it is taken from the database, and older rows lack it. */
+const CitationInputSchema = Citation.omit({ available: true }).extend({
+  versionNumber: Citation.shape.versionNumber.optional(),
+})
 
 export interface RunAnswerParams {
   thread: Thread
@@ -40,9 +43,9 @@ export async function settleCitations(
   input: CitationInput[],
   lock = false,
 ): Promise<{ stored: StoredCitation[]; live: Set<string> }> {
-  const parsed: StoredCitation[] = []
+  const parsed: CitationInput[] = []
   for (const c of input) {
-    const r = StoredCitationSchema.safeParse({ ...c, quote: (c.quote ?? '').slice(0, 600) })
+    const r = CitationInputSchema.safeParse({ ...c, quote: (c.quote ?? '').slice(0, 600) })
     if (r.success) parsed.push(r.data)
   }
   const ids = [...new Set(parsed.map((c) => c.itemId))]
@@ -66,9 +69,19 @@ export async function settleCitations(
       `
     ).map((r) => r.target_id),
   )
-  const stored = parsed
-    .filter((c) => live.has(c.itemId) || tombstoned.has(c.itemId))
-    .map((c) => (live.has(c.itemId) ? c : { ...c, quote: '' }))
+  // The number members know a version by comes from the database, never from the Answerer. A live
+  // item's citation must name one of its versions; an unshared item's versions are gone, so its
+  // citation keeps the number it already recorded.
+  const numbers = await versionNumbers(sql, parsed)
+  const stored: StoredCitation[] = []
+  for (const c of parsed) {
+    if (live.has(c.itemId)) {
+      const versionNumber = numbers.get(c.itemVersionId)
+      if (versionNumber !== undefined) stored.push({ ...c, versionNumber })
+    } else if (tombstoned.has(c.itemId)) {
+      stored.push({ ...c, quote: '', versionNumber: c.versionNumber ?? UNKNOWN_VERSION_NUMBER })
+    }
+  }
   return { stored, live }
 }
 

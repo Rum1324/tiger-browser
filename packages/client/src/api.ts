@@ -16,10 +16,17 @@ import {
  */
 
 /**
- * Codes the client can report on top of the server's: `network` (no HTTP response at all) and
- * `aborted` (the caller cancelled). Everything else is an ApiErrorCode from the server.
+ * Codes the client can report on top of the server's: `network` (no HTTP response at all),
+ * `aborted` (the caller cancelled), `send_failed` (a message got no response and the thread, read
+ * again, does not have it), and `attachment_unconfirmed` (a page attachment was not confirmed for
+ * the provider of the model that would read it). Everything else is an ApiErrorCode from the server.
  */
-export type ClientErrorCode = ApiErrorCode | 'network' | 'aborted'
+export type ClientErrorCode =
+  | ApiErrorCode
+  | 'network'
+  | 'aborted'
+  | 'send_failed'
+  | 'attachment_unconfirmed'
 
 /**
  * `server`: the server answered with an error body. `network`: no response (offline, DNS, refused).

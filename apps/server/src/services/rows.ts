@@ -19,7 +19,7 @@ import type {
   User,
   UserRef,
 } from '@tiger/shared'
-import type { Fragment, Sql } from '../db/sql'
+import type { Fragment, Sql, TxSql } from '../db/sql'
 
 /**
  * Row types and row → contract mappers. Timestamps come back from postgres.js as Date and leave as
@@ -231,6 +231,35 @@ export function selectThreads(sql: Sql, where: Fragment) {
 /** A citation as stored in messages.citations: `available` is computed on read. */
 export type StoredCitation = Omit<Citation, 'available'>
 
+/**
+ * The number a citation shows when its version no longer exists (the item was unshared, which deletes
+ * its versions, before the citation recorded its number). Such a citation is unavailable, and an
+ * unavailable citation is shown without name, date or version.
+ */
+export const UNKNOWN_VERSION_NUMBER = 1
+
+/**
+ * Version numbers of the given item versions, keyed by version id. A version only counts under the
+ * item the citation names, so a citation cannot borrow another item's number.
+ */
+export async function versionNumbers(
+  sql: Sql | TxSql,
+  cited: { itemId: string; itemVersionId: string }[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>()
+  if (cited.length === 0) return out
+  const rows = await sql<{ id: string; item_id: string; number: number }[]>`
+    select id, item_id, number from item_versions
+    where id = any(${[...new Set(cited.map((c) => c.itemVersionId))]}::uuid[])
+  `
+  const owner = new Map(rows.map((r) => [r.id, r]))
+  for (const c of cited) {
+    const row = owner.get(c.itemVersionId)
+    if (row && row.item_id === c.itemId) out.set(c.itemVersionId, row.number)
+  }
+  return out
+}
+
 export interface MessageRow {
   id: string
   thread_id: string
@@ -273,7 +302,15 @@ export function selectMessages(sql: Sql, where: Fragment, tail?: Fragment) {
  */
 export async function toMessages(sql: Sql, rows: MessageRow[]): Promise<Message[]> {
   const cited = new Set<string>()
-  for (const r of rows) for (const c of r.citations) cited.add(c.itemId)
+  // Citations written before versionNumber existed are completed from their item version.
+  const legacy: StoredCitation[] = []
+  for (const r of rows) {
+    for (const c of r.citations) {
+      cited.add(c.itemId)
+      if (typeof c.versionNumber !== 'number') legacy.push(c)
+    }
+  }
+  const legacyNumbers = await versionNumbers(sql, legacy)
   const existing = new Set<string>()
   if (cited.size > 0) {
     const found = await sql<{ id: string }[]>`
@@ -293,7 +330,11 @@ export async function toMessages(sql: Sql, rows: MessageRow[]): Promise<Message[
     content: r.content,
     citations: r.citations.map((c) => {
       const available = existing.has(c.itemId)
-      return { ...c, quote: available ? c.quote : '', available }
+      const versionNumber =
+        typeof c.versionNumber === 'number'
+          ? c.versionNumber
+          : (legacyNumbers.get(c.itemVersionId) ?? UNKNOWN_VERSION_NUMBER)
+      return { ...c, versionNumber, quote: available ? c.quote : '', available }
     }),
     attachments: r.attachments,
     status: r.status as Message['status'],

@@ -23,6 +23,8 @@ export const MESSAGE_KEYS = [
   ...prefixed('error.', API_ERROR_CODES),
   'error.network',
   'error.aborted',
+  'error.send_failed',
+  'error.attachment_unconfirmed',
   ...prefixed('capture.reason.', CAPTURE_BLOCK_REASONS),
   ...prefixed('capture.error.', CAPTURE_ERRORS),
   ...prefixed('connection.', CONNECTION_STATES),

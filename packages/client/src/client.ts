@@ -18,6 +18,7 @@ import { createSession, type SessionController } from './stores/session'
 import { createShareFlow, type ShareFlowController } from './stores/share'
 import { createShareThreadFlow, type ShareThreadController } from './stores/share-thread'
 import { createSpaces, type SpacesController } from './stores/spaces'
+import { createStaleness, type StalenessController } from './stores/staleness'
 import { createThreads, type ThreadsController } from './stores/threads'
 
 export interface TigerClientOptions {
@@ -33,6 +34,8 @@ export interface TigerClientOptions {
   realtime?: { baseBackoffMs?: number; maxBackoffMs?: number; heartbeatMs?: number }
   /** How long a gap in a streaming answer may last before it is repaired by a refetch. */
   gapRepairMs?: number
+  /** Clock for the staleness policy (tests). */
+  now?: () => number
 }
 
 export interface UiState {
@@ -51,6 +54,11 @@ export interface TigerClient {
   items: ItemsController
   urlShare: UrlShareController
   share: ShareFlowController
+  /**
+   * When shared pages are compared with the open page (DESIGN.md 15.2 item 9). Tab activation is
+   * wired here; the UI calls `request(tabId, 'surface-opened' | 'explicit')`.
+   */
+  staleness: StalenessController
   /** Share a private thread with the Space as a new Space thread, deciding each attached question. */
   shareThread: ShareThreadController
   threads: ThreadsController
@@ -134,6 +142,19 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
       urlShare.applyItem(result.item)
     },
   })
+  const staleness = createStaleness({
+    tabUrl: (tabId) => urlShare.store.getState().tabs[tabId] ?? null,
+    isShared: (url) => {
+      const spaceId = spaces.store.getState().currentSpaceId
+      return spaceId !== null && urlShare.inSpace(url, spaceId) !== null
+    },
+    check: (tabId) => share.checkStale(tabId),
+    ...(opts.now ? { now: opts.now } : {}),
+  })
+  // Attachments are confirmed for one company: a model of another company needs a new confirmation.
+  models.store.subscribe((s, prev) => {
+    if (s.selected?.provider !== prev.selected?.provider) threads.modelChanged(s.selected)
+  })
   const shareThread = createShareThreadFlow(ctx, {
     thread: (threadId) => threads.thread(threadId),
     // The socket event follows; applying the answer now shows the new Space thread at once.
@@ -162,6 +183,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
       activity.reset()
       models.reset()
       share.reset()
+      staleness.reset()
       shareThread.reset()
       // Tab URLs stay known; their share state is cleared because it was the old member's view.
       const tabs = urlShare.store.getState().tabs
@@ -206,6 +228,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
     items,
     urlShare,
     share,
+    staleness,
     shareThread,
     threads,
     models,
@@ -225,6 +248,8 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
         bridge.on('settings.changed', (s) => ui.setState({ locale: s.locale })),
         bridge.on('invite.open', ({ token }) => spaces.offerInvite(token)),
         urlShare.attachTabs(),
+        // After attachTabs, so the tab's URL is known when its activation is checked.
+        bridge.on('tabs.changed', (s) => staleness.tabsChanged(s.tabs, s.activeTabId)),
         google.attach(),
       )
       void google.refresh()

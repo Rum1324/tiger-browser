@@ -292,6 +292,87 @@ describe('permissions', () => {
     const asked = await events<PermissionRequest>('permission.request')
     expect(asked.map((r) => r.permission).sort()).toEqual(['geolocation', 'notifications'])
   })
+
+  it('a private window remembers nothing and lists nothing', async () => {
+    const before = t.uiPages().length
+    await t.invoke('window.create', { private: true })
+    const priv = await waitFor(() => t.uiPages()[before], 15_000, 'private window UI')
+    await priv.waitForFunction(() => typeof window.tiger?.invoke === 'function')
+    await priv.evaluate(() => {
+      const w = window as unknown as { __asked: PermissionRequest[] }
+      w.__asked = []
+      window.tiger.on('permission.request', (r: PermissionRequest) => w.__asked.push(r))
+    })
+    const asked = () =>
+      priv.evaluate(() => (window as unknown as { __asked: PermissionRequest[] }).__asked)
+    const s = await t.tabsState(priv)
+    const id = s.activeTabId as string
+    const privUrl = url('/perm?private=1')
+    await t.invokeFrom(priv, 'tabs.navigate', { tabId: id, input: privUrl })
+    await waitForTab(t, id, (x) => x.title === 'Permissions' && !x.isLoading, 'private perm', priv)
+    const privPage = await t.tabPage((u) => u === privUrl)
+    // The normal window's remembered allow does not reach the private window.
+    expect(await privPage.evaluate(() => Notification.permission)).toBe('default')
+    void privPage.evaluate(() => {
+      ;(window as unknown as { __p: Promise<string> }).__p = Notification.requestPermission()
+    })
+    const req = await waitFor(async () => (await asked())[0], 10_000, 'private prompt')
+    await t.invokeFrom(priv, 'permission.respond', {
+      requestId: req.requestId,
+      allow: true,
+      remember: true,
+    })
+    expect(await t.invokeFrom(priv, 'permissions.list')).toEqual([])
+    await t.invokeFrom(priv, 'tabs.reload', { tabId: id })
+    await waitForTab(t, id, (x) => !x.isLoading, 'private reloaded', priv)
+    const reloaded = await t.tabPage((u) => u === privUrl)
+    expect(await reloaded.evaluate(() => Notification.permission)).toBe('default')
+    // The normal window still has its own decision.
+    expect(await t.invoke('permissions.list')).toHaveLength(1)
+    await t.invokeFrom(priv, 'window.action', { action: 'close' })
+    await waitFor(() => t.uiPages().length === before, 10_000, 'private window closed')
+  })
+
+  it('lists the remembered decision; revoking it makes the site ask again', async () => {
+    const origin = `http://127.0.0.1:${server.port}`
+    expect(await t.invoke('permissions.list')).toEqual([
+      { origin, permission: 'notifications', allow: true, decidedAt: expect.any(String) },
+    ])
+    await t.invoke('permissions.revoke', { origin, permission: 'notifications' })
+    expect(await t.invoke('permissions.list')).toEqual([])
+
+    const s = await t.tabsState()
+    const id = s.activeTabId as string
+    await t.invoke('tabs.reload', { tabId: id })
+    await waitForTab(t, id, (x) => !x.isLoading, 'reloaded after revoke')
+    const page = await t.tabPage((u) => u === url('/perm'))
+    expect(await page.evaluate(() => Notification.permission)).toBe('default')
+    const asked = async () =>
+      (await events<PermissionRequest>('permission.request')).filter(
+        (r) => r.permission === 'notifications',
+      )
+    const before = (await asked()).length
+    void page.evaluate(() => {
+      ;(window as unknown as { __again: Promise<string> }).__again =
+        Notification.requestPermission()
+    })
+    const req = await waitFor(
+      async () => {
+        const list = await asked()
+        return list.length > before ? list.at(-1) : null
+      },
+      10_000,
+      'asked again',
+    )
+    await t.invoke('permission.respond', {
+      requestId: req.requestId,
+      allow: false,
+      remember: false,
+    })
+    expect(
+      await page.evaluate(() => (window as unknown as { __again: Promise<string> }).__again),
+    ).toBe('denied')
+  })
 })
 
 describe('menus, clipboard and export', () => {

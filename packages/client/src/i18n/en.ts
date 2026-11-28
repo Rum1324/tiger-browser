@@ -41,6 +41,9 @@ export const en: Dictionary = {
   'error.internal': 'Something went wrong on the server. Please try again later.',
   'error.network': 'Cannot reach the server. Check your connection.',
   'error.aborted': 'Cancelled.',
+  'error.send_failed': "Couldn't send the message. You can send it again.",
+  'error.attachment_unconfirmed':
+    'The AI provider changed. Confirm again that the attached pages may go to the new provider.',
 
   'capture.reason.incognito': 'Pages in a private window cannot be shared.',
   'capture.reason.scheme': 'This page cannot be shared.',

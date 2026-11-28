@@ -379,6 +379,7 @@ describe('unshareItem', () => {
       n,
       itemId: item.id,
       itemVersionId: item.currentVersion.id,
+      versionNumber: item.currentVersion.number,
       title: item.title,
       url: item.url,
       sourceType: 'web',

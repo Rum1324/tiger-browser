@@ -7,7 +7,7 @@ import {
   WebContentsView,
 } from 'electron'
 import { eligibilityFor } from './capture'
-import { inviteTokenFromUrl } from './invite'
+import { inviteTokenFromAppLink, inviteTokenFromUrl } from './invite'
 import { pageMenuTemplate } from './menus'
 import { isWebUrl } from './resolve-input'
 import type { EngineWindow } from './window'
@@ -137,7 +137,11 @@ export class TabController {
    * accept it. The token is never sent anywhere by the engine.
    */
   private interceptInvite(url: string): boolean {
-    const token = inviteTokenFromUrl(url, this.window.engine.settings.get().serverUrl)
+    // `tiger://invite/<token>` too: a page can link to it, but all it gets is the same accept
+    // dialog the member must answer; nothing is joined on the page's behalf.
+    const token =
+      inviteTokenFromUrl(url, this.window.engine.settings.get().serverUrl) ??
+      inviteTokenFromAppLink(url)
     if (!token) return false
     this.window.emit('invite.open', { token })
     return true
@@ -164,7 +168,7 @@ export class TabController {
     const engine = this.window.engine
 
     wc.setWindowOpenHandler(({ url, disposition }) => {
-      if (!frameUrlAllowed(url) || this.interceptInvite(url)) return { action: 'deny' }
+      if (this.interceptInvite(url) || !frameUrlAllowed(url)) return { action: 'deny' }
       // 'allow' with createWindow keeps window.opener, which OAuth popups post their result through.
       return {
         action: 'allow',
@@ -178,15 +182,17 @@ export class TabController {
     })
 
     wc.on('will-navigate', (e) => {
-      if (!isWebUrl(e.url)) e.preventDefault()
-      else if (e.isMainFrame && this.interceptInvite(e.url)) e.preventDefault()
+      if (!isWebUrl(e.url)) {
+        e.preventDefault()
+        if (e.isMainFrame) this.interceptInvite(e.url)
+      } else if (e.isMainFrame && this.interceptInvite(e.url)) e.preventDefault()
     })
     wc.on('will-frame-navigate', (e) => {
       if (!frameUrlAllowed(e.url)) e.preventDefault()
     })
     wc.on('will-redirect', (e) => {
-      if (!frameUrlAllowed(e.url)) e.preventDefault()
-      else if (e.isMainFrame && this.interceptInvite(e.url)) e.preventDefault()
+      if (e.isMainFrame && this.interceptInvite(e.url)) e.preventDefault()
+      else if (!frameUrlAllowed(e.url)) e.preventDefault()
     })
 
     wc.on('did-start-loading', () => {

@@ -51,7 +51,8 @@ export function answerToMarkdown(
   if (citations.length === 0) return text
   const lines = [...citations]
     .sort((a, b) => a.n - b.n)
-    .map((c) => `[${c.n}] ${c.title} <${c.url}>${c.available ? '' : ' (unshared)'}`)
+    // An unshared source is listed by number only: no name, address or date (DESIGN.md 15.2).
+    .map((c) => (c.available ? `[${c.n}] ${c.title} <${c.url}>` : `[${c.n}] (unshared)`))
   return `${text.trimEnd()}\n\n## ${sourcesHeading}\n\n${lines.join('\n')}\n`
 }
 

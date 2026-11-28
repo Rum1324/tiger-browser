@@ -1,6 +1,7 @@
 import {
   api,
   type Invite,
+  type InvitePreview,
   type ServerEvent,
   type Space,
   type SpaceHue,
@@ -36,10 +37,19 @@ export interface SpacesState {
   /** State of the last mutation (create, rename, invite, accept...), for buttons and toasts. */
   mutation: Load
   /**
-   * An invite link the member opened in a tab (engine `invite.open`), waiting for them to accept
-   * or dismiss it. Nothing is sent until `acceptPendingInvite()`.
+   * An invite the member opened (engine `invite.open`) or pasted (`previewInvite`), waiting for them
+   * to accept it or put it aside. `preview` is what the server says about it (Space name, colour,
+   * size, who invited, expiry) once `previewLoad` is ready; a refused token reads as a failed
+   * `previewLoad` with the same error accepting would give. Nothing is joined until
+   * `acceptPendingInvite()`.
    */
-  pendingInvite: { token: string } | null
+  pendingInvite: PendingInvite | null
+}
+
+export interface PendingInvite {
+  token: string
+  preview: InvitePreview | null
+  previewLoad: Load
 }
 
 export interface SpacesController {
@@ -57,7 +67,12 @@ export interface SpacesController {
   revokeInvite(inviteId: string): Promise<boolean>
   /** Accepts a pasted invite link or bare token, then switches to the joined Space. */
   acceptInvite(linkOrToken: string): Promise<Space | null>
-  /** The engine reported an opened invite link: hold it until the member decides. */
+  /**
+   * Look at an invite before joining: holds it as `pendingInvite` and loads its preview. Accepts a
+   * pasted link or bare token; resolves to the preview, or null when the token is refused.
+   */
+  previewInvite(linkOrToken: string): Promise<InvitePreview | null>
+  /** The engine reported an opened invite link: hold it and load its preview until the member decides. */
   offerInvite(token: string): void
   acceptPendingInvite(): Promise<Space | null>
   dismissPendingInvite(): void
@@ -251,9 +266,36 @@ export function createSpaces(ctx: ClientContext, hooks: SpacesHooks): SpacesCont
       return space
     },
 
+    async previewInvite(linkOrToken) {
+      const token = parseInviteToken(linkOrToken)
+      if (!token) {
+        store.setState({
+          mutation: failed(new ApiClientError('client', 'invite_not_found', 'no invite token')),
+        })
+        return null
+      }
+      store.setState({ pendingInvite: { token, preview: null, previewLoad: LOADING } })
+      // A later invite (or putting this one aside) wins over a preview that arrives late.
+      const stillPending = () => store.getState().pendingInvite?.token === token
+      try {
+        const preview = await ctx.api.call(api.previewInvite, { body: { token } })
+        if (stillPending()) {
+          store.setState({ pendingInvite: { token, preview, previewLoad: READY } })
+        }
+        return preview
+      } catch (e) {
+        if (stillPending()) {
+          store.setState({
+            pendingInvite: { token, preview: null, previewLoad: failed(toClientError(e)) },
+          })
+        }
+        return null
+      }
+    },
+
     offerInvite(token) {
-      const parsed = parseInviteToken(token)
-      if (parsed) store.setState({ pendingInvite: { token: parsed } })
+      // A link with nothing token-shaped in it is ignored, as before: there is nothing to offer.
+      if (parseInviteToken(token)) void controller.previewInvite(token)
     },
 
     async acceptPendingInvite() {

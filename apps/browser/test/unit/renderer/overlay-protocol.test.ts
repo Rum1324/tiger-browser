@@ -70,7 +70,7 @@ describe('overlay protocol', () => {
     expect(guest.store.getState().current).toBeNull()
   })
 
-  it('popover: a tight rectangle next to its anchor, flipped when it does not fit', async () => {
+  it('popover: drawn next to its anchor on a full-window overlay, flipped when it does not fit', async () => {
     const { host, guest, setOpen } = setup()
     host.open(
       'downloads',
@@ -85,7 +85,8 @@ describe('overlay protocol', () => {
     await tick()
     guest.shown('s1')
     await tick()
-    expect(setOpen[0]).toEqual({ open: true, bounds: { x: 1052, y: 44, width: 360, height: 420 } })
+    // DESIGN.md 15.3 item 14: the overlay covers the window, so a click outside lands on its ground.
+    expect(setOpen[0]).toEqual({ open: true, bounds: null })
     expect(guest.store.getState().current?.placement).toEqual({
       mode: 'popover',
       bounds: { x: 1052, y: 44, width: 360, height: 420 },

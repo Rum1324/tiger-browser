@@ -3,6 +3,7 @@ import {
   type ReactNode,
   useCallback,
   useLayoutEffect,
+  useMemo,
   useRef,
   useSyncExternalStore,
 } from 'react'
@@ -30,19 +31,18 @@ import './layout.css'
  * `data-surface` for layout. The overlay layer is a separate view (overlay/), not a region here.
  */
 export function WindowFrame({ children }: { children: ReactNode }) {
-  const { client, engine, layout } = useServices()
+  const { client, engine } = useServices()
   const hue = useStore(
     client.spaces.store,
     (s) => s.list.find((x) => x.id === s.currentSpaceId)?.hue ?? null,
   )
   const privateWindow = useStore(engine.tabs, (s) => s.value?.privateWindow ?? false)
-  const { mode, sidebar, panel } = useEffectiveLayout()
-  const sidebarWidth = useStore(layout.store, (s) => s.sidebarWidth)
-  const panelWidth = useStore(layout.store, (s) => s.panelWidth)
+  const { mode, sidebar, panel, sidebarWidth, panelWidth } = useEffectiveLayout()
   const { surface } = useSurface()
-  const style: CSSProperties & Record<string, string> = {}
-  if (sidebarWidth) style['--sidebar-width'] = `${sidebarWidth}px`
-  if (panelWidth) style['--panel-width'] = `${panelWidth}px`
+  const style: CSSProperties & Record<string, string> = {
+    '--sidebar-width': `${sidebarWidth}px`,
+    '--panel-width': `${panelWidth}px`,
+  }
   return (
     <div
       data-region="window"
@@ -155,8 +155,13 @@ export function useEffectiveLayout() {
   const { layout } = useServices()
   const sidebarCollapsed = useStore(layout.store, (s) => s.sidebarCollapsed)
   const panelOpen = useStore(layout.store, (s) => s.panelOpen)
+  const sidebarWidth = useStore(layout.store, (s) => s.sidebarWidth)
+  const panelWidth = useStore(layout.store, (s) => s.panelWidth)
   const width = useWindowWidth()
-  return effectiveLayout({ sidebarCollapsed, panelOpen }, width)
+  return useMemo(
+    () => effectiveLayout({ sidebarCollapsed, panelOpen, sidebarWidth, panelWidth }, width),
+    [sidebarCollapsed, panelOpen, sidebarWidth, panelWidth, width],
+  )
 }
 
 /** Re-measure after a layout change made outside React state (a drag that resizes a column). */
