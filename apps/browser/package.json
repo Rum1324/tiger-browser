@@ -13,7 +13,11 @@
     "test:e2e": "electron-vite build && xvfb-run -a --server-args='-screen 0 1600x1000x24' vitest run -c vitest.e2e.config.ts",
     "package": "electron-vite build && electron-builder",
     "package:dir": "electron-vite build && electron-builder --dir",
-    "test:package": "electron-vite build && electron-builder --dir && xvfb-run -a node test/package/smoke.mts"
+    "test:package": "electron-vite build && electron-builder --dir && xvfb-run -a node test/package/smoke.mts",
+    "rig": "vite --config rig.vite.config.ts --open /rig.html?screen=app/page-fresh",
+    "rig:shots": "tsx test/rig/shots.mts",
+    "test:rig": "vitest run -c vitest.rig.config.ts",
+    "tokens:sync": "node -e \"require('node:fs').copyFileSync('../../design/final/tokens.css','src/renderer/src/theme/tokens.css')\""
   },
   "devDependencies": {
     "@tiger/client": "workspace:*",
