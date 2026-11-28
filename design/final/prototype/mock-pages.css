@@ -486,3 +486,31 @@
 .m-chat-new { align-self: stretch; display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-12); color: var(--mock-crimson); font-weight: 600; }
 .m-chat-new::before, .m-chat-new::after { content: ""; flex: 1; height: 1px; background: var(--mock-crimson); opacity: 0.5; }
 .m-chat-box { flex: none; margin: 0 var(--sp-7) var(--sp-7); height: 76px; border-radius: var(--r-control); border: 1px solid var(--mock-line); padding: var(--sp-5); color: var(--mock-ink-2); }
+
+/* ── part 2: a meeting page (dark, asks for the microphone), a PDF viewer, find highlights ── */
+.m-meet { height: 100%; display: flex; flex-direction: column; color-scheme: dark; background: var(--mock-black); color: var(--mock-white); }
+.m-meet-bar { flex: none; height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--sp-8); }
+.m-meet-brand { display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-15); font-weight: 600; }
+.m-meet-user { font-size: var(--fs-12); color: var(--mock-on-black-2); }
+.m-meet-body { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 56px; align-items: center; padding: 0 72px 88px; }
+.m-meet-stage { position: relative; aspect-ratio: 16 / 10; display: grid; place-items: center; align-content: center; gap: var(--sp-5); border-radius: 12px; background: var(--mock-black-2); }
+.m-meet-av { width: 88px; height: 88px; display: grid; place-items: center; border-radius: var(--r-round); background: var(--mock-teal); font-size: 34px; font-weight: 600; }
+.m-meet-stage p { font-size: var(--fs-13); color: var(--mock-on-black-2); }
+.m-meet-ctl { position: absolute; left: 0; right: 0; bottom: 20px; display: flex; justify-content: center; gap: var(--sp-6); }
+.m-meet-ctl i { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r-round); background: var(--mock-red); color: var(--mock-white); }
+.m-meet-side h1 { font-size: 24px; font-weight: 400; line-height: 1.4; }
+.m-meet-side p { margin-top: var(--sp-4); font-size: 14px; color: var(--mock-on-black-2); }
+.m-meet-quiet { margin-top: var(--sp-8) !important; }
+.m-meet-join { margin-top: var(--sp-6); display: inline-flex; align-items: center; height: 44px; padding: 0 28px; border-radius: var(--r-round); background: var(--mock-blue); font-size: 14px; font-weight: 600; }
+.m-meet-alt { margin-left: var(--sp-6); font-size: 14px; color: var(--mock-blue-wash); }
+
+.m-pdf { height: 100%; display: flex; flex-direction: column; color-scheme: light; background: var(--mock-fill); color: var(--mock-ink); }
+.m-pdf-bar { flex: none; height: 48px; display: flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-7); background: var(--mock-black-2); color: var(--mock-white); font-size: var(--fs-13); }
+.m-pdf-name { display: flex; align-items: center; gap: var(--sp-4); font-weight: 600; }
+.m-pdf-page { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--mock-on-black-2); }
+.m-pdf-tools { display: flex; gap: var(--sp-5); color: var(--mock-on-black-2); }
+.m-pdf-canvas { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: var(--sp-7) 0 0; }
+.m-pdf .m-sheet { font-family: var(--mock-serif); }
+
+mark.m-find { background: var(--mock-find); color: inherit; }
+mark.m-find.is-active { background: var(--mock-find-active); }

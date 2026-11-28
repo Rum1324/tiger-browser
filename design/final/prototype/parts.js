@@ -232,7 +232,7 @@ function pinTile(id, s) {
 function itemRow(id, s) {
   const it = ALL_ITEMS.find((x) => x.id === id);
   const cur = s.current === id;
-  return `<li><a class="item${cur ? " is-current" : ""}${s.landing === id ? " is-landing" : ""}" href="#">
+  return `<li><a class="item${cur ? " is-current" : ""}${s.landing === id ? " is-landing" : ""}${s.hoverItem === id ? " is-hover" : ""}" href="#">
     <span class="item-ico">${icon(SOURCE[it.type].icon)}</span>
     <span class="item-text"><span class="item-title">${it.title}</span>${byline([PEOPLE[it.by].short, `第${s.itemV?.[id] ?? it.v}版`, s.itemAt?.[id] ?? it.at])}</span>
   </a></li>`;
@@ -358,6 +358,8 @@ function stateCluster(s) {
       return `<span class="st st--blocked"><span class="st-main"><span class="st-glyph">${icon("glasses")}</span><span class="st-label">プライベート</span><span class="byline">共有も添付もできません</span></span></span>`;
     case "pending":
       return `<span class="st st--local"><span class="st-main"><span class="st-label st-label--quiet">共有の状態を確認しています…</span></span></span>`;
+    case "unknown":
+      return `<span class="st st--local"><span class="st-main"><span class="st-label st-label--quiet">共有の状態を確認できません</span></span><button class="st-act">${icon("retry", 14)}もう一度確認</button></span>`;
     case "home":
       return `<span class="st st--fresh"><span class="st-main">${seal(sp, 20)}<span class="st-label">メンバー${SPACES[sp].members}人に見えます</span></span></span>`;
     default:

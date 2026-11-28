@@ -1,0 +1,64 @@
+/* Tiger — layout of the component sheet (index.html?screen=components). Consumes ../tokens.css.
+   Nothing here styles a component: only the page that shows them, and the classes that pin a
+   pointer state (.h = :hover) so it can be photographed. */
+body.is-sheet { height: auto; overflow: visible; background: var(--paper); }
+html:has(body.is-sheet) { background: var(--paper); }
+.specsheet { width: var(--w-window); padding: var(--sp-11) 56px 72px; background: var(--paper); color: var(--ink); }
+.spec-top h1 { font-size: var(--fs-20); font-weight: var(--fw-strong); line-height: var(--lh-tight); }
+.spec-top p { margin-top: var(--sp-3); max-width: 62em; line-height: var(--lh-body); color: var(--ink-2); }
+.spec-top .spec-meta { font-size: var(--fs-12); color: var(--ink-3); }
+.spec { margin-top: var(--sp-11); }
+.spec-head { display: flex; align-items: baseline; gap: var(--sp-5); padding-bottom: var(--sp-4); border-bottom: 1px solid var(--line-strong); }
+.spec-head h2 { font-size: var(--fs-15); font-weight: var(--fw-strong); white-space: nowrap; }
+.spec-en { font-family: var(--font-mono); font-size: var(--fs-11); color: var(--ink-3); white-space: nowrap; }
+.spec-head p { margin-left: auto; max-width: 64em; font-size: var(--fs-12); line-height: var(--lh-ui); color: var(--ink-2); text-align: right; }
+.spec-row { margin-top: var(--sp-7); display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-8) var(--sp-9); }
+.spec-item { margin: 0; display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.spec-item figcaption { font-family: var(--font-mono); font-size: var(--fs-11); line-height: 1.45; color: var(--ink-3); }
+.spec-box { min-width: 0; min-height: var(--hit-min); display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-5); }
+.spec-item--col .spec-box { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
+.spec-item--col .spec-box > :is(.input, .picker, .find, .composer, .halt, .outcome, .notice, .conn, .field-error) { align-self: stretch; margin-top: 0; }
+.spec-item--col .spec-box > .composer { margin: 0; }
+.spec-box--frame { padding: var(--sp-5); border-radius: var(--r-control); background: var(--space-frame); box-shadow: inset 0 0 0 1px var(--space-line); }
+.spec-box--field { min-height: var(--h-capsule); padding: 0 var(--sp-4); border-radius: var(--r-capsule); background: var(--space-field); box-shadow: inset 0 0 0 1px var(--space-line); }
+.spec-box--quiet { padding: var(--sp-5) var(--sp-6); border-radius: var(--r-control); background: var(--paper-2); }
+.spec-item--flush .spec-box { display: block; }
+.spec-item--flush .spec-box--frame { padding: var(--sp-4); }
+.spec-item--flush .composer { margin: 0; }
+.spec-item--flush.spec-item--col .spec-box { display: flex; }
+.spec-item--float .spec-box { padding: 2px 2px var(--sp-5); }
+.spec-item--bare .spec-box { flex-direction: column; align-items: flex-start; flex-wrap: nowrap; }
+.spec-pocket { margin: var(--gutter); padding: var(--sp-2); border-radius: var(--r-pocket); background: var(--pocket); box-shadow: inset 0 0 0 1px var(--pocket-line), 0 0 0 var(--gutter) var(--space-frame); }
+.spec-pocket .pins { padding: 0; }
+.spec-pocket--rail { width: 44px; display: flex; justify-content: center; }
+.spec-capsule { width: 100%; min-width: 0; }
+.spec-capsule .toolbar { height: var(--h-capsule); padding: 0; }
+.spec-capsule .nav, .spec-capsule .actions { display: none; }
+.spec-win { position: relative; width: 208px; height: 132px; padding: var(--sp-5); border-radius: var(--r-control); background: var(--space-frame); box-shadow: inset 0 0 0 1px var(--space-line); }
+.spec-win .card { width: 100%; height: 100%; }
+.spec-win .view { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-6) var(--sp-7); }
+.spec-win .view i { height: 6px; border-radius: 3px; background: var(--paper-3); }
+.spec-win .view i:first-child { width: 55%; height: 8px; background: var(--paper-4); }
+.spec-win .view i:last-child { width: 70%; }
+.spec-mean { max-width: 208px; font-size: var(--fs-12); line-height: var(--lh-ui); color: var(--ink); }
+.spec-voice { font-family: var(--font-voice); font-weight: var(--fw-voice); font-size: var(--fs-15); }
+.spec-tabs { height: 44px; display: flex; padding: 0 var(--sp-2); border-bottom: 1px solid var(--line); }
+.spec-side { min-height: 0; }
+.spec-item .book { border-top: 1px solid var(--line); }
+.spec-icons { margin-top: var(--sp-7); display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0 var(--sp-6); }
+.spec-icons li { height: var(--h-row-dense); display: flex; align-items: center; gap: var(--sp-5); font-family: var(--font-mono); font-size: var(--fs-11); color: var(--ink-2); }
+.spec-icons .i { color: var(--ink); }
+
+/* pinned pointer states */
+.specsheet .btn--space.h { background: var(--space-solid-2); }
+.specsheet .btn--ink.h { background: var(--inverse-2); }
+.specsheet .btn--line.h, .specsheet .btn--paper.h, .specsheet .st-act.h { background: var(--paper-2); }
+.specsheet .btn--quiet.h, .specsheet .ibtn--paper.h { background: var(--paper-3); }
+.specsheet .ibtn.h:not(.ibtn--paper) { background: var(--space-frame-2); }
+.specsheet .link.h { text-decoration-color: var(--ink); }
+.specsheet .check.h .check-box { background: var(--paper-2); }
+.spec-pal { width: 100%; }
+.spec-row--edges { gap: var(--sp-8) 28px; }
+.spec-row--edges .spec-win { width: 196px; height: 126px; }
+.spec-row--edges .spec-mean { max-width: 196px; }
+.spec-box--quiet .vers { margin: 0; }

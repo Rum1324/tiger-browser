@@ -69,7 +69,9 @@
   --w-sidebar: 248px; /* 200 to 320, user-resizable */
   --w-rail: 52px; /* collapsed sidebar */
   --w-panel: 400px; /* 360 to 520, user-resizable */
-  --w-thread: 400px; /* thread column on Space home */
+  --w-thread: 400px; /* thread column on Space home; the side column of its other sections */
+  --w-find: 320px; /* find-in-page field in the toolbar */
+  --w-pop-list: 376px; /* a popover that holds a list (downloads) */
   --gutter: 8px; /* frame between the sidebar, toolbar, page card, panel and window edge */
   --ring: 3px; /* inner lane: the Space's line around a page it holds */
   --ring-gap: 1px; /* between the two lanes */
@@ -406,7 +408,11 @@
   --mock-navy: oklch(0.3 0.09 262); /* bank */
   --mock-navy-2: oklch(0.38 0.1 262);
   --mock-crimson: oklch(0.52 0.19 22); /* bank accent */
-  --mock-black: oklch(0.2 0 0); /* notes app, code host */
+  --mock-black: oklch(0.2 0 0); /* notes app, code host, meeting page */
+  --mock-black-2: oklch(0.27 0 0); /* tile on a dark page */
+  --mock-on-black-2: oklch(0.76 0 0); /* secondary text on a dark page */
+  --mock-find: oklch(0.9 0.16 98); /* Chromium's own find-in-page highlight: painted by the engine */
+  --mock-find-active: oklch(0.78 0.17 62); /* the active match */
   --mock-violet: oklch(0.55 0.19 295); /* design tool */
   --mock-orange: oklch(0.7 0.17 55); /* analytics */
 

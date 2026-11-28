@@ -16,7 +16,7 @@ const proto = path.join(here, "..");
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
-const sources = ["index.html", "icons.js", "parts.js", "mocks.js", "screens.js"].map((f) =>
+const sources = ["index.html", "icons.js", "parts.js", "mocks.js", "screens.js", "screens2.js", "sheet.js"].map((f) =>
   fs.readFileSync(path.join(proto, f), "utf8"),
 );
 const chars = new Set();
