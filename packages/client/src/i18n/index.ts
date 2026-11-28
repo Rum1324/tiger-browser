@@ -8,6 +8,7 @@ import type { ApiClientError } from '../api'
 import type { CaptureOutcome } from '../capture'
 import type { GoogleExportError } from '../export'
 import type { ShareFailure } from '../stores/share'
+import type { ShareThreadFailure } from '../stores/share-thread'
 import type { AttachFailure } from '../stores/threads'
 import { en } from './en'
 import { ja } from './ja'
@@ -44,6 +45,12 @@ export function captureKey(outcome: Extract<CaptureOutcome, { ok: false }>): Mes
 export function shareFailureKey(failure: ShareFailure): MessageKey {
   if (failure.kind === 'no-space') return 'share.noSpace'
   if (failure.kind === 'capture') return captureKey(failure.outcome)
+  return errorKey(failure.error)
+}
+
+export function shareThreadFailureKey(failure: ShareThreadFailure): MessageKey {
+  if (failure.kind === 'not-private') return 'shareThread.notPrivate'
+  if (failure.kind === 'nothing-to-share') return 'shareThread.nothingToShare'
   return errorKey(failure.error)
 }
 

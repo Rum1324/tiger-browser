@@ -173,7 +173,8 @@ describe('sharing a private thread to the Space', () => {
       kept.map(({ id: _id, threadId: _t, attachments: _a, ...rest }) => rest),
     )
     expect(seen.every((x) => x.threadId === copy.id && x.attachments.length === 0)).toBe(true)
-    expect(seen.map((x) => x.id)).not.toEqual(expect.arrayContaining([kept[0]?.id]))
+    const originalIds = new Set(ownerBefore.map((x) => x.id))
+    expect(seen.filter((x) => originalIds.has(x.id))).toEqual([])
     const [pages] = await h.sql<{ n: number }[]>`
       select count(*)::int as n from message_attachments a join messages m on m.id = a.message_id
       where m.thread_id = ${copy.id}
@@ -191,7 +192,7 @@ describe('sharing a private thread to the Space', () => {
     })
     await memberWs.sync()
     const newFrames = memberWs.events.slice(framesBefore)
-    expect(newFrames.map((e) => e.type)).toEqual(['pong', 'thread.created', 'audit.appended', 'pong'])
+    expect(newFrames.map((e) => e.type)).toEqual(['thread.created', 'audit.appended', 'pong'])
 
     // No route and no frame gives the member the excluded exchange, a page, its title or its URL.
     const memberReads = JSON.stringify([

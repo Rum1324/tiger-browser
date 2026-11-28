@@ -16,6 +16,7 @@ import {
 import { createModels, type ModelsController } from './stores/models'
 import { createSession, type SessionController } from './stores/session'
 import { createShareFlow, type ShareFlowController } from './stores/share'
+import { createShareThreadFlow, type ShareThreadController } from './stores/share-thread'
 import { createSpaces, type SpacesController } from './stores/spaces'
 import { createThreads, type ThreadsController } from './stores/threads'
 
@@ -50,6 +51,8 @@ export interface TigerClient {
   items: ItemsController
   urlShare: UrlShareController
   share: ShareFlowController
+  /** Share a private thread with the Space as a new Space thread, deciding each attached question. */
+  shareThread: ShareThreadController
   threads: ThreadsController
   models: ModelsController
   activity: ActivityController
@@ -131,6 +134,11 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
       urlShare.applyItem(result.item)
     },
   })
+  const shareThread = createShareThreadFlow(ctx, {
+    thread: (threadId) => threads.thread(threadId),
+    // The socket event follows; applying the answer now shows the new Space thread at once.
+    shared: (thread) => threads.handleEvent({ type: 'thread.created', thread }),
+  })
   const exports = createExport(ctx)
   const google = createGoogle(ctx)
 
@@ -154,6 +162,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
       activity.reset()
       models.reset()
       share.reset()
+      shareThread.reset()
       // Tab URLs stay known; their share state is cleared because it was the old member's view.
       const tabs = urlShare.store.getState().tabs
       urlShare.reset()
@@ -197,6 +206,7 @@ export function createTigerClient(opts: TigerClientOptions): TigerClient {
     items,
     urlShare,
     share,
+    shareThread,
     threads,
     models,
     activity,

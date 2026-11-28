@@ -293,6 +293,75 @@ describe('MVP flow in the real app', () => {
     expect(await t.ui.$$(sel('attachment-draft'))).toHaveLength(0)
   })
 
+  it('shares the private thread to the Space: the attached question is decided, the page never leaves', async () => {
+    const assistantDone = '[data-testid="message"][data-role="assistant"][data-phase="complete"]'
+    const shareRequests = () => readLog().filter((r) => r.method === 'POST' && r.url.endsWith('/share'))
+    await t.ui.fill(sel('question'), '発売時期について一般的な注意点は?')
+    await t.ui.click(sel('ask'))
+    await waitFor(async () => (await t.ui.$$(assistantDone)).length === 2, 30_000, 'second answer')
+    const texts = () => t.ui.$$eval(sel('message-text'), (els) => els.map((e) => e.textContent))
+    const privateBefore = await texts()
+    const sharesBefore = shareRequests().length
+
+    await t.ui.click(sel('share-thread-begin'))
+    await t.ui.waitForSelector(sel('share-thread-dialog'), { timeout: 15_000 })
+    expect(await t.ui.$$(sel('share-thread-question'))).toHaveLength(1)
+    const attachedId = await t.ui.getAttribute(sel('share-thread-question'), 'data-message-id')
+    expect(await t.ui.textContent(sel('share-thread-question'))).toContain(
+      'このメモを三行でまとめて',
+    )
+    // Undecided: confirm is disabled and nothing was sent.
+    expect(await t.ui.isDisabled(sel('share-thread-confirm'))).toBe(true)
+    expect(shareRequests()).toHaveLength(sharesBefore)
+
+    await t.ui.click(sel('share-thread-exclude'))
+    expect(await t.ui.textContent(sel('share-thread-count'))).toContain('2')
+    await t.ui.click(sel('share-thread-confirm'))
+    await t.ui.waitForSelector(sel('share-thread-done'), { timeout: 15_000 })
+    const copyId = (await t.ui.getAttribute(sel('share-thread-done'), 'data-thread-id')) ?? ''
+    expect(copyId).not.toBe('')
+
+    // The request carried only the decisions (message ids), never page content or a URL.
+    const sent = shareRequests()
+    expect(sent).toHaveLength(sharesBefore + 1)
+    expect(JSON.parse(sent.at(-1)?.body ?? '{}')).toEqual({
+      includeAttachedMessageIds: [],
+      excludeMessageIds: [attachedId],
+    })
+
+    // The private thread is unchanged and still selected.
+    expect(await t.ui.textContent(sel('thread-kind'))).toBe('private')
+    expect(await texts()).toEqual(privateBefore)
+
+    // The new Space thread holds only the plain exchange, without the memo question or any page.
+    const token = await t.invoke('auth.getToken')
+    const res = await fetch(`${directUrl}/v1/threads/${copyId}/messages`, {
+      headers: { authorization: `Bearer ${token}` },
+    })
+    const copied = (await res.json()) as {
+      role: string
+      content: string
+      attachments: unknown[]
+    }[]
+    expect(copied.map((m) => m.role)).toEqual(['user', 'assistant'])
+    expect(copied[0]?.content).toBe('発売時期について一般的な注意点は?')
+    const body = JSON.stringify(copied)
+    expect(body).not.toContain('このメモを三行でまとめて')
+    expect(body).not.toContain(MEMO_TITLE)
+    for (const p of MEMO_PARAS) expect(body).not.toContain(p)
+    for (const f of urlForms(MEMO_URL())) expect(body).not.toContain(f)
+    expect(copied.every((m) => m.attachments.length === 0)).toBe(true)
+
+    await t.ui.selectOption(sel('thread-select'), copyId)
+    await waitFor(
+      async () => (await t.ui.textContent(sel('thread-kind'))) === 'space',
+      10_000,
+      'copy selected',
+    )
+    await waitFor(async () => (await t.ui.$$(sel('message'))).length === 2, 10_000, 'copy loaded')
+    await t.ui.selectOption(sel('thread-select'), 'private')
+  })
+
   it('unshares: the tab returns to not shared and the citation is marked unavailable', async () => {
     await t.invoke('tabs.activate', { tabId: articleTabId })
     await waitFor(async () => (await shareState()) === 'true', 10_000, 'article tab shared')

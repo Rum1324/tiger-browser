@@ -455,50 +455,100 @@ describe('threads and AI', () => {
     await server.settle()
   })
 
-  it('a private thread with an attached page is not promoted: refused before any request, and by the server', async () => {
+  it('sharing a private thread: each attached question is decided before anything is sent', async () => {
     const privateId = A.client.threads.store.getState().privateThreadId as string
+    const flow = A.client.shareThread
     const shares = () => A.count('POST', /\/share$/)
-    expect(A.client.threads.hasAttachments(privateId)).toBe(true)
-
-    // The loaded messages show an attachment: refused locally.
     const s0 = shares()
-    expect(await A.client.threads.promote(privateId)).toBeNull()
-    expect(shares()).toBe(s0)
-    expect(A.client.threads.store.getState().mutation.error).toMatchObject({
-      kind: 'client',
-      code: 'thread_has_private_attachments',
-    })
 
-    // Without the messages loaded, the request goes out and the server refuses it the same way.
-    const { [privateId]: _loaded, ...rest } = A.client.threads.store.getState().messages
-    A.client.threads.store.setState({ messages: rest })
-    expect(await A.client.threads.promote(privateId)).toBeNull()
+    // A Space thread cannot be shared again: refused before any request.
+    const r0 = A.requests.length
+    await flow.begin(spaceThread.id)
+    expect(flow.store.getState()).toMatchObject({ phase: 'error', failure: { kind: 'not-private' } })
+    expect(A.requests.length).toBe(r0)
+
+    // The whole thread is read; the attached question is listed with its answer.
+    await flow.begin(privateId)
+    const d0 = flow.store.getState()
+    if (d0.phase !== 'deciding') throw new Error(`expected deciding, got ${d0.phase}`)
+    expect(d0.messages.map((m) => m.content).slice(0, 1)).toEqual(['My own question'])
+    expect(d0.questions).toHaveLength(1)
+    const q = d0.questions[0]
+    expect(q?.question.content).toBe('Summarise my notes')
+    expect(q?.answers.map((m) => m.role)).toEqual(['assistant'])
+    expect(q?.decision).toBeNull()
+    expect(d0.ready).toBe(false)
+
+    // Undecided: confirm sends nothing; an attached question cannot be dropped as a plain message.
+    expect(await flow.confirm()).toBe(false)
+    expect(flow.setExcluded(q?.question.id as string, true)).toBe(false)
+    expect(shares()).toBe(s0)
+
+    // Excluding the question excludes its answer; including it brings both back.
+    expect(flow.decide(q?.question.id as string, 'include')).toBe(true)
+    expect(flow.preview().map((m) => m.id)).toEqual(d0.messages.map((m) => m.id))
+    expect(flow.decide(q?.question.id as string, 'exclude')).toBe(true)
+    expect(flow.preview().map((m) => m.content)).not.toContain('Summarise my notes')
+    expect(flow.preview().some((m) => m.id === q?.answers[0]?.id)).toBe(false)
+    expect(flow.store.getState()).toMatchObject({ phase: 'deciding', ready: true })
+    expect(shares()).toBe(s0)
+
+    expect(await flow.confirm()).toBe(true)
     expect(shares()).toBe(s0 + 1)
-    expect(A.client.threads.store.getState().mutation.error).toMatchObject({
-      kind: 'server',
-      code: 'thread_has_private_attachments',
-      status: 409,
+    const sent = A.requests.filter((x) => x.method === 'POST' && x.path.endsWith('/share')).at(-1)
+    expect(sent?.body).toEqual({
+      includeAttachedMessageIds: [],
+      excludeMessageIds: [q?.question.id],
     })
+    const done = flow.store.getState()
+    if (done.phase !== 'done') throw new Error(`expected done, got ${done.phase}`)
+    const copy = done.thread
+    expect(copy).toMatchObject({ visibility: 'space', spaceId })
+    expect(copy.id).not.toBe(privateId)
+    expect(A.client.threads.thread(copy.id)?.visibility).toBe('space')
+
+    // The private thread is unchanged and still the side-panel thread; B sees only the copy.
     expect(A.client.threads.thread(privateId)?.visibility).toBe('private')
     expect(A.client.threads.store.getState().privateThreadId).toBe(privateId)
+    await waitFor(() => B.client.threads.thread(copy.id) !== null, 5000, 'B sees the copy')
     expect(B.client.threads.thread(privateId)).toBeNull()
-    await A.client.threads.loadMessages(privateId)
+    await B.client.threads.loadMessages(copy.id)
+    const seen = B.client.threads.store.getState().messages[copy.id]?.list ?? []
+    expect(seen.map((m) => m.message.content).slice(0, 1)).toEqual(['My own question'])
+    const visible = JSON.stringify(seen)
+    for (const s of ['Summarise my notes', 'notes.example.net', 'Private notes about pricing']) {
+      expect(visible).not.toContain(s)
+    }
+    expect(seen.every((m) => m.message.attachments.length === 0)).toBe(true)
   })
 
-  it('promoting a private thread without attachments makes it visible to the Space', async () => {
-    A.client.threads.store.setState({ privateThreadId: null })
-    const fresh = await A.client.threads.ensurePrivateThread()
-    const privateId = fresh?.id as string
-    expect(await A.client.threads.post(privateId, 'No pages here', { askAi: false })).not.toBeNull()
-    expect(A.client.threads.hasAttachments(privateId)).toBe(false)
-    const promoted = await A.client.threads.promote(privateId)
-    expect(promoted?.visibility).toBe('space')
-    expect(A.client.threads.store.getState().privateThreadId).toBeNull()
-    await waitFor(
-      () => B.client.threads.thread(privateId)?.visibility === 'space',
-      5000,
-      'B sees promoted',
-    )
+  it('a page attached after the decisions were made is refused by the server; nothing is created', async () => {
+    const privateId = A.client.threads.store.getState().privateThreadId as string
+    const flow = A.client.shareThread
+    await flow.begin(privateId)
+    const d = flow.store.getState()
+    if (d.phase !== 'deciding') throw new Error(`expected deciding, got ${d.phase}`)
+    for (const q of d.questions) flow.decide(q.question.id, 'exclude')
+    const threadsBefore = B.client.threads.store.getState().threads.length
+
+    // A new attached question lands before confirm: it is undecided, so the server refuses.
+    A.bridge.captures.set('t3', {
+      ok: true,
+      page: makePage('https://notes.example.net/late', '# Late\n\nLate private page.', 'Late'),
+    })
+    await A.client.threads.beginAttach(privateId, 't3')
+    expect(A.client.threads.confirmAttach()).toBe(true)
+    expect(await A.client.threads.post(privateId, 'One more page', { askAi: false })).not.toBeNull()
+
+    expect(await flow.confirm()).toBe(false)
+    expect(flow.store.getState()).toMatchObject({
+      phase: 'error',
+      failure: { kind: 'api', error: { code: 'thread_has_private_attachments', status: 409 } },
+    })
+    await sleep(100)
+    expect(B.client.threads.store.getState().threads.length).toBe(threadsBefore)
+    flow.cancel()
+    expect(flow.store.getState().phase).toBe('idle')
   })
 
   it('unshare updates both clients and marks citations unavailable', async () => {

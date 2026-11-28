@@ -60,7 +60,19 @@ function loadState() {
 function saveState() {
   try { fs.writeFileSync(statePath(), JSON.stringify(state, null, 2)); } catch (e) { console.error('saveState', e.message); }
 }
+// Sign-in pages put the account's email address and session tokens in the query string
+// (accounts.google.com/...&idnf=<email>...). The report must not carry them, so every recorded URL is
+// cut down to origin + path plus the few parameters that describe the flow.
+const SAFE_PARAMS = ['flowName', 'flowEntry', 'rrk', 'service', 'hl'];
+function redactUrl(raw) {
+  try {
+    const u = new URL(raw);
+    const kept = SAFE_PARAMS.filter(k => u.searchParams.has(k)).map(k => `${k}=${u.searchParams.get(k)}`);
+    return `${u.origin}${u.pathname}${kept.length ? '?' + kept.join('&') : ''}`;
+  } catch { return typeof raw === 'string' ? raw.split('?')[0] : raw; }
+}
 function logEvent(type, data) {
+  if (data && typeof data.url === 'string') data = Object.assign({}, data, { url: redactUrl(data.url) });
   const ev = Object.assign({ at: new Date().toISOString(), type }, data);
   state.events.push(ev);
   if (state.events.length > 300) state.events.splice(0, state.events.length - 300);
@@ -284,6 +296,7 @@ async function scanTab(tab) {
   try { text = await wc.executeJavaScript('document.body ? document.body.innerText.slice(0, 30000) : ""', true); } catch { return null; }
   const hit = detectBlock(wc.getURL(), text);
   if (!hit) return null;
+  hit.url = redactUrl(hit.url);
   if (tab.block && tab.block.id === hit.id && tab.block.url === hit.url) return hit;
   tab.block = hit;
   const checkId = tab.checkId || checkForUrl(hit.url);

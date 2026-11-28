@@ -80,6 +80,13 @@ export type {
   ShareFlowState,
   StaleCheck,
 } from './stores/share'
+export {
+  type AttachedQuestion,
+  attachedQuestions,
+  type ShareThreadController,
+  type ShareThreadFailure,
+  type ShareThreadState,
+} from './stores/share-thread'
 export type {
   CreatedInvite,
   SpaceDetail,

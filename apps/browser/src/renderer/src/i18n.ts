@@ -65,6 +65,11 @@ const en = {
   unavailable: 'unavailable',
   stopAnswer: 'Stop',
   googleCancel: 'Cancel',
+  shareThread: 'Share this thread to the Space',
+  answers: 'answers',
+  includeInShare: 'Share',
+  excludeFromShare: 'Leave out',
+  messagesToShare: 'Messages to share',
 }
 
 export type Strings = typeof en
@@ -136,6 +141,11 @@ const ja: Strings = {
   unavailable: '利用できません',
   stopAnswer: '停止',
   googleCancel: 'キャンセル',
+  shareThread: 'このスレッドをスペースに共有',
+  answers: '回答',
+  includeInShare: '共有する',
+  excludeFromShare: '除外する',
+  messagesToShare: '共有するメッセージ',
 }
 
 export function strings(locale: 'ja' | 'en'): Strings {

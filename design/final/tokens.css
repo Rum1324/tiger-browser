@@ -1,35 +1,34 @@
-/* Tiger / direction "Rooms" — design tokens.
-   Every colour, size, radius, shadow and timing used by prototype/app.css is declared here.
-   Colour is OKLCH. Hue carries exactly one meaning: a room (Space). People, private things
-   and the AI are neutral.
+/* Tiger — design tokens (final system).
+   Every colour, size, radius, shadow and timing used by prototype/*.css is declared here.
+   Colour is OKLCH. Hue carries exactly one meaning: a Space. People, private things, the AI,
+   errors, focus and selection are neutral ink. There is no red and no green in Tiger's own UI.
 
-   Structure
-   1. Static scales: type, spacing, radii, layout, motion.
+   1. Static scales: type, spacing, density, layout, radii, motion.
    2. Neutral colour roles, light then dark.
-   3. Room colour roles, computed from four inputs per room (two hues, two chromas).
-   4. Rooms.
-   5. Mock web-page content (third-party pages drawn inside a tab; not product UI).
+   3. Space colour roles, computed from four inputs per Space hue.
+   4. The nine Space hues (keys of SpaceHue in packages/shared/src/domain.ts).
+   5. The private window.
+   6. Mock content: third-party pages, favicons and member photos drawn inside the mock.
 */
 
 /* ───────────────────────── 1. Static scales ───────────────────────── */
 :root {
-  /* Type. Mock renders with webfonts; production stack on macOS follows after them.
-     Gothic = people and chrome. Mincho = the Space's own voice (AI output, seals). */
+  /* Type. The mock renders with webfonts; the macOS production faces follow them in each stack.
+     Gothic = people and chrome. Mincho = the Space's own voice (AI answers, seals). */
   --font-ui: "Inter", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "SF Pro Text",
     "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
   --font-voice: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --font-mono: "Geist Mono", "SF Mono", ui-monospace, "Noto Sans JP", "Hiragino Sans", monospace;
 
-  --fs-10: 10px; /* monogram inside an 18 px avatar, nothing else */
-  --fs-11: 11px; /* labels, keys, timestamps */
-  --fs-12: 12px; /* secondary sentences */
+  --fs-11: 11px; /* Latin and digits only: key caps, clock times, mono hosts, line numbers */
+  --fs-12: 12px; /* smallest Japanese text: bylines, labels, notes */
   --fs-13: 13px; /* UI base */
-  --fs-15: 15px; /* titles, AI body */
+  --fs-15: 15px; /* titles, AI answers */
   --fs-20: 20px; /* screen titles */
   --fs-28: 28px; /* generated documents only */
 
-  --fw-regular: 400; /* Hiragino W3 */
-  --fw-strong: 600; /* Hiragino W6 */
+  --fw-regular: 400; /* Hiragino Sans W3 */
+  --fw-strong: 600; /* Hiragino Sans W6 */
   --fw-voice: 500; /* Mincho body */
   --fw-voice-strong: 700; /* Mincho emphasis, seals */
 
@@ -53,36 +52,42 @@
   --sp-11: 48px;
   --sp-12: 64px;
 
-  /* Density scale */
-  --h-row-dense: 28px; /* menus, zone headers */
-  --h-row: 32px; /* sidebar tabs */
-  --h-row-roomy: 36px; /* palette rows */
-  --h-row-table: 44px; /* two-line audit rows */
-  --h-control: 30px; /* buttons, address field */
-  --h-toolbar: 48px;
+  /* Density */
+  --h-row-dense: 28px; /* menus, zone headers, ledger lines in the composer */
+  --h-row: 32px; /* tab rows */
+  --h-row-roomy: 36px; /* palette rows, model rows */
+  --h-row-item: 44px; /* two-line rows: shared items, ledger */
+  --h-control: 28px; /* buttons, address field */
+  --h-toolbar: 44px;
   --hit-min: 28px; /* smallest pointer target */
 
-  /* Layout */
+  /* Layout (CSS px at 1x) */
   --w-window: 1440px;
   --h-window: 900px;
-  --w-sidebar: 248px;
-  --w-panel: 400px;
-  --w-thread: 368px;
-  --gutter: 8px;
-  --ring: 3px; /* the shared ring around a card */
+  --w-sidebar: 248px; /* 200 to 320, user-resizable */
+  --w-rail: 52px; /* collapsed sidebar */
+  --w-panel: 400px; /* 360 to 520, user-resizable */
+  --w-thread: 400px; /* thread column on Space home */
+  --gutter: 8px; /* frame between the sidebar, toolbar, page card, panel and window edge */
+  --ring: 3px; /* inner lane: the Space's line around a page it holds */
+  --ring-gap: 1px; /* between the two lanes */
+  --frame: 2px; /* outer lane: the dashed "next question only" line */
+  --frame-dash: 7px;
+  --frame-space: 5px;
+  --ring-lid: 44px; /* length of each stub left on the top edge when the ring is open */
 
-  /* Radii. Concentric: card = window - gutter; row = pocket - padding. */
-  --r-window: 18px;
+  /* Radii. Concentric: ring = card + ring; frame = card + ring + gap + frame. */
+  --r-window: 16px; /* mock only: production uses the system window shape */
   --r-card: 10px;
-  --r-ring: 13px; /* card + ring */
+  --r-ring: 13px;
+  --r-frame: 16px;
   --r-pocket: 10px;
-  --r-row: 6px;
-  --r-control: 8px;
-  --r-chip: 5px;
-  --r-key: 4px;
-  --r-sheet: 14px;
   --r-menu: 10px;
-  --r-round: 999px; /* avatars only */
+  --r-sheet: 14px;
+  --r-control: 8px;
+  --r-row: 6px;
+  --r-key: 4px;
+  --r-round: 999px; /* member photos and monograms only */
 
   /* Motion */
   --dur-press: 90ms;
@@ -90,12 +95,14 @@
   --dur-move: 240ms;
   --dur-tint: 280ms;
   --dur-cross: 360ms;
+  --dur-close: 420ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in: cubic-bezier(0.5, 0, 0.9, 0.4);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-cross: cubic-bezier(0.34, 1.3, 0.64, 1); /* small overshoot when a tab lands */
+  --ease-cross: cubic-bezier(0.34, 1.3, 0.64, 1); /* small overshoot when a copy lands */
+  --ease-close: cubic-bezier(0.3, 0, 0.1, 1); /* the ring's two arms meeting */
 
-  /* macOS window controls */
+  /* macOS window controls (drawn by the system in production) */
   --tl-close: oklch(0.68 0.2 25);
   --tl-min: oklch(0.82 0.16 85);
   --tl-zoom: oklch(0.74 0.2 145);
@@ -107,183 +114,253 @@
   color-scheme: light;
   --desktop: oklch(0.42 0.012 250);
 
-  --paper: oklch(0.995 0.001 80); /* cards, sheets */
+  --paper: oklch(0.995 0.001 80); /* cards, sheets, the pocket */
   --paper-2: oklch(0.972 0.003 80); /* quiet fill */
-  --paper-3: oklch(0.945 0.004 80); /* hover, selected-in-pocket */
+  --paper-3: oklch(0.945 0.004 80); /* hover, selected tab */
   --paper-4: oklch(0.915 0.005 80); /* pressed */
   --line: oklch(0.905 0.004 80);
   --line-strong: oklch(0.83 0.005 80);
-  --line-control: oklch(0.62 0.005 80); /* boundary of inputs and switches: 3:1 on paper */
+  --line-control: oklch(0.62 0.005 80); /* boundary of inputs: 3:1 on paper */
 
   --ink: oklch(0.23 0.006 80);
   --ink-2: oklch(0.43 0.006 80);
-  --ink-3: oklch(0.51 0.006 80); /* lowest text step; 4.5:1 on paper-3 */
-  --ink-off: oklch(0.68 0.005 80); /* disabled, decorative only */
+  --ink-3: oklch(0.5 0.006 80); /* lowest text step; 4.5:1 on paper-3 */
+  --ink-off: oklch(0.68 0.005 80); /* disabled glyphs, decorative only */
 
-  --inverse: oklch(0.25 0.006 80); /* toast, blocked chip, AI seal */
+  --inverse: oklch(0.25 0.006 80); /* AI seal, destructive confirm, selected key */
+  --inverse-2: oklch(0.33 0.006 80);
   --on-inverse: oklch(0.97 0.003 80);
   --on-inverse-2: oklch(0.8 0.004 80);
 
-  --danger: oklch(0.5 0.17 27);
-  --danger-wash: oklch(0.96 0.02 27);
-  --added: oklch(0.45 0.11 150);
-  --added-wash: oklch(0.955 0.035 150);
-
   --focus: oklch(0.23 0.006 80);
   --selection: oklch(0.88 0.02 80);
+  --mark: oklch(0.93 0.004 80); /* the cited passage, a search hit */
 
-  --pocket: oklch(0.992 0.002 80 / 0.82); /* the private zone inside the tinted sidebar */
-  --pocket-line: oklch(0.2 0.01 80 / 0.1);
-  --row-hover-pocket: oklch(0.2 0.01 80 / 0.05);
-  --row-active-pocket: oklch(0.2 0.01 80 / 0.1);
+  --scrim: oklch(0.2 0.01 80 / 0.3); /* flat alpha behind a sheet or the palette; never blurred */
 
-  --shadow-float: 0 0 0 1px oklch(0.2 0.01 80 / 0.14), 0 18px 44px -10px oklch(0.2 0.02 80 / 0.34),
-    0 4px 12px oklch(0.2 0.02 80 / 0.1);
-  --shadow-menu: 0 0 0 1px oklch(0.2 0.01 80 / 0.12), 0 8px 20px -6px oklch(0.2 0.02 80 / 0.26);
-  --shadow-lift: 0 0 0 1px oklch(0.2 0.01 80 / 0.1), 0 6px 14px -4px oklch(0.2 0.02 80 / 0.3);
+  --shadow-sheet: 0 0 0 1px oklch(0.2 0.01 80 / 0.22), 0 24px 56px -12px oklch(0.2 0.02 80 / 0.42),
+    0 6px 16px oklch(0.2 0.02 80 / 0.12);
+  --shadow-menu: 0 0 0 1px oklch(0.2 0.01 80 / 0.16), 0 10px 24px -6px oklch(0.2 0.02 80 / 0.28);
+  --shadow-lift: 0 0 0 1px oklch(0.2 0.01 80 / 0.12), 0 6px 14px -4px oklch(0.2 0.02 80 / 0.3);
   --shadow-window: 0 0 0 1px oklch(0 0 0 / 0.35), 0 30px 70px -12px oklch(0 0 0 / 0.55);
 }
 
-[data-theme="dark"],
-[data-room="incognito"] {
+[data-theme="dark"] {
   color-scheme: dark;
   --desktop: oklch(0.2 0.01 250);
 
-  --paper: oklch(0.185 0.004 80);
-  --paper-2: oklch(0.215 0.004 80);
-  --paper-3: oklch(0.25 0.005 80);
-  --paper-4: oklch(0.29 0.005 80);
-  --line: oklch(0.285 0.005 80);
-  --line-strong: oklch(0.36 0.006 80);
-  --line-control: oklch(0.54 0.006 80);
+  --paper: oklch(0.195 0.004 80);
+  --paper-2: oklch(0.225 0.004 80);
+  --paper-3: oklch(0.262 0.005 80);
+  --paper-4: oklch(0.3 0.005 80);
+  --line: oklch(0.295 0.005 80);
+  --line-strong: oklch(0.37 0.006 80);
+  --line-control: oklch(0.55 0.006 80);
 
   --ink: oklch(0.93 0.004 80);
-  --ink-2: oklch(0.76 0.005 80);
-  --ink-3: oklch(0.66 0.005 80);
+  --ink-2: oklch(0.77 0.005 80);
+  --ink-3: oklch(0.68 0.005 80);
   --ink-off: oklch(0.48 0.005 80);
 
   --inverse: oklch(0.93 0.004 80);
+  --inverse-2: oklch(0.84 0.004 80);
   --on-inverse: oklch(0.2 0.005 80);
   --on-inverse-2: oklch(0.38 0.005 80);
 
-  --danger: oklch(0.74 0.12 27);
-  --danger-wash: oklch(0.27 0.04 27);
-  --added: oklch(0.78 0.1 150);
-  --added-wash: oklch(0.27 0.035 150);
-
   --focus: oklch(0.93 0.004 80);
   --selection: oklch(0.36 0.02 80);
+  --mark: oklch(0.3 0.005 80);
 
-  --pocket: oklch(0.15 0.004 80 / 0.62);
-  --pocket-line: oklch(1 0 0 / 0.07);
-  --row-hover-pocket: oklch(1 0 0 / 0.05);
-  --row-active-pocket: oklch(1 0 0 / 0.11);
+  --scrim: oklch(0.08 0.005 80 / 0.5);
 
-  --shadow-float: 0 0 0 1px oklch(1 0 0 / 0.12), 0 18px 44px -10px oklch(0 0 0 / 0.7),
-    0 4px 12px oklch(0 0 0 / 0.4);
-  --shadow-menu: 0 0 0 1px oklch(1 0 0 / 0.1), 0 8px 20px -6px oklch(0 0 0 / 0.6);
+  --shadow-sheet: 0 0 0 1px oklch(1 0 0 / 0.14), 0 24px 56px -12px oklch(0 0 0 / 0.75),
+    0 6px 16px oklch(0 0 0 / 0.4);
+  --shadow-menu: 0 0 0 1px oklch(1 0 0 / 0.12), 0 10px 24px -6px oklch(0 0 0 / 0.65);
   --shadow-lift: 0 0 0 1px oklch(1 0 0 / 0.12), 0 6px 14px -4px oklch(0 0 0 / 0.6);
 }
 
-/* ───────────────────────── 3. Room roles ─────────────────────────
-   Four inputs per room: --room-h (identity hue), --room-cs (chroma of the solid),
-   --room-ht (hue of the pale tint; warm hues are nudged toward yellow so the tint
-   does not read pink), --room-ct (chroma of the tint).
-   Declared on the element that carries data-room so a nested element
-   (a seal for another Space, a second window) re-resolves them. */
-[data-room] {
-  --room-frame: oklch(0.93 var(--room-ct) var(--room-ht)); /* window frame */
-  --room-frame-2: oklch(0.9 calc(var(--room-ct) * 1.2) var(--room-ht)); /* hover on frame */
-  --room-frame-3: oklch(0.87 calc(var(--room-ct) * 1.4) var(--room-ht)); /* pressed on frame */
-  --room-field: oklch(0.965 calc(var(--room-ct) * 0.55) var(--room-ht)); /* address field */
-  --room-line: oklch(0.85 calc(var(--room-ct) * 1.5) var(--room-ht)); /* hairlines on frame */
-  --room-ink: oklch(0.34 calc(var(--room-cs) * 0.5) var(--room-h)); /* Space name */
-  --room-ink-2: oklch(0.45 calc(var(--room-cs) * 0.45) var(--room-h)); /* secondary text on frame */
-  --room-ink-off: oklch(0.72 calc(var(--room-ct) * 1.6) var(--room-ht)); /* disabled glyphs on frame */
-  --room-accent: oklch(0.59 calc(var(--room-cs) * 1.08) calc(var(--room-h) + 3)); /* the shared ring; 3:1 on frame and paper */
-  --room-solid: oklch(0.54 var(--room-cs) var(--room-h)); /* seal, primary button, shared chip */
-  --room-solid-2: oklch(0.49 var(--room-cs) var(--room-h)); /* hover, pressed */
-  --on-room-solid: oklch(0.99 0.004 var(--room-ht));
-  --room-wash: oklch(0.972 calc(var(--room-ct) * 0.55) var(--room-ht)); /* hue on paper */
-  --room-wash-2: oklch(0.945 calc(var(--room-ct) * 1.05) var(--room-ht));
-  --room-wash-line: oklch(0.87 calc(var(--room-ct) * 1.5) var(--room-ht));
-  --row-active-frame: var(--paper); /* selected tab on the tinted ground */
-  --row-hover-frame: oklch(1 0 0 / 0.45);
+/* ───────────────────────── 3. Space roles ─────────────────────────
+   Four inputs per hue: --space-h (identity hue), --space-cs (chroma of the solids),
+   --space-ht (hue of the pale frame; warm hues lean toward yellow so the frame reads as dyed
+   paper, not pink), --space-ct (chroma of the frame).
+   The roles are declared on the element that carries data-space, so a nested element
+   (a seal of another Space, a second window) resolves its own. */
+[data-space] {
+  --space-frame: oklch(0.916 var(--space-ct) var(--space-ht)); /* window frame: sidebar, toolbar, gutter */
+  --space-frame-2: oklch(0.89 calc(var(--space-ct) * 1.15) var(--space-ht)); /* hover on the frame */
+  --space-frame-3: oklch(0.862 calc(var(--space-ct) * 1.3) var(--space-ht)); /* pressed, current item */
+  --space-field: oklch(0.957 calc(var(--space-ct) * 0.55) var(--space-ht)); /* address field */
+  --space-line: oklch(0.82 calc(var(--space-ct) * 1.5) var(--space-ht)); /* hairlines on the frame */
+  --space-ink: oklch(0.31 calc(var(--space-cs) * 0.5) var(--space-h)); /* Space name, state label */
+  --space-ink-2: oklch(0.4 calc(var(--space-cs) * 0.42) var(--space-h)); /* bylines on the frame */
+  --space-ink-off: oklch(0.7 calc(var(--space-ct) * 1.5) var(--space-ht)); /* disabled glyphs on the frame */
+  --space-accent: oklch(0.57 var(--space-cs) var(--space-h)); /* the ring: 3:1 on frame and paper */
+  --space-solid: oklch(0.52 var(--space-cs) var(--space-h)); /* seal, confirm button */
+  --space-solid-2: oklch(0.47 var(--space-cs) var(--space-h)); /* hover, pressed */
+  --on-space-solid: oklch(0.99 0.004 var(--space-ht));
+  --space-wash: oklch(0.968 calc(var(--space-ct) * 0.5) var(--space-ht)); /* hue on paper */
+  --space-wash-2: oklch(0.94 calc(var(--space-ct) * 0.9) var(--space-ht)); /* citation chip */
+  --space-wash-line: oklch(0.85 calc(var(--space-ct) * 1.4) var(--space-ht));
+  --pocket: var(--paper); /* "this Mac": always neutral, always opaque */
+  --pocket-line: oklch(0.2 0.01 80 / 0.12);
 }
 
-[data-theme="dark"] [data-room],
-[data-room="incognito"] {
-  --room-frame: oklch(0.262 calc(var(--room-ct) * 1.3) var(--room-ht));
-  --room-frame-2: oklch(0.3 calc(var(--room-ct) * 1.45) var(--room-ht));
-  --room-frame-3: oklch(0.335 calc(var(--room-ct) * 1.6) var(--room-ht));
-  --room-field: oklch(0.215 calc(var(--room-ct) * 0.9) var(--room-ht));
-  --room-line: oklch(0.36 calc(var(--room-ct) * 1.7) var(--room-ht));
-  --room-ink: oklch(0.9 calc(var(--room-cs) * 0.38) var(--room-h));
-  --room-ink-2: oklch(0.79 calc(var(--room-cs) * 0.38) var(--room-h));
-  --room-ink-off: oklch(0.5 calc(var(--room-ct) * 1.5) var(--room-ht));
-  --room-accent: oklch(0.72 calc(var(--room-cs) * 0.8) calc(var(--room-h) + 3));
-  --room-solid: oklch(0.76 calc(var(--room-cs) * 0.72) var(--room-h));
-  --room-solid-2: oklch(0.82 calc(var(--room-cs) * 0.66) var(--room-h));
-  --on-room-solid: oklch(0.2 calc(var(--room-cs) * 0.3) var(--room-h));
-  --room-wash: oklch(0.245 calc(var(--room-ct) * 0.9) var(--room-ht));
-  --room-wash-2: oklch(0.3 calc(var(--room-ct) * 1.3) var(--room-ht));
-  --room-wash-line: oklch(0.39 calc(var(--room-ct) * 1.7) var(--room-ht));
-  --row-active-frame: oklch(1 0 0 / 0.12);
-  --row-hover-frame: oklch(1 0 0 / 0.06);
+[data-theme="dark"] [data-space],
+[data-theme="dark"][data-space] {
+  --space-frame: oklch(0.3 calc(var(--space-ct) * 1.5) var(--space-ht));
+  --space-frame-2: oklch(0.335 calc(var(--space-ct) * 1.6) var(--space-ht));
+  --space-frame-3: oklch(0.375 calc(var(--space-ct) * 1.7) var(--space-ht));
+  --space-field: oklch(0.245 calc(var(--space-ct) * 1.1) var(--space-ht));
+  --space-line: oklch(0.41 calc(var(--space-ct) * 1.8) var(--space-ht));
+  --space-ink: oklch(0.93 calc(var(--space-cs) * 0.3) var(--space-h));
+  --space-ink-2: oklch(0.83 calc(var(--space-cs) * 0.32) var(--space-h));
+  --space-ink-off: oklch(0.52 calc(var(--space-ct) * 1.5) var(--space-ht));
+  --space-accent: oklch(0.76 calc(var(--space-cs) * 0.8) var(--space-h));
+  --space-solid: oklch(0.78 calc(var(--space-cs) * 0.72) var(--space-h));
+  --space-solid-2: oklch(0.84 calc(var(--space-cs) * 0.66) var(--space-h));
+  --on-space-solid: oklch(0.2 calc(var(--space-cs) * 0.3) var(--space-h));
+  --space-wash: oklch(0.25 calc(var(--space-ct) * 0.9) var(--space-ht));
+  --space-wash-2: oklch(0.31 calc(var(--space-ct) * 1.3) var(--space-ht));
+  --space-wash-line: oklch(0.41 calc(var(--space-ct) * 1.7) var(--space-ht));
+  --pocket: oklch(0.165 0.004 80); /* a recess, darker than the frame */
+  --pocket-line: oklch(1 0 0 / 0.08);
 }
 
-/* ───────────────────────── 4. Rooms ───────────────────────── */
-/* 資金調達 2027: 柿 (persimmon) */
-[data-room="fund"] {
-  --room-h: 40;
-  --room-cs: 0.16;
-  --room-ht: 60;
-  --room-ct: 0.028;
+/* ───────────────────────── 4. The nine Space hues ─────────────────────────
+   Keys are SpaceHue; the Japanese name is the label shown in the colour picker. */
+[data-space="amber"] {
+  /* 琥珀 */
+  --space-h: 68;
+  --space-cs: 0.125;
+  --space-ht: 86;
+  --space-ct: 0.05;
 }
-/* 採用: 若竹 (young bamboo) */
-[data-room="hire"] {
-  --room-h: 165;
-  --room-cs: 0.1;
-  --room-ht: 160;
-  --room-ct: 0.03;
+[data-space="coral"] {
+  /* 柿 */
+  --space-h: 38;
+  --space-cs: 0.16;
+  --space-ht: 52;
+  --space-ct: 0.04;
 }
-/* プロダクト: 藍 (indigo) */
-[data-room="product"] {
-  --room-h: 256;
-  --room-cs: 0.14;
-  --room-ht: 250;
-  --room-ct: 0.027;
+[data-space="rose"] {
+  /* 紅梅 */
+  --space-h: 6;
+  --space-cs: 0.15;
+  --space-ht: 8;
+  --space-ct: 0.032;
 }
-/* further hues offered when a Space is created */
-[data-room="ochre"] {
-  --room-h: 88;
-  --room-cs: 0.105;
-  --room-ht: 92;
-  --room-ct: 0.035;
+[data-space="violet"] {
+  /* 藤 */
+  --space-h: 302;
+  --space-cs: 0.13;
+  --space-ht: 302;
+  --space-ct: 0.032;
 }
-[data-room="sky"] {
-  --room-h: 222;
-  --room-cs: 0.1;
-  --room-ht: 220;
-  --room-ct: 0.028;
+[data-space="indigo"] {
+  /* 藍 */
+  --space-h: 264;
+  --space-cs: 0.14;
+  --space-ht: 260;
+  --space-ct: 0.036;
 }
-[data-room="plum"] {
-  --room-h: 345;
-  --room-cs: 0.14;
-  --room-ht: 350;
-  --room-ct: 0.024;
+[data-space="sky"] {
+  /* 空 */
+  --space-h: 234;
+  --space-cs: 0.115;
+  --space-ht: 230;
+  --space-ct: 0.036;
 }
-/* private window: no room, no hue */
-[data-room="incognito"] {
-  --room-h: 80;
-  --room-cs: 0;
-  --room-ht: 80;
-  --room-ct: 0.004;
+[data-space="teal"] {
+  /* 浅葱 */
+  --space-h: 200;
+  --space-cs: 0.09;
+  --space-ht: 202;
+  --space-ct: 0.036;
+}
+[data-space="green"] {
+  /* 若竹 */
+  --space-h: 142;
+  --space-cs: 0.115;
+  --space-ht: 128;
+  --space-ct: 0.05;
+}
+[data-space="graphite"] {
+  /* 墨 */
+  --space-h: 250;
+  --space-cs: 0.014;
+  --space-ht: 250;
+  --space-ct: 0.007;
+}
+/* no Space yet (first run): neutral frame, no hue */
+[data-space="none"] {
+  --space-h: 80;
+  --space-cs: 0;
+  --space-ht: 80;
+  --space-ct: 0.004;
 }
 
-/* ───────────────────────── 5. Mock page content ─────────────────────────
-   Colours for the third-party pages drawn inside a tab. A real page paints itself;
-   these exist only so the mock pages do not carry stray values. */
+/* ───────────────────────── 5. The private window ─────────────────────────
+   No Space, no hue. Light theme: an ink frame. Dark theme: a frame lighter than every
+   Space frame, so it never reads as one more dark Space. */
+[data-window="private"] {
+  color-scheme: dark;
+  --space-h: 80;
+  --space-cs: 0;
+  --space-ht: 80;
+  --space-ct: 0.003;
+  --space-frame: oklch(0.27 0.004 80);
+  --space-frame-2: oklch(0.31 0.004 80);
+  --space-frame-3: oklch(0.35 0.004 80);
+  --space-field: oklch(0.22 0.004 80);
+  --space-line: oklch(0.39 0.004 80);
+  --space-ink: oklch(0.95 0.003 80);
+  --space-ink-2: oklch(0.82 0.003 80);
+  --space-ink-off: oklch(0.5 0.003 80);
+  --space-accent: oklch(0.74 0.003 80);
+  --space-solid: oklch(0.93 0.004 80);
+  --space-solid-2: oklch(0.84 0.004 80);
+  --on-space-solid: oklch(0.2 0.005 80);
+  --space-wash: oklch(0.25 0.004 80);
+  --space-wash-2: oklch(0.3 0.004 80);
+  --space-wash-line: oklch(0.4 0.004 80);
+  --pocket: oklch(0.2 0.004 80);
+  --pocket-line: oklch(1 0 0 / 0.1);
+
+  --paper: oklch(0.195 0.004 80);
+  --paper-2: oklch(0.225 0.004 80);
+  --paper-3: oklch(0.262 0.005 80);
+  --paper-4: oklch(0.3 0.005 80);
+  --line: oklch(0.295 0.005 80);
+  --line-strong: oklch(0.37 0.006 80);
+  --line-control: oklch(0.55 0.006 80);
+  --ink: oklch(0.93 0.004 80);
+  --ink-2: oklch(0.77 0.005 80);
+  --ink-3: oklch(0.68 0.005 80);
+  --ink-off: oklch(0.48 0.005 80);
+  --inverse: oklch(0.93 0.004 80);
+  --inverse-2: oklch(0.84 0.004 80);
+  --on-inverse: oklch(0.2 0.005 80);
+  --on-inverse-2: oklch(0.38 0.005 80);
+  --focus: oklch(0.93 0.004 80);
+  --mark: oklch(0.3 0.005 80);
+  --shadow-menu: 0 0 0 1px oklch(1 0 0 / 0.12), 0 10px 24px -6px oklch(0 0 0 / 0.65);
+}
+[data-theme="dark"] [data-window="private"],
+[data-theme="dark"][data-window="private"] {
+  --space-frame: oklch(0.4 0.003 80);
+  --space-frame-2: oklch(0.44 0.003 80);
+  --space-frame-3: oklch(0.48 0.003 80);
+  --space-field: oklch(0.33 0.003 80);
+  --space-line: oklch(0.52 0.003 80);
+  --space-ink: oklch(0.97 0.003 80);
+  --space-ink-2: oklch(0.9 0.003 80);
+  --space-ink-off: oklch(0.62 0.003 80);
+}
+
+/* ───────────────────────── 6. Mock content ─────────────────────────
+   Colours of things Tiger does not own: third-party pages drawn inside a tab, stand-in
+   favicons and member photos. A real page, favicon or photo paints itself; these exist so
+   the mock can test the frame against real-world hues without carrying stray values. */
 :root {
   --mock-canvas: oklch(0.965 0.003 250);
   --mock-sheet: oklch(1 0 0);
@@ -292,6 +369,34 @@
   --mock-ink: oklch(0.25 0.005 250);
   --mock-ink-2: oklch(0.48 0.006 250);
   --mock-fill: oklch(0.93 0.004 250);
+  --mock-white: oklch(1 0 0);
   --mock-shadow: 0 0 0 1px oklch(0.2 0.01 250 / 0.08), 0 1px 3px oklch(0.2 0.01 250 / 0.1);
   --mock-serif: "Noto Serif JP", "Hiragino Mincho ProN", serif;
+
+  --mock-blue: oklch(0.6 0.17 258); /* document editor */
+  --mock-blue-wash: oklch(0.93 0.04 258);
+  --mock-green: oklch(0.6 0.14 152); /* spreadsheet */
+  --mock-yellow: oklch(0.8 0.15 88); /* slides */
+  --mock-red: oklch(0.6 0.2 27); /* mail, PDF */
+  --mock-aubergine: oklch(0.3 0.09 325); /* team chat */
+  --mock-aubergine-2: oklch(0.37 0.1 325);
+  --mock-aubergine-ink: oklch(0.86 0.03 325);
+  --mock-teal: oklch(0.56 0.09 200); /* trade journal */
+  --mock-navy: oklch(0.3 0.09 262); /* bank */
+  --mock-navy-2: oklch(0.38 0.1 262);
+  --mock-crimson: oklch(0.52 0.19 22); /* bank accent */
+  --mock-black: oklch(0.2 0 0); /* notes app, code host */
+  --mock-violet: oklch(0.55 0.19 295); /* design tool */
+  --mock-orange: oklch(0.7 0.17 55); /* analytics */
+
+  --photo-bg-a: oklch(0.8 0.05 230);
+  --photo-bg-b: oklch(0.84 0.06 95);
+  --photo-bg-c: oklch(0.78 0.05 20);
+  --photo-skin: oklch(0.82 0.05 65);
+  --photo-skin-2: oklch(0.76 0.06 60);
+  --photo-hair: oklch(0.25 0.02 60);
+  --photo-hair-2: oklch(0.34 0.04 50);
+  --photo-cloth-a: oklch(0.42 0.06 255);
+  --photo-cloth-b: oklch(0.93 0.01 90);
+  --photo-cloth-c: oklch(0.36 0.02 150);
 }

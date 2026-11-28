@@ -5,6 +5,7 @@ import {
   errorKey,
   googleFlowKey,
   shareFailureKey,
+  shareThreadFailureKey,
   type TigerClient,
   type ViewMessage,
 } from '@tiger/client'
@@ -403,6 +404,9 @@ function Threads({
               </button>
             </div>
           ))}
+          {threads.privateThreadId ? (
+            <ShareThread client={client} t={t} threadId={threads.privateThreadId} />
+          ) : null}
         </div>
       ) : null}
 
@@ -443,6 +447,89 @@ function Threads({
       </form>
       {threads.mutation.error ? (
         <div className="error">{tr(errorKey(threads.mutation.error))}</div>
+      ) : null}
+    </div>
+  )
+}
+
+/** Share the private thread with the Space: every question with an attached page is decided first. */
+function ShareThread({
+  client,
+  t,
+  threadId,
+}: {
+  client: TigerClient
+  t: Strings
+  threadId: string
+}) {
+  const flow = useTigerStore(client.shareThread.store, (s) => s)
+  const tr = client.t()
+  const busy = flow.phase === 'loading' || flow.phase === 'sending'
+  return (
+    <div>
+      <button
+        type="button"
+        data-testid="share-thread-begin"
+        disabled={busy}
+        onClick={() => void client.shareThread.begin(threadId)}
+      >
+        {t.shareThread}
+      </button>
+      {flow.phase === 'deciding' ? (
+        <div className="preview" data-testid="share-thread-dialog">
+          {flow.questions.map((q) => (
+            <div
+              key={q.question.id}
+              data-testid="share-thread-question"
+              data-message-id={q.question.id}
+              data-decision={q.decision ?? ''}
+            >
+              <div>{tr('shareThread.decide')}</div>
+              <div>
+                {q.question.content} ({t.answers}: {q.answers.length})
+              </div>
+              <button
+                type="button"
+                data-testid="share-thread-include"
+                onClick={() => client.shareThread.decide(q.question.id, 'include')}
+              >
+                {t.includeInShare}
+              </button>
+              <button
+                type="button"
+                data-testid="share-thread-exclude"
+                onClick={() => client.shareThread.decide(q.question.id, 'exclude')}
+              >
+                {t.excludeFromShare}
+              </button>
+            </div>
+          ))}
+          <div data-testid="share-thread-count">
+            {t.messagesToShare}: {client.shareThread.preview().length}
+          </div>
+          <button
+            type="button"
+            data-testid="share-thread-confirm"
+            disabled={!flow.ready}
+            onClick={() => void client.shareThread.confirm()}
+          >
+            {t.confirmShare}
+          </button>
+          <button type="button" onClick={() => client.shareThread.cancel()}>
+            {t.cancel}
+          </button>
+        </div>
+      ) : null}
+      {flow.phase === 'sending' ? <div>{t.sending}</div> : null}
+      {flow.phase === 'done' ? (
+        <div data-testid="share-thread-done" data-thread-id={flow.thread.id}>
+          {tr('shareThread.done')}
+        </div>
+      ) : null}
+      {flow.phase === 'error' ? (
+        <div className="error" data-testid="share-thread-error">
+          {tr(shareThreadFailureKey(flow.failure))}
+        </div>
       ) : null}
     </div>
   )

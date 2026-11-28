@@ -106,14 +106,6 @@ export interface ThreadsController {
   confirmAttach(): boolean
   cancelAttach(): void
   removeAttachment(threadId: string, index: number): void
-  /**
-   * Promote a private thread to the Space. A thread with page attachments is refused with
-   * `thread_has_private_attachments`: here, without a request, when one of its loaded messages has
-   * one, and by the server otherwise.
-   */
-  promote(threadId: string): Promise<Thread | null>
-  /** Whether a loaded message of the thread has a page attachment (so `promote` would be refused). */
-  hasAttachments(threadId: string): boolean
   remove(threadId: string): Promise<boolean>
   thread(threadId: string): Thread | null
   /**
@@ -381,11 +373,7 @@ export function createThreads(
     const s = store.getState()
     if (thread.spaceId !== s.spaceId) return
     const rest = s.threads.filter((t) => t.id !== thread.id)
-    const patch: Partial<ThreadsState> = { threads: [thread, ...rest].sort(byActivity) }
-    // A promoted side-panel thread now belongs to the Space; the next private question starts anew.
-    if (s.privateThreadId === thread.id && thread.visibility !== 'private')
-      patch.privateThreadId = null
-    store.setState(patch)
+    store.setState({ threads: [thread, ...rest].sort(byActivity) })
   }
 
   function dropThread(threadId: string): void {
@@ -422,12 +410,6 @@ export function createThreads(
       }
     }
     store.setState({ messages })
-  }
-
-  /** Some loaded message of the thread carries a page attachment. */
-  function hasAttachments(threadId: string): boolean {
-    const list = store.getState().messages[threadId]?.list ?? []
-    return list.some((v) => v.message.attachments.length > 0)
   }
 
   function pickPrivate(threads: Thread[]): string | null {
@@ -683,30 +665,6 @@ export function createThreads(
       store.setState({ drafts: { ...drafts, [threadId]: list } })
     },
 
-    async promote(threadId) {
-      if (hasAttachments(threadId)) {
-        // Refused here, before any request: the server refuses it too.
-        store.setState({
-          mutation: failed(
-            new ApiClientError(
-              'client',
-              'thread_has_private_attachments',
-              'A thread with attached pages cannot be shared',
-            ),
-          ),
-        })
-        return null
-      }
-      const thread = await mutate(() => ctx.api.call(api.shareThread, { params: { threadId } }))
-      if (thread) {
-        upsertThread(thread)
-        // A Space thread takes no pages: drop any unsent ones.
-        const { [threadId]: _d, ...drafts } = store.getState().drafts
-        store.setState({ drafts })
-      }
-      return thread
-    },
-
     async remove(threadId) {
       const ok = await mutate(() => ctx.api.call(api.deleteThread, { params: { threadId } }))
       if (ok) dropThread(threadId)
@@ -717,7 +675,6 @@ export function createThreads(
       return store.getState().threads.find((t) => t.id === threadId) ?? null
     },
 
-    hasAttachments,
 
     async stop(messageId) {
       const ok = await mutate(() => ctx.api.call(api.abortMessage, { params: { messageId } }))

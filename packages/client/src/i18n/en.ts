@@ -26,7 +26,7 @@ export const en: Dictionary = {
     'Pages cannot be attached in a Space thread. Share the page to the Space instead.',
   'error.already_shared': 'This is already shared. You can find it in the Space.',
   'error.thread_has_private_attachments':
-    'A thread with attached pages cannot be shared to the Space. Share the pages to the Space and ask again in a Space thread.',
+    'Decide for every question with an attached page whether it is shared. A page may have been attached since; open the share again.',
   'error.budget_exceeded':
     'This Space has reached its AI limit for the month. Ask a Space owner to raise it.',
   'error.model_unavailable': 'This model is not available right now. Choose another model.',
@@ -71,6 +71,11 @@ export const en: Dictionary = {
   'share.stale.stale': 'This page changed after it was shared.',
   'share.stale.not-shared': 'This page is not shared yet.',
   'share.noSpace': 'Choose a Space to share to.',
+  'shareThread.notPrivate': 'Only your own private thread can be shared to the Space.',
+  'shareThread.nothingToShare': 'Everything is left out, so there is nothing to share.',
+  'shareThread.decide':
+    'This question had a page attached. Share it with its answers, or leave both out. The page itself is never shared.',
+  'shareThread.done': 'Shared to the Space as a new thread. Your private thread is unchanged.',
 
   'ai.ai_aborted': 'The answer was stopped. Ask again to get a full answer.',
   'ai.ai_failed': 'The answer could not be produced. Please ask again.',
