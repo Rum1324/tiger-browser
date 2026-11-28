@@ -226,14 +226,20 @@ describe('attachments', () => {
 
     await h.fails(
       'shareThread',
-      { params: { threadId: t.id }, body: { includeAttachedMessageIds: [], excludeMessageIds: [] } },
+      {
+        params: { threadId: t.id },
+        body: { includeAttachedMessageIds: [], excludeMessageIds: [] },
+      },
       member.token,
       404,
       'thread_not_found',
     )
     await h.fails(
       'shareThread',
-      { params: { threadId: t.id }, body: { includeAttachedMessageIds: [], excludeMessageIds: [] } },
+      {
+        params: { threadId: t.id },
+        body: { includeAttachedMessageIds: [], excludeMessageIds: [] },
+      },
       owner.token,
       409,
       'thread_has_private_attachments',
@@ -301,7 +307,10 @@ describe('attachments', () => {
         ),
         h.call(
           'shareThread',
-          { params: { threadId: t.id }, body: { includeAttachedMessageIds: [], excludeMessageIds: [] } },
+          {
+            params: { threadId: t.id },
+            body: { includeAttachedMessageIds: [], excludeMessageIds: [] },
+          },
           owner.token,
         ),
       ])

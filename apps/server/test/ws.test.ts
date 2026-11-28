@@ -108,7 +108,10 @@ describe('/v1/ws', () => {
     )
     const copy = await h.ok(
       'shareThread',
-      { params: { threadId: t2.id }, body: { includeAttachedMessageIds: [], excludeMessageIds: [] } },
+      {
+        params: { threadId: t2.id },
+        body: { includeAttachedMessageIds: [], excludeMessageIds: [] },
+      },
       owner.token,
     )
     expect((await memberWs.next('thread.created')).thread).toMatchObject({

@@ -117,9 +117,7 @@ export function createShareThreadFlow(
   // Each begin/cancel bumps this, so a late load or response cannot revive a stale flow.
   let run = 0
 
-  function update(
-    patch: Partial<{ questions: AttachedQuestion[]; excluded: string[] }>,
-  ): boolean {
+  function update(patch: Partial<{ questions: AttachedQuestion[]; excluded: string[] }>): boolean {
     const s = store.getState()
     if (s.phase !== 'deciding') return false
     const questions = patch.questions ?? s.questions

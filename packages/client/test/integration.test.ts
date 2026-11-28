@@ -464,7 +464,10 @@ describe('threads and AI', () => {
     // A Space thread cannot be shared again: refused before any request.
     const r0 = A.requests.length
     await flow.begin(spaceThread.id)
-    expect(flow.store.getState()).toMatchObject({ phase: 'error', failure: { kind: 'not-private' } })
+    expect(flow.store.getState()).toMatchObject({
+      phase: 'error',
+      failure: { kind: 'not-private' },
+    })
     expect(A.requests.length).toBe(r0)
 
     // The whole thread is read; the attached question is listed with its answer.

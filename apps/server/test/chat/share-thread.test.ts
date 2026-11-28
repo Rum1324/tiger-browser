@@ -65,7 +65,10 @@ describe('planThreadShare', () => {
     expect(code(() => planThreadShare(thread, ['q2', 'q2'], []))).toBe('invalid_request')
     expect(code(() => planThreadShare(thread, ['q2', 'q1'], []))).toBe('invalid_request')
     expect(code(() => planThreadShare(thread, [], ['q1', 'q2', 'q3']))).toBe('invalid_request')
-    const streaming = [...thread.slice(0, 6), { ...m('a3', 'assistant'), status: 'streaming' as const }]
+    const streaming = [
+      ...thread.slice(0, 6),
+      { ...m('a3', 'assistant'), status: 'streaming' as const },
+    ]
     expect(code(() => planThreadShare(streaming, ['q2'], []))).toBe('invalid_request')
     expect(ids(planThreadShare(streaming, ['q2'], ['a3']))).toEqual(ids(thread.slice(0, 6)))
   })
@@ -85,7 +88,8 @@ describe('sharing a private thread to the Space', () => {
     const { h } = c
     return {
       thread: await h.sql`select * from threads where id = ${threadId}`,
-      messages: await h.sql`select * from messages where thread_id = ${threadId} order by created_at, id`,
+      messages:
+        await h.sql`select * from messages where thread_id = ${threadId} order by created_at, id`,
       attachments: await h.sql`
         select a.* from message_attachments a join messages m on m.id = a.message_id
         where m.thread_id = ${threadId} order by a.id
@@ -201,8 +205,16 @@ describe('sharing a private thread to the Space', () => {
       await h.ok('listAudit', { params: { spaceId: space.id }, query: {} }, member.token),
       await h.ok('getSpace', { params: { spaceId: space.id } }, member.token),
       await h.ok('listItems', { params: { spaceId: space.id } }, member.token),
-      await h.ok('search', { params: { spaceId: space.id }, body: { query: 'ZEBRA' } }, member.token),
-      await h.ok('search', { params: { spaceId: space.id }, body: { query: 'PELICAN' } }, member.token),
+      await h.ok(
+        'search',
+        { params: { spaceId: space.id }, body: { query: 'ZEBRA' } },
+        member.token,
+      ),
+      await h.ok(
+        'search',
+        { params: { spaceId: space.id }, body: { query: 'PELICAN' } },
+        member.token,
+      ),
       memberWs.events,
     ])
     for (const s of [
@@ -270,7 +282,10 @@ describe('sharing a private thread to the Space', () => {
     )
     const { message } = await h.ok(
       'postMessage',
-      { params: { threadId: alone.id }, body: { content: 'x', askAi: false, attachments: [OFFER] } },
+      {
+        params: { threadId: alone.id },
+        body: { content: 'x', askAi: false, attachments: [OFFER] },
+      },
       owner.token,
     )
     await h.fails(
@@ -303,7 +318,10 @@ describe('sharing a private thread to the Space', () => {
     const attached = (
       await h.ok(
         'postMessage',
-        { params: { threadId: priv.id }, body: { content: 'q', askAi: false, attachments: [OFFER] } },
+        {
+          params: { threadId: priv.id },
+          body: { content: 'q', askAi: false, attachments: [OFFER] },
+        },
         owner.token,
       )
     ).message
@@ -326,7 +344,8 @@ describe('sharing a private thread to the Space', () => {
     )
 
     const state = async () => ({
-      threads: await h.sql`select id, visibility, title from threads where space_id = ${space.id} order by id`,
+      threads:
+        await h.sql`select id, visibility, title from threads where space_id = ${space.id} order by id`,
       messages: await h.sql`
         select m.id from messages m join threads t on t.id = m.thread_id
         where t.space_id = ${space.id} order by m.id

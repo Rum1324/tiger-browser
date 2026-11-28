@@ -382,7 +382,8 @@ export function planThreadShare(
     throw new AppError(400, 'invalid_request', 'A message is listed twice')
   }
   for (const id of [...include, ...excluded]) {
-    if (!byId.has(id)) throw new AppError(400, 'invalid_request', 'A listed message is not in this thread')
+    if (!byId.has(id))
+      throw new AppError(400, 'invalid_request', 'A listed message is not in this thread')
     if (include.has(id) && excluded.has(id)) {
       throw new AppError(400, 'invalid_request', 'A message is both included and excluded')
     }
@@ -412,7 +413,11 @@ export function planThreadShare(
   }
   if (chosen.length === 0) throw new AppError(400, 'invalid_request', 'Nothing is left to share')
   if (chosen.some((m) => m.status === 'streaming')) {
-    throw new AppError(400, 'invalid_request', 'An answer is still being written; share it once it ends')
+    throw new AppError(
+      400,
+      'invalid_request',
+      'An answer is still being written; share it once it ends',
+    )
   }
   return chosen
 }

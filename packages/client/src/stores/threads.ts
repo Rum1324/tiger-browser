@@ -675,7 +675,6 @@ export function createThreads(
       return store.getState().threads.find((t) => t.id === threadId) ?? null
     },
 
-
     async stop(messageId) {
       const ok = await mutate(() => ctx.api.call(api.abortMessage, { params: { messageId } }))
       if (ok === null) return false

@@ -295,7 +295,8 @@ describe('MVP flow in the real app', () => {
 
   it('shares the private thread to the Space: the attached question is decided, the page never leaves', async () => {
     const assistantDone = '[data-testid="message"][data-role="assistant"][data-phase="complete"]'
-    const shareRequests = () => readLog().filter((r) => r.method === 'POST' && r.url.endsWith('/share'))
+    const shareRequests = () =>
+      readLog().filter((r) => r.method === 'POST' && r.url.endsWith('/share'))
     await t.ui.fill(sel('question'), '発売時期について一般的な注意点は?')
     await t.ui.click(sel('ask'))
     await waitFor(async () => (await t.ui.$$(assistantDone)).length === 2, 30_000, 'second answer')

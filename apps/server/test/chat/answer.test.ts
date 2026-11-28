@@ -399,7 +399,10 @@ describe('private attachments', () => {
     // question; the member still cannot read it and the attachment stays with its owner.
     await h.fails(
       'shareThread',
-      { params: { threadId: thread.id }, body: { includeAttachedMessageIds: [], excludeMessageIds: [] } },
+      {
+        params: { threadId: thread.id },
+        body: { includeAttachedMessageIds: [], excludeMessageIds: [] },
+      },
       owner.token,
       409,
       'thread_has_private_attachments',
