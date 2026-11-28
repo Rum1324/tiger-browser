@@ -187,8 +187,12 @@ export class TabController {
         if (e.isMainFrame) this.interceptInvite(e.url)
       } else if (e.isMainFrame && this.interceptInvite(e.url)) e.preventDefault()
     })
+    // Fires before will-navigate, for every frame; a top-frame link to `tiger://invite/<token>`
+    // is stopped here and only offered as the accept dialog. A subframe's never is.
     wc.on('will-frame-navigate', (e) => {
-      if (!frameUrlAllowed(e.url)) e.preventDefault()
+      if (frameUrlAllowed(e.url)) return
+      e.preventDefault()
+      if (e.isMainFrame) this.interceptInvite(e.url)
     })
     wc.on('will-redirect', (e) => {
       if (e.isMainFrame && this.interceptInvite(e.url)) e.preventDefault()

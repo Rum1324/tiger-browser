@@ -21,6 +21,14 @@ files:
   - "!node_modules/pdfjs-dist/{legacy,build,web,image_decoders,types}/**"
   - "!node_modules/pdfjs-dist/*.{md,mjs}"
 asar: true
+# OS-level invite links, tiger://invite/<token>: CFBundleURLTypes in the macOS Info.plist and
+# x-scheme-handler/tiger in the Linux .desktop file. Windows has no installer entry for it; the
+# packaged app registers itself at startup (src/main/index.ts). Unrelated to tiger://ui, the
+# in-app protocol that serves the UI on its own session.
+protocols:
+  - name: Tiger invite link
+    schemes:
+      - tiger
 # Release binaries cannot be repurposed as a Node runtime or debugged through NODE_OPTIONS, and only
 # load the app from the integrity-checked asar. E2E runs the unpackaged app, which keeps the defaults
 # (Playwright cannot launch a fused binary, docs/research/electron-shell.md).

@@ -329,7 +329,8 @@ describe('permissions', () => {
     expect(await reloaded.evaluate(() => Notification.permission)).toBe('default')
     // The normal window still has its own decision.
     expect(await t.invoke('permissions.list')).toHaveLength(1)
-    await t.invokeFrom(priv, 'window.action', { action: 'close' })
+    // The window closes under the call, so its answer never arrives.
+    await t.invokeFrom(priv, 'window.action', { action: 'close' }).catch(() => {})
     await waitFor(() => t.uiPages().length === before, 10_000, 'private window closed')
   })
 
