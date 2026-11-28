@@ -71,18 +71,33 @@ export async function startRig(): Promise<Rig> {
     return { page, errors }
   }
 
+  const shot = async (
+    screen: string,
+    theme: RigTheme,
+  ): Promise<{ path: string; errors: string[] }> => {
+    const { page, errors } = await open(screen, theme)
+    mkdirSync(SHOTS_DIR, { recursive: true })
+    const path = join(SHOTS_DIR, `${screen.replace(/\//g, '__')}.${theme}.png`)
+    await page.screenshot({ path, fullPage: false })
+    await page.close()
+    return { path, errors }
+  }
+
+  const shots = async (): Promise<Record<string, string>> => {
+    const page = await browser.newPage()
+    await page.goto(`${url}/rig.html?screen=__list__`)
+    await page.waitForFunction(() => !!window.__rig)
+    const shots = await page.evaluate(() => window.__rig?.shots ?? {})
+    await page.close()
+    return shots
+  }
+
   return {
     url,
     browser,
     open,
-    async shot(screen, theme) {
-      const { page, errors } = await open(screen, theme)
-      mkdirSync(SHOTS_DIR, { recursive: true })
-      const path = join(SHOTS_DIR, `${screen.replace(/\//g, '__')}.${theme}.png`)
-      await page.screenshot({ path, fullPage: false })
-      await page.close()
-      return { path, errors }
-    },
+    shot,
+    shots,
     async screens() {
       const page = await browser.newPage()
       await page.goto(`${url}/rig.html?screen=__list__`)
@@ -91,21 +106,13 @@ export async function startRig(): Promise<Rig> {
       await page.close()
       return names
     },
-    async shots() {
-      const page = await browser.newPage()
-      await page.goto(`${url}/rig.html?screen=__list__`)
-      await page.waitForFunction(() => !!window.__rig)
-      const shots = await page.evaluate(() => window.__rig?.shots ?? {})
-      await page.close()
-      return shots
-    },
     async compare(screen) {
-      const shots = await this.shots()
-      const name = shots[screen]
+      const all = await shots()
+      const name = all[screen]
       const designPath = name ? join(DESIGN_SHOTS_DIR, `${name}.png`) : null
       if (!designPath || !existsSync(designPath)) return null
       const theme: RigTheme = name?.includes('-dark-') ? 'dark' : 'light'
-      const { path: implPath, errors } = await this.shot(screen, theme)
+      const { path: implPath, errors } = await shot(screen, theme)
       const b64 = (p: string) => `data:image/png;base64,${readFileSync(p).toString('base64')}`
       const page = await browser.newPage({
         viewport: { width: VIEWPORT.width * 2 + 16, height: VIEWPORT.height + 32 },

@@ -52,6 +52,8 @@ describe('shell: surfaces and the page slot', () => {
   })
 
   async function mount() {
+    // The window-width rules (layout-state.ts) read the CSS width; jsdom defaults to 1024.
+    Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
     const el = document.createElement('div')
     document.body.appendChild(el)
     const root = createRoot(el)

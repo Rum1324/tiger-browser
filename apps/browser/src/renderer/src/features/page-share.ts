@@ -20,10 +20,10 @@ import { useServices } from '../app/context'
 import type { AppServices } from '../app/services'
 import type { EngineState } from '../engine/engine-state'
 import type { Notice } from '../i18n'
+import { createStore, shallow, useStore, type WritableStore } from '../lib/store'
 import { popoverAt } from '../overlay/anchors'
 import { attachActions } from './attach'
 import { shareActions } from './share'
-import { createStore, shallow, useStore, type WritableStore } from '../lib/store'
 
 /** The minimum the UI needs to draw a Space's seal and name. */
 export interface SpaceRef {

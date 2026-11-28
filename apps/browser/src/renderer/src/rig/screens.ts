@@ -250,7 +250,10 @@ const overlayShown = (ctx: RigContext, surface: string) =>
   waitUntil(() => svc(ctx).overlay.store.getState().open?.surface === surface)
 
 const messagesOf = (w: FixtureWorld) => w.messages[w.ids.privateThread] ?? []
-const settleAnswer = (w: FixtureWorld, patch: Partial<NonNullable<ReturnType<typeof messagesOf>[number]>>) => {
+const settleAnswer = (
+  w: FixtureWorld,
+  patch: Partial<NonNullable<ReturnType<typeof messagesOf>[number]>>,
+) => {
   w.messages[w.ids.privateThread] = messagesOf(w).map((m) =>
     m.id === w.ids.streamingAnswer ? { ...m, streamSeq: null, ...patch } : m,
   )
@@ -263,22 +266,33 @@ const MANY_TABS: FakeTabSpec[] = [
   })),
 ]
 
-const ALL_DOWNLOADS: Download[] = (['progressing', 'paused', 'completed', 'cancelled', 'interrupted'] as const).map(
-  (state, i) => ({
-    id: `dl-${state}`,
-    url: `https://files.example.com/${state}.pdf`,
-    filename: ['事業計画_2027.pdf', '議事録_1125.docx', '介護報酬改定の概要.pdf', 'ロゴ一式.zip', '決算書_2025.pdf'][i] as string,
-    savePath: state === 'completed' ? `/Users/saeki/Downloads/${state}.pdf` : null,
-    state,
-    receivedBytes: state === 'completed' ? 2_412_000 : 820_000,
-    totalBytes: 2_412_000,
-    startedAt: new Date(Date.parse('2026-11-26T03:14:00.000Z') - (i + 1) * 60_000).toISOString(),
-  }),
-)
+const ALL_DOWNLOADS: Download[] = (
+  ['progressing', 'paused', 'completed', 'cancelled', 'interrupted'] as const
+).map((state, i) => ({
+  id: `dl-${state}`,
+  url: `https://files.example.com/${state}.pdf`,
+  filename: [
+    '事業計画_2027.pdf',
+    '議事録_1125.docx',
+    '介護報酬改定の概要.pdf',
+    'ロゴ一式.zip',
+    '決算書_2025.pdf',
+  ][i] as string,
+  savePath: state === 'completed' ? `/Users/saeki/Downloads/${state}.pdf` : null,
+  state,
+  receivedBytes: state === 'completed' ? 2_412_000 : 820_000,
+  totalBytes: 2_412_000,
+  startedAt: new Date(Date.parse('2026-11-26T03:14:00.000Z') - (i + 1) * 60_000).toISOString(),
+}))
 
 interface ShotSpec extends Omit<RigScreen, 'name' | 'kind' | 'shot'> {}
 
-const shot = (name: string, spec: ShotSpec): RigScreen => ({ name, kind: 'app', shot: name, ...spec })
+const shot = (name: string, spec: ShotSpec): RigScreen => ({
+  name,
+  kind: 'app',
+  shot: name,
+  ...spec,
+})
 const dark = (name: string, base: RigScreen): RigScreen => ({
   ...base,
   name,
@@ -355,7 +369,10 @@ export const DESIGN_SCREENS: RigScreen[] = [
     description: 'The moment after the server answered a share (motion frozen as its end state).',
     tabs: activate('news'),
     setup: async (ctx) => {
-      await ctx.client.share.begin(activeTab(ctx), ctx.client.spaces.store.getState().currentSpaceId)
+      await ctx.client.share.begin(
+        activeTab(ctx),
+        ctx.client.spaces.store.getState().currentSpaceId,
+      )
       await ctx.client.share.confirm()
     },
   }),
@@ -363,7 +380,10 @@ export const DESIGN_SCREENS: RigScreen[] = [
     description: 'Just shared: closed ring, the item first on the shelf, undo in the capsule.',
     tabs: activate('news'),
     setup: async (ctx) => {
-      await ctx.client.share.begin(activeTab(ctx), ctx.client.spaces.store.getState().currentSpaceId)
+      await ctx.client.share.begin(
+        activeTab(ctx),
+        ctx.client.spaces.store.getState().currentSpaceId,
+      )
       await ctx.client.share.confirm()
     },
   }),
@@ -505,7 +525,10 @@ export const DESIGN_SCREENS: RigScreen[] = [
   }),
   shot('15a-permission-prompt', {
     description: 'A meeting page asks for the microphone.',
-    tabs: [...BROWSING.map((t) => ({ ...t, active: false })), { page: 'https://meet.example.com/abc-defg', active: true }],
+    tabs: [
+      ...BROWSING.map((t) => ({ ...t, active: false })),
+      { page: 'https://meet.example.com/abc-defg', active: true },
+    ],
     setup: async (ctx) => {
       ctx.engine.emit('permission.request', {
         requestId: 'rig-mic',
@@ -653,7 +676,9 @@ export const DESIGN_SCREENS: RigScreen[] = [
   }),
   shot('20d-tab-crashed', {
     description: 'The page process ended.',
-    tabs: BROWSING.map((t) => (t.page === 'pitch' ? { ...t, active: true, crashed: true } : { ...t, active: false })),
+    tabs: BROWSING.map((t) =>
+      t.page === 'pitch' ? { ...t, active: true, crashed: true } : { ...t, active: false },
+    ),
   }),
   itemDetail,
   shot('22-new-tab', {

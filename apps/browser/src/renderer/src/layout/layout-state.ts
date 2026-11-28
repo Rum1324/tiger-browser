@@ -71,7 +71,11 @@ export function effectiveLayout(
   windowWidth: number,
 ): EffectiveLayout {
   const mode: LayoutMode =
-    windowWidth >= BREAKPOINTS.wide ? 'wide' : windowWidth >= BREAKPOINTS.medium ? 'medium' : 'narrow'
+    windowWidth >= BREAKPOINTS.wide
+      ? 'wide'
+      : windowWidth >= BREAKPOINTS.medium
+        ? 'medium'
+        : 'narrow'
   const railForPanel = mode !== 'wide' && prefs.panelOpen
   return {
     mode,

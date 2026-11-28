@@ -86,7 +86,8 @@ describe('usePageShareActions: what the capsule can do', () => {
     expect(s.surface).toBe('attach')
     w.guest.shown(s.id)
     await waitFor(
-      () => (s && (w.guest.store.getState().current?.props as { phase?: string })?.phase) === 'preview',
+      () =>
+        (s && (w.guest.store.getState().current?.props as { phase?: string })?.phase) === 'preview',
       'attach preview',
     )
     await settle(() => w.guest.emit(s.id, { type: 'confirm' }))

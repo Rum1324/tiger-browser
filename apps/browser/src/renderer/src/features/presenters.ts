@@ -27,7 +27,10 @@ export async function presentMenu(
   anchor: string,
   side: 'below' | 'above' = 'below',
 ): Promise<string | null> {
-  const height = Math.min(480, 16 + items.length * 32 + items.filter((i) => i.separatorBefore).length * 9)
+  const height = Math.min(
+    480,
+    16 + items.length * 32 + items.filter((i) => i.separatorBefore).length * 9,
+  )
   const placement = popoverAt(anchor, 'menu', side)
   if (placement.mode === 'popover') placement.size = { width: placement.size.width, height }
   const outcome = await s.overlay.open('menu', { items }, placement).outcome
@@ -141,7 +144,10 @@ export async function presentModelPicker(s: AppServices): Promise<ModelRef | nul
 
 export type ExportTarget = 'google' | 'copy' | 'file'
 
-export async function presentExportMenu(s: AppServices, anchor = 'export'): Promise<ExportTarget | null> {
+export async function presentExportMenu(
+  s: AppServices,
+  anchor = 'export',
+): Promise<ExportTarget | null> {
   const t = tOf(s)
   const id = await presentMenu(
     s,
@@ -207,7 +213,8 @@ export function bindPermissionPrompts(s: AppServices): () => void {
       )
       .outcome.then((o) => {
         showing = null
-        if (o.status === 'result') void s.permissions.respond(req.requestId, o.value.allow, o.value.remember)
+        if (o.status === 'result')
+          void s.permissions.respond(req.requestId, o.value.allow, o.value.remember)
         else dismissedIds.add(req.requestId)
       })
   }
@@ -250,20 +257,25 @@ export function bindInviteOffer(s: AppServices): () => void {
     const pending = s.client.spaces.store.getState().pendingInvite
     if (!pending || open === pending.token) return
     open = pending.token
-    const handle = s.overlay.open('invite', props(), { mode: 'modal' }, {
-      async onEvent(e) {
-        if (e.type === 'dismiss') {
-          s.client.spaces.dismissPendingInvite()
-          return handle.close('closed')
-        }
-        handle.update({ ...props(), busy: true })
-        const space = await s.client.spaces.acceptPendingInvite()
-        if (space) {
-          handle.close('closed')
-          s.router.go({ name: 'space-home', section: 'overview' })
-        } else handle.update(props())
+    const handle = s.overlay.open(
+      'invite',
+      props(),
+      { mode: 'modal' },
+      {
+        async onEvent(e) {
+          if (e.type === 'dismiss') {
+            s.client.spaces.dismissPendingInvite()
+            return handle.close('closed')
+          }
+          handle.update({ ...props(), busy: true })
+          const space = await s.client.spaces.acceptPendingInvite()
+          if (space) {
+            handle.close('closed')
+            s.router.go({ name: 'space-home', section: 'overview' })
+          } else handle.update(props())
+        },
       },
-    })
+    )
     void handle.outcome.then((o) => {
       open = null
       // Escape or a click outside: the offer is put aside, not accepted.
@@ -300,4 +312,3 @@ export function usePresenters() {
     [s],
   )
 }
-

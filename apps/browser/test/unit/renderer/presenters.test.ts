@@ -18,7 +18,8 @@ const TABS = [{ page: 'pitch', active: true }, { page: 'news' }]
 /** The surface the overlay view was asked to show, once it arrives, reported as shown. */
 async function opened(w: World, name: string) {
   const s = await waitFor(
-    () => (w.guest.store.getState().current?.surface === name ? w.guest.store.getState().current : null),
+    () =>
+      w.guest.store.getState().current?.surface === name ? w.guest.store.getState().current : null,
     `${name} in the overlay`,
   )
   w.guest.shown(s.id)
