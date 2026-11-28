@@ -52,6 +52,8 @@ const ICONS = {
   arrowRight: '<path d="M3 8h9.5M9 4.5 12.5 8 9 11.5"/>',
   info: '<circle cx="8" cy="8" r="5.5"/><path d="M8 7.25v3.5"/><circle cx="8" cy="5.2" r=".6" fill="currentColor" stroke="none"/>',
   stop: '<rect x="4.5" y="4.5" width="7" height="7" rx="1.5"/>',
+  /* a page of Tiger's own, a new tab */
+  page: '<rect x="2.75" y="3.25" width="10.5" height="9.5" rx="2"/><path d="M2.75 6.25h10.5"/>',
   /* this Mac */
   laptop: '<rect x="3.25" y="3.5" width="9.5" height="6.75" rx="1.5"/><path d="M1.75 12.5h12.5"/>',
   /* attached to the next question only: a miniature of the dashed page frame */

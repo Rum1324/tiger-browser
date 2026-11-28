@@ -1,6 +1,6 @@
 /* Regenerates the webfont subsets used by the mock.
 
-   node prototype/fonts/fetch-fonts.cjs
+   node design/final/prototype/fonts/fetch-fonts.cjs
 
    Collects every character that appears in the prototype sources, asks the Google Fonts
    CSS API for subsets containing exactly those characters (text= parameter), downloads the

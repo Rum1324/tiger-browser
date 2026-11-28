@@ -434,7 +434,7 @@
 .m-bars i:nth-child(2) { background: var(--mock-teal); }
 .m-bars i:nth-child(3) { background: var(--mock-yellow); }
 .m-sheet p, .m-sheet li, .m-news-body p, .md-text { word-break: auto-phrase; line-break: strict; }
-.m-edit { background: var(--mock-blue-wash); box-shadow: 0 2px 0 var(--mock-blue); }
+.m-edit { background: var(--mock-blue-wash); }
 
 .m-news-bar { background: var(--mock-teal); color: var(--mock-white); border-bottom: 0; }
 .m-news-brand { color: var(--mock-white); }

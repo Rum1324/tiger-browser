@@ -100,6 +100,15 @@ const ITEMS = [
   { id: "plan", title: "事業計画 2027–2029", type: "google-doc", host: "docs.google.com", by: "saeki", at: "10/27 09:15", v: 2 },
 ];
 
+/* プロダクト: a second Space with another hue and another owner */
+const PRODUCT_ITEMS = [
+  { id: "p-spec", title: "請求ソフト連携 仕様", type: "notion", host: "notion.so", by: "mori", at: "今日 11:02", v: 4 },
+  { id: "p-slack", title: "#product", type: "slack", host: "kotonoha.slack.com", by: "kashiwagi", at: "昨日 19:10", v: 9 },
+  { id: "p-eval", title: "記録下書きの評価 10月", type: "google-sheet", host: "docs.google.com", by: "mori", at: "11/22 14:20", v: 2 },
+  { id: "p-req", title: "導入14事業所の要望一覧", type: "notion", host: "notion.so", by: "kashiwagi", at: "11/19 10:36", v: 3 },
+];
+const ALL_ITEMS = [...ITEMS, ...PRODUCT_ITEMS];
+
 /* ── atoms ── */
 const FAVS = {
   gdoc: `<path d="M3.5 2.5a1.5 1.5 0 0 1 1.5-1.5h4.5L12.5 4v9.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z" style="fill:var(--mock-blue)"/><path d="M5.75 7.5h4.5M5.75 9.75h4.5M5.75 12h3" style="stroke:var(--mock-white);stroke-width:1.1;fill:none"/>`,
@@ -119,7 +128,7 @@ const FAVS = {
 };
 function favicon(kind, size = 16) {
   if (kind === "web" || kind === "search" || kind === "key" || kind === "tab") {
-    const map = { web: "globe", search: "search", key: "key", tab: "plus" };
+    const map = { web: "globe", search: "search", key: "key", tab: "page" };
     return `<span class="fav fav--glyph">${icon(map[kind], size)}</span>`;
   }
   return `<svg class="fav" width="${size}" height="${size}" viewBox="0 0 16 16" aria-hidden="true">${FAVS[kind]}</svg>`;
@@ -157,10 +166,12 @@ function lights(inactive = false) {
 function cite(n, { gone = false } = {}) {
   return `<button class="cite${gone ? " cite--gone" : ""}" aria-label="出典${n}${gone ? "（共有を解除済み）" : ""}">${n}</button>`;
 }
-/* keeps a figure, its citation and the punctuation after it on one line (kinsoku) */
+/* a citation chip never starts a line and never loses its punctuation (kinsoku): the last two
+   characters of the figure, the chip and the punctuation after it stay together. The unit is kept
+   short so a justified line is never stretched far. */
 function fig(text, n, tail = "", opts) {
   const chip = n === "添付" ? `<span class="cite cite--attach">添付</span>` : cite(n, opts);
-  return `<span class="nb">${text}${chip}${tail}</span>`;
+  return `${text.slice(0, -2)}<span class="nb">${text.slice(-2)}${chip}${tail}</span>`;
 }
 
 /* who · version · when, set in type */
@@ -206,7 +217,7 @@ function pinTile(id, s) {
   return `<li><a class="pin${s.active === id ? " is-active" : ""}" href="#" title="${p.title}">${favicon(p.fav)}${pip}</a></li>`;
 }
 function itemRow(id, s) {
-  const it = ITEMS.find((x) => x.id === id);
+  const it = ALL_ITEMS.find((x) => x.id === id);
   const cur = s.current === id;
   return `<li><a class="item${cur ? " is-current" : ""}${s.landing === id ? " is-landing" : ""}" href="#">
     <span class="item-ico">${icon(SOURCE[it.type].icon)}</span>
@@ -321,7 +332,7 @@ function stateCluster(s) {
     case "done":
       return `<span class="st st--fresh"><span class="st-main">${seal(sp, 20)}<span class="st-label">${s.label}</span>${byline(s.by)}</span><button class="st-act st-act--quiet">${icon("undo", 14)}取り消す</button></span>`;
     case "stale":
-      return `<span class="st st--stale">${attach}<button class="st-main" aria-label="共有の状態">${seal(sp, 20, { hollow: true })}<span class="st-label">第${s.v}版を共有中</span><span class="byline">ページが共有後に更新されています</span></button>${act("新しい版を共有…", "st-act--solid")}</span>`;
+      return `<span class="st st--stale">${attach}<button class="st-main" aria-label="共有の状態">${seal(sp, 20, { hollow: true })}<span class="st-label">第${s.v}版を共有中</span>${s.attached ? "" : `<span class="byline">ページが共有後に更新されています</span>`}</button>${act("新しい版を共有…", "st-act--solid")}</span>`;
     case "elsewhere":
       return `<span class="st st--else">${attach}<button class="st-main" aria-label="共有の状態">${seal(s.other, 20)}<span class="st-label">「${SPACES[s.other].name}」で共有中</span>${byline(s.by)}</button>${act("このスペースにも共有…")}</span>`;
     case "blocked":
@@ -352,8 +363,7 @@ function toolbar(s) {
   const capsule = `
     <div class="capsule${s.focus ? " is-focus" : ""}" role="group" aria-label="このページ">
       <button class="where" aria-label="アドレスとコマンド">${s.insecure ? `<span class="url-warn">${icon("warn", 14)}保護されていない通信</span>` : ""}${where}</button>
-      <span class="capsule-rule"></span>
-      ${stateCluster(s)}
+      ${s.state ? `<span class="capsule-rule"></span>${stateCluster(s)}` : ""}
     </div>`;
   const ask =
     s.ask === false

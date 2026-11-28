@@ -246,8 +246,8 @@
   /* 柿 */
   --space-h: 38;
   --space-cs: 0.16;
-  --space-ht: 52;
-  --space-ct: 0.04;
+  --space-ht: 58;
+  --space-ct: 0.042;
 }
 [data-space="rose"] {
   /* 紅梅 */

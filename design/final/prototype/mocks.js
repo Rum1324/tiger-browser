@@ -21,7 +21,7 @@ const PITCH = {
 function mockDoc({ edited = false } = {}) {
   const market = PITCH.market.map((r) => r.slice());
   if (edited) market[1][2] = `<span class="m-edit">1,150億円</span>`;
-  const growth = edited ? `年成長率は18%と見込んでいます<span class="m-edit">（自社パイプラインの実績から推計）</span>。` : PITCH.growth;
+  const growth = edited ? "年成長率は18%と見込んでいます（自社パイプラインの実績から推計）。" : PITCH.growth;
   const tools = ["100%", "標準テキスト", "Noto Sans JP", "11"]
     .map((t) => `<span class="m-tool m-tool--text">${t}${icon("chevDown", 12)}</span>`)
     .join('<span class="m-tool-sep"></span>');
@@ -188,17 +188,23 @@ function mockNote() {
 }
 
 
+const GRID_ROWS = [
+  ["", "調達前", "シード後", "シリーズA後（想定）"],
+  ["佐伯 遥", "40.0%", "32.0%", "25.6%"],
+  ["森 拓海", "30.0%", "24.0%", "19.2%"],
+  ["小野 美咲", "15.0%", "12.0%", "9.6%"],
+  ["柏木 蓮", "15.0%", "12.0%", "9.6%"],
+  ["オプションプール", "—", "4.0%", "3.2%"],
+  ["シード投資家", "—", "16.0%", "12.8%"],
+  ["シリーズA投資家", "—", "—", "20.0%"],
+  ["合計", "100.0%", "100.0%", "100.0%"],
+  ["発行済株式数", "1,000,000", "1,250,000", "1,562,500"],
+  ["調達額", "—", "1.5億円", "6.0億円"],
+  ["プレマネー評価額", "—", "7.9億円", "24.0億円"],
+  ["ポストマネー評価額", "—", "9.4億円", "30.0億円"],
+];
 function mockGrid() {
-  const rows = [
-    ["", "調達前", "シード後", "シリーズA後（想定）"],
-    ["創業者 4名", "100.0%", "83.3%", "66.7%"],
-    ["シード投資家", "—", "16.7%", "13.3%"],
-    ["シリーズA投資家", "—", "—", "20.0%"],
-    ["発行済株式数", "1,000,000", "1,200,000", "1,500,000"],
-    ["調達額", "—", "1.5億円", "6.0億円"],
-    ["プレマネー評価額", "—", "7.5億円", "24.0億円"],
-    ["ポストマネー評価額", "—", "9.0億円", "30.0億円"],
-  ];
+  const rows = GRID_ROWS;
   const cols = ["A", "B", "C", "D", "E", "F", "G"];
   return `
   <div class="m-grid">
@@ -210,15 +216,15 @@ function mockGrid() {
       </div>
       <div class="m-doc-right"><span class="m-doc-saved">ドライブに保存しました</span><span class="m-doc-share">${icon("lock", 14)}共有</span><span class="m-doc-av">佐</span></div>
     </div>
-    <div class="m-grid-fx"><b>C3</b><span>=C6/(C6+B6*0+1000000)</span></div>
+    <div class="m-grid-fx"><b>C2</b><span>=B2*(1-C$6-C$7)</span></div>
     <table>
       <thead><tr><th style="width:44px"></th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead>
       <tbody>${rows
         .map(
           (r, i) =>
-            `<tr><th>${i + 1}</th>${r.map((c, j) => `<td class="${j ? "num" : ""}${i === 0 || j === 0 ? " is-head" : ""}${i === 2 && j === 2 ? " is-sel" : ""}">${c}</td>`).join("")}<td></td><td></td><td></td></tr>`,
+            `<tr><th>${i + 1}</th>${r.map((c, j) => `<td class="${j ? "num" : ""}${i === 0 || j === 0 ? " is-head" : ""}${i === 1 && j === 2 ? " is-sel" : ""}">${c}</td>`).join("")}<td></td><td></td><td></td></tr>`,
         )
-        .join("")}${[9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+        .join("")}${[14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
         .map((n) => `<tr><th>${n}</th>${cols.map(() => "<td></td>").join("")}</tr>`)
         .join("")}</tbody>
     </table>
@@ -247,5 +253,31 @@ function mockChat() {
       </div>
       <div class="m-chat-box">#fundraising へのメッセージ</div>
     </section>
+  </div>`;
+}
+
+
+function mockSpec() {
+  const rows = [
+    ["1回目", "30秒後", "同じ内容で再送"],
+    ["2回目", "5分後", "同じ内容で再送"],
+    ["3回目", "30分後", "再送し、失敗したら担当者に通知"],
+  ];
+  return `
+  <div class="m-note">
+    <header class="m-note-bar"><span>コトノハ</span><span class="m-note-sep">/</span><span>プロダクト</span><span class="m-note-sep">/</span><span class="is-on">請求ソフト連携 仕様</span><span class="m-note-edit">今日 森 拓海が編集</span></header>
+    <article class="m-note-body">
+      <h1>請求ソフト連携 仕様</h1>
+      <dl class="m-note-props"><dt>状態</dt><dd>レビュー中</dd><dt>担当</dt><dd>森 拓海</dd><dt>更新</dt><dd>2026年11月26日</dd></dl>
+      <h2>転記の再試行</h2>
+      <table>
+        <thead><tr><th>回</th><th>待ち時間</th><th>動作</th></tr></thead>
+        <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table>
+      <h2>失敗として扱う条件</h2>
+      <ol><li>請求ソフトが5xxを返したとき</li><li>30秒以内に応答がないとき</li><li>利用者番号が請求ソフトに存在しないとき（再試行しない）</li></ol>
+      <h2>決めていないこと</h2>
+      <ul><li>月末締めの前後だけ、間隔を短くするか</li><li>通知の宛先を事業所ごとに変えられるようにするか</li></ul>
+    </article>
   </div>`;
 }
